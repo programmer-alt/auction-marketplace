@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String
+  name      String?
+  balance   Decimal   @default(0) @db.Decimal(10, 2)
+  auctions  Auction[] @relation("SellerAuctions")
+  bids      Bid[]
+  payments  Payment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model Auction {
+  id           Int        @id @default(autoincrement())
+  title        String
+  description  String?
+  imageUrl     String?
+  startingPrice Decimal    @db.Decimal(10, 2)
+  currentPrice Decimal    @db.Decimal(10, 2)
+  sellerId     Int
+  seller       User       @relation("SellerAuctions", fields: [sellerId], references: [id])
+  winnerId     Int?
+  winner       User?      @relation("WinnerAuctions", fields: [winnerId], references: [id])
+  status       AuctionStatus @default(ACTIVE)
+  endsAt       DateTime
+  bids         Bid[]
+  payments     Payment[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([endsAt])
+}
+
+model Bid {
+  id        Int      @id @default(autoincrement())
+  auctionId Int
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@index([auctionId])
+  @@index([userId])
+}
+
+model Payment {
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auctionId       Int
+  auction         Auction        @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  amount          Decimal        @db.Decimal(10, 2)
+  stripePaymentId String?
+  status          PaymentStatus  @default(PENDING)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([auctionId])
+  @@index([stripePaymentId])
+}
+
+enum AuctionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}

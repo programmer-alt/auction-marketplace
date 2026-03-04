@@ -17,6 +17,8 @@ yarn-debug.log
 .env.development.local
 .env.test.local
 .env.production.local
+backend/.env
+frontend/.env
 
 # IDE
 .idea/
