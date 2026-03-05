@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 // Routes
 import authRouter from './routes/auth.js';
@@ -14,8 +15,13 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Prisma клиент
-export const prisma = new PrismaClient();
+// Prisma 7: Создаём адаптер для PostgreSQL
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Prisma клиент с адаптером
+export const prisma = new PrismaClient({ adapter });
 
 // Socket.io
 const io = new Server(httpServer, {
@@ -72,7 +78,7 @@ export { io };
 httpServer.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV}`);
-  
+
   // Проверка подключения к БД
   try {
     await prisma.$connect();
