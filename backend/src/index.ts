@@ -21,8 +21,9 @@ const adapter = new PrismaPg({
 });
 
 // Prisma клиент с адаптером
-export const prisma = new PrismaClient({ adapter });
-
+export const prisma = new PrismaClient().$extends({
+  driverAdapter: adapter,
+});
 // Socket.io
 const io = new Server(httpServer, {
   cors: {
@@ -52,22 +53,22 @@ app.use('/api/auth', authRouter);
 
 // Socket.io подключение
 io.on('connection', (socket) => {
-  console.log(`⚡ Client connected: ${socket.id}`);
+  console.log(`⚡ Клиент соединился: ${socket.id}`);
 
   socket.on('disconnect', () => {
-    console.log(`🔌 Client disconnected: ${socket.id}`);
+    console.log(`🔌 Клиент отключился: ${socket.id}`);
   });
 
   // Присоединиться к комнате аукциона
   socket.on('auction:join', (auctionId: number) => {
     socket.join(`auction:${auctionId}`);
-    console.log(`Client ${socket.id} joined auction:${auctionId}`);
+    console.log(`Клиент ${socket.id} присоединился к аукциону:${auctionId}`);
   });
 
   // Покинуть комнату аукциона
   socket.on('auction:leave', (auctionId: number) => {
     socket.leave(`auction:${auctionId}`);
-    console.log(`Client ${socket.id} left auction:${auctionId}`);
+    console.log(`Клиент ${socket.id} покинул аукцион:${auctionId}`);
   });
 });
 
@@ -76,24 +77,24 @@ export { io };
 
 // Запуск сервера
 httpServer.listen(PORT, async () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV}`);
+  console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
+  console.log(`📝 Окружение: ${process.env.NODE_ENV}`);
 
   // Проверка подключения к БД
   try {
     await prisma.$connect();
-    console.log('📦 Database connected');
+    console.log('📦 База данных подключена');
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error('❌ Подключение к базе данных не удалось:', error);
   }
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down...');
+  console.log('\n🛑 Завершение работы...');
   await prisma.$disconnect();
   httpServer.close(() => {
-    console.log('Server closed');
+    console.log('Сервер закрыт');
     process.exit(0);
   });
 });
