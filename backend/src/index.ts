@@ -15,12 +15,12 @@ app.use(cors({
 app.use(express.json());
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // API routes placeholder
-app.get('/api', (req, res) => {
+app.get('/api', (_req, res) => {
   res.json({ message: 'Auction Marketplace API', version: '1.0.0' });
 });
 
