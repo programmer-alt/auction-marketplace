@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 // Routes
 import authRouter from './routes/auth.js';
@@ -15,15 +16,17 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Prisma 7: Создаём адаптер для PostgreSQL
-const adapter = new PrismaPg({
+// Prisma 7: Создаём пул подключений к PostgreSQL
+const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Prisma 7: Создаём адаптер для PostgreSQL
+const adapter = new PrismaPg(pool);
+
 // Prisma клиент с адаптером
-export const prisma = new PrismaClient().$extends({
-  driverAdapter: adapter,
-});
+export const prisma = new PrismaClient({ adapter });
+
 // Socket.io
 const io = new Server(httpServer, {
   cors: {

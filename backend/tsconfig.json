@@ -2,9 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022"],
     "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
     "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
@@ -22,6 +21,6 @@
     "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
-"include": ["src/**/*", "prisma.config.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
