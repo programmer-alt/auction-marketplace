@@ -78,6 +78,22 @@ io.on('connection', (socket) => {
 // Экспорт io для использования в роутах
 export { io };
 
+// Функция корректного завершения работы
+async function shutdown() {
+  console.log('\n🛑 Завершение работы...');
+  
+  // Закрываем подключение Prisma
+  await prisma.$disconnect();
+  
+  // Закрываем пул подключений PostgreSQL
+  await pool.end();
+  
+  httpServer.close(() => {
+    console.log('✅ Все подключения закрыты');
+    process.exit(0);
+  });
+}
+
 // Запуск сервера
 httpServer.listen(PORT, async () => {
   console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
@@ -93,11 +109,5 @@ httpServer.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Завершение работы...');
-  await prisma.$disconnect();
-  httpServer.close(() => {
-    console.log('Сервер закрыт');
-    process.exit(0);
-  });
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
