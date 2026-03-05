@@ -21,8 +21,9 @@ const adapter = new PrismaPg({
 });
 
 // Prisma клиент с адаптером
-export const prisma = new PrismaClient({ adapter });
-
+export const prisma = new PrismaClient().$extends({
+  driverAdapter: adapter,
+});
 // Socket.io
 const io = new Server(httpServer, {
   cors: {
