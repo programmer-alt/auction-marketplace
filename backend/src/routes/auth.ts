@@ -9,14 +9,14 @@ const router = Router();
 
 // Схемы валидации
 const registerSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Некорректный email'),
+  password: z.string().min(6, 'Пароль должен содержать не менее 6 символов'),
   name: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Некорректный email'),
+  password: z.string().min(1, 'Пароль обязателен'),
 });
 
 // POST /api/auth/register - Регистрация
@@ -27,7 +27,7 @@ router.post('/register', async (req, res) => {
     // Проверка, существует ли пользователь
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ error: 'User already exists' });
+      res.status(400).json({ error: 'Пользователь уже существует' });
       return;
     }
 
@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
     );
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'Пользователь успешно зарегистрирован',
       user: {
         id: user.id,
         email: user.email,
@@ -64,8 +64,8 @@ router.post('/register', async (req, res) => {
       res.status(400).json({ error: error.errors });
       return;
     }
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Ошибка регистрации:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
@@ -77,14 +77,14 @@ router.post('/login', async (req, res) => {
     // Поиск пользователя
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Неверные учетные данные' });
       return;
     }
 
     // Проверка пароля
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Неверные учетные данные' });
       return;
     }
 
@@ -96,7 +96,7 @@ router.post('/login', async (req, res) => {
     );
 
     res.json({
-      message: 'Login successful',
+      message: 'Вход выполнен успешно',
       user: {
         id: user.id,
         email: user.email,
@@ -110,8 +110,8 @@ router.post('/login', async (req, res) => {
       res.status(400).json({ error: error.errors });
       return;
     }
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Ошибка входа:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
@@ -130,14 +130,14 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
     });
 
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'Пользователь не найден' });
       return;
     }
 
     res.json({ user });
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Ошибка получения пользователя:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 

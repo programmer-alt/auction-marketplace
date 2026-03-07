@@ -1,0 +1,264 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from '../index.js';
+import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import { io } from '../index.js';
+
+const router = Router();
+
+// Схемы валидации
+const createAuctionSchema = z.object({
+  title: z.string().min(1, 'Название обязательно'),
+  description: z.string().optional(),
+  imageUrl: z.string().url('Некорректный URL изображения').optional().or(z.literal('')),
+  startingPrice: z.number().positive('Начальная цена должна быть положительной'),
+  endsAt: z.string().datetime('Некорректная дата окончания'),
+});
+
+const updateAuctionSchema = z.object({
+  title: z.string().min(1, 'Название обязательно').optional(),
+  description: z.string().optional(),
+  imageUrl: z.string().url('Некорректный URL изображения').optional().or(z.literal('')).optional(),
+  startingPrice: z.number().positive('Начальная цена должна быть положительной').optional(),
+  endsAt: z.string().datetime('Некорректная дата окончания').optional(),
+});
+
+// GET /api/auctions — список аукционов с фильтрами
+router.get('/', async (req, res) => {
+  try {
+    const { status, sellerId, page = '1', limit = '20' } = req.query;
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = {};
+    if (status) where.status = status;
+    if (sellerId) where.sellerId = parseInt(sellerId as string, 10);
+
+    const auctions = await prisma.auction.findMany({
+      where,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        _count: {
+          select: { bids: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limitNum,
+    });
+
+    const total = await prisma.auction.count({ where });
+
+    res.json({
+      auctions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения списка аукционов:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// GET /api/auctions/:id — детали аукциона
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Некорректный ID аукциона' });
+      return;
+    }
+
+    const auction = await prisma.auction.findUnique({
+      where: { id },
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        bids: {
+          include: {
+            user: {
+              select: { id: true, email: true, name: true },
+            },
+          },
+          orderBy: { amount: 'desc' },
+        },
+      },
+    });
+
+    if (!auction) {
+      res.status(404).json({ error: 'Аукцион не найден' });
+      return;
+    }
+
+    res.json({ auction });
+  } catch (error) {
+    console.error('Ошибка получения аукциона:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// POST /api/auctions — создание аукциона (только авторизованный)
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { title, description, imageUrl, startingPrice, endsAt } = createAuctionSchema.parse(req.body);
+
+    const endsAtDate = new Date(endsAt);
+    if (endsAtDate <= new Date()) {
+      res.status(400).json({ error: 'Дата окончания должна быть в будущем' });
+      return;
+    }
+
+    const auction = await prisma.auction.create({
+      data: {
+        title,
+        description,
+        imageUrl: imageUrl || null,
+        startingPrice,
+        currentPrice: startingPrice,
+        sellerId: req.user!.id,
+        endsAt: endsAtDate,
+        status: 'ACTIVE',
+      },
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+      },
+    });
+
+    // Уведомление через WebSocket о новом аукционе
+    io.emit('auction:new', auction);
+
+    res.status(201).json({
+      message: 'Аукцион успешно создан',
+      auction,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors });
+      return;
+    }
+    console.error('Ошибка создания аукциона:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// PUT /api/auctions/:id — обновление аукциона (только продавец)
+router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Некорректный ID аукциона' });
+      return;
+    }
+
+    // Проверяем, существует ли аукцион и принадлежит ли пользователю
+    const existingAuction = await prisma.auction.findUnique({
+      where: { id },
+    });
+
+    if (!existingAuction) {
+      res.status(404).json({ error: 'Аукцион не найден' });
+      return;
+    }
+
+    if (existingAuction.sellerId !== req.user!.id) {
+      res.status(403).json({ error: 'Недостаточно прав для редактирования этого аукциона' });
+      return;
+    }
+
+    if (existingAuction.status !== 'ACTIVE') {
+      res.status(400).json({ error: 'Можно редактировать только активные аукционы' });
+      return;
+    }
+
+    const data = updateAuctionSchema.parse(req.body);
+    const updateData: any = { ...data };
+    if (data.endsAt) {
+      const endsAtDate = new Date(data.endsAt);
+      if (endsAtDate <= new Date()) {
+        res.status(400).json({ error: 'Дата окончания должна быть в будущем' });
+        return;
+      }
+      updateData.endsAt = endsAtDate;
+    }
+
+    const auction = await prisma.auction.update({
+      where: { id },
+      data: updateData,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+      },
+    });
+
+    // Уведомление об обновлении
+    io.to(`auction:${id}`).emit('auction:updated', auction);
+
+    res.json({
+      message: 'Аукцион успешно обновлён',
+      auction,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors });
+      return;
+    }
+    console.error('Ошибка обновления аукциона:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// DELETE /api/auctions/:id — удаление аукциона (только продавец)
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Некорректный ID аукциона' });
+      return;
+    }
+
+    const existingAuction = await prisma.auction.findUnique({
+      where: { id },
+    });
+
+    if (!existingAuction) {
+      res.status(404).json({ error: 'Аукцион не найден' });
+      return;
+    }
+
+    if (existingAuction.sellerId !== req.user!.id) {
+      res.status(403).json({ error: 'Недостаточно прав для удаления этого аукциона' });
+      return;
+    }
+
+    await prisma.auction.delete({
+      where: { id },
+    });
+
+    // Уведомление об удалении
+    io.to(`auction:${id}`).emit('auction:deleted', { id });
+
+    res.json({ message: 'Аукцион успешно удалён' });
+  } catch (error) {
+    console.error('Ошибка удаления аукциона:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+export default router;
