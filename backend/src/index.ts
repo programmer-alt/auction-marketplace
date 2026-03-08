@@ -9,6 +9,9 @@ import pg from 'pg';
 
 // Routes
 import authRouter from './routes/auth.js';
+import auctionsRouter from './routes/auctions.js';
+import bidsRouter from './routes/bids.js';
+import paymentsRouter from './routes/payments.js';
 
 dotenv.config();
 
@@ -40,6 +43,11 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:5173',
   credentials: true,
 }));
+
+// Stripe webhook requires raw body for signature verification
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+
+// Parse JSON for all other routes
 app.use(express.json());
 
 // Health check
@@ -53,6 +61,9 @@ app.get('/api', (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/auctions', auctionsRouter);
+app.use('/api/auctions', bidsRouter); // ставки находятся под /api/auctions/:auctionId/bids
+app.use('/api/payments', paymentsRouter);
 
 // Socket.io подключение
 io.on('connection', (socket) => {
