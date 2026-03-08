@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
-import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import { type AuthRequest, authMiddleware } from '../middleware/auth.js';
 import { io } from '../index.js';
 
 const router = Router();
@@ -12,6 +12,7 @@ const createAuctionSchema = z.object({
   description: z.string().optional(),
   imageUrl: z.string().url('Некорректный URL изображения').optional().or(z.literal('')),
   startingPrice: z.number().positive('Начальная цена должна быть положительной'),
+  currency: z.string().length(3, 'Валюта должна быть трёхбуквенным кодом (например, USD, RUB)').optional().default('usd'),
   endsAt: z.string().datetime('Некорректная дата окончания'),
 });
 
@@ -20,6 +21,7 @@ const updateAuctionSchema = z.object({
   description: z.string().optional(),
   imageUrl: z.string().url('Некорректный URL изображения').optional().or(z.literal('')).optional(),
   startingPrice: z.number().positive('Начальная цена должна быть положительной').optional(),
+  currency: z.string().length(3, 'Валюта должна быть трёхбуквенным кодом (например, USD, RUB)').optional(),
   endsAt: z.string().datetime('Некорректная дата окончания').optional(),
 });
 
@@ -114,7 +116,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/auctions — создание аукциона (только авторизованный)
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { title, description, imageUrl, startingPrice, endsAt } = createAuctionSchema.parse(req.body);
+    const { title, description, imageUrl, startingPrice, currency, endsAt } = createAuctionSchema.parse(req.body);
 
     const endsAtDate = new Date(endsAt);
     if (endsAtDate <= new Date()) {
@@ -129,6 +131,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
         imageUrl: imageUrl || null,
         startingPrice,
         currentPrice: startingPrice,
+        currency: currency.toLowerCase(),
         sellerId: req.user!.id,
         endsAt: endsAtDate,
         status: 'ACTIVE',
@@ -166,26 +169,6 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Проверяем, существует ли аукцион и принадлежит ли пользователю
-    const existingAuction = await prisma.auction.findUnique({
-      where: { id },
-    });
-
-    if (!existingAuction) {
-      res.status(404).json({ error: 'Аукцион не найден' });
-      return;
-    }
-
-    if (existingAuction.sellerId !== req.user!.id) {
-      res.status(403).json({ error: 'Недостаточно прав для редактирования этого аукциона' });
-      return;
-    }
-
-    if (existingAuction.status !== 'ACTIVE') {
-      res.status(400).json({ error: 'Можно редактировать только активные аукционы' });
-      return;
-    }
-
     const data = updateAuctionSchema.parse(req.body);
     const updateData: any = { ...data };
     if (data.endsAt) {
@@ -196,10 +179,40 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
       }
       updateData.endsAt = endsAtDate;
     }
+    if (data.currency) {
+      updateData.currency = data.currency.toLowerCase();
+    }
 
-    const auction = await prisma.auction.update({
-      where: { id },
+    // Perform a conditional update to avoid TOCTOU: only update if id matches, seller is the current user and status is ACTIVE
+    const result = await prisma.auction.updateMany({
+      where: { id, sellerId: req.user!.id, status: 'ACTIVE' },
       data: updateData,
+    });
+
+    if (result.count === 0) {
+      // Determine the exact reason to return the appropriate error
+      const existingAuction = await prisma.auction.findUnique({ where: { id } });
+      if (!existingAuction) {
+        res.status(404).json({ error: 'Аукцион не найден' });
+        return;
+      }
+      if (existingAuction.sellerId !== req.user!.id) {
+        res.status(403).json({ error: 'Недостаточно прав для редактирования этого аукциона' });
+        return;
+      }
+      if (existingAuction.status !== 'ACTIVE') {
+        res.status(400).json({ error: 'Можно редактировать только активные аукционы' });
+        return;
+      }
+
+      // Fallback
+      res.status(409).json({ error: 'Не удалось обновить аукцион' });
+      return;
+    }
+
+    // Fetch the updated auction with seller info
+    const auction = await prisma.auction.findUnique({
+      where: { id },
       include: {
         seller: {
           select: { id: true, email: true, name: true },
