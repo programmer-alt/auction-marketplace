@@ -32,6 +32,7 @@ model Auction {
   imageUrl     String?
   startingPrice Decimal    @db.Decimal(10, 2)
   currentPrice Decimal    @db.Decimal(10, 2)
+  currency     String     @default("usd")
   sellerId     Int
   seller       User       @relation("SellerAuctions", fields: [sellerId], references: [id])
   winnerId     Int?
@@ -68,6 +69,7 @@ model Payment {
   auctionId       Int
   auction         Auction        @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   amount          Decimal        @db.Decimal(10, 2)
+  currency        String         @default("usd")
   stripePaymentId String?
   status          PaymentStatus  @default(PENDING)
   createdAt       DateTime       @default(now())
