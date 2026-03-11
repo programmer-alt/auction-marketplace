@@ -92,14 +92,14 @@ export { io };
 // Функция корректного завершения работы
 async function shutdown() {
   console.log('\n🛑 Завершение работы...');
-  
-  // Закрываем подключение Prisma
-  await prisma.$disconnect();
-  
-  // Закрываем пул подключений PostgreSQL
-  await pool.end();
-  
-  httpServer.close(() => {
+
+  httpServer.close(async () => {
+    // Закрываем подключение Prisma
+    await prisma.$disconnect();
+
+    // Закрываем пул подключений PostgreSQL
+    await pool.end();
+
     console.log('✅ Все подключения закрыты');
     process.exit(0);
   });
@@ -121,4 +121,3 @@ httpServer.listen(PORT, async () => {
 
 // Graceful shutdown
 process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
