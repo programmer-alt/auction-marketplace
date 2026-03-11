@@ -7,6 +7,7 @@ import { io } from '../index.js';
 const router = Router();
 
 // Схемы валидации
+// Схема для создания нового аукциона
 const createAuctionSchema = z.object({
   title: z.string().min(1, 'Название обязательно'),
   description: z.string().optional(),
@@ -15,7 +16,7 @@ const createAuctionSchema = z.object({
   currency: z.string().length(3, 'Валюта должна быть трёхбуквенным кодом (например, USD, RUB)').optional().default('usd'),
   endsAt: z.string().datetime('Некорректная дата окончания'),
 });
-
+ // Схема для обновления аукциона
 const updateAuctionSchema = z.object({
   title: z.string().min(1, 'Название обязательно').optional(),
   description: z.string().optional(),
@@ -25,7 +26,7 @@ const updateAuctionSchema = z.object({
   endsAt: z.string().datetime('Некорректная дата окончания').optional(),
 });
 
-// GET /api/auctions — список аукционов с фильтрами
+// GET /api/auctions — получение списка аукционов с возможностью фильтрации по статусу и продавцу, а также пагинации
 router.get('/', async (req, res) => {
   try {
     const { status, sellerId, page = '1', limit = '20' } = req.query;
@@ -72,7 +73,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/auctions/:id — детали аукциона
+// GET /api/auctions/:id — получение подробной информации о конкретном аукционе, включая данные о продавце, победителе (если есть) и всех ставках, отсортированных по размеру
 router.get('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -113,7 +114,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/auctions — создание аукциона (только авторизованный)
+// POST /api/auctions — создание нового аукциона (доступно только авторизованным пользователям)
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { title, description, imageUrl, startingPrice, currency, endsAt } = createAuctionSchema.parse(req.body);
@@ -160,7 +161,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// PUT /api/auctions/:id — обновление аукциона (только продавец)
+// PUT /api/auctions/:id — обновление существующего аукциона (доступно только продавцу аукциона, при условии, что аукцион активен)
 router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -237,7 +238,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// DELETE /api/auctions/:id — удаление аукциона (только продавец)
+// DELETE /api/auctions/:id — удаление аукциона (доступно только продавцу)
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id, 10);
