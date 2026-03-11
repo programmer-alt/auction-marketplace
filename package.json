@@ -10,10 +10,19 @@
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "install:all": "npm install --prefix backend && npm install --prefix frontend"
   },
-  "keywords": ["auction", "marketplace", "react", "nodejs", "prisma", "stripe"],
+  "keywords": [
+    "auction",
+    "marketplace",
+    "react",
+    "nodejs",
+    "prisma",
+    "stripe"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@types/supertest": "^7.2.0",
+    "concurrently": "^8.2.2",
+    "supertest": "^7.2.2"
   }
 }
