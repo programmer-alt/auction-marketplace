@@ -8,10 +8,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
 // Routes
-import authRouter from './routes/auth.js';
-import auctionsRouter from './routes/auctions.js';
-import bidsRouter from './routes/bids.js';
-import paymentsRouter from './routes/payments.js';
+import authRouter from './routes/auth';
+import auctionsRouter from './routes/auctions';
+import bidsRouter from './routes/bids';
+import paymentsRouter from './routes/payments';
 
 dotenv.config();
 
