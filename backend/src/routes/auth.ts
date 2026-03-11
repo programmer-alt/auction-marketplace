@@ -2,8 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { prisma } from '../index.js';
-import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import { prisma } from '../index';
+import { authMiddleware, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
 

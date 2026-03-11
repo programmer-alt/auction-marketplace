@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { z } from 'zod';
-import { prisma } from '../index.js';
-import { type AuthRequest, authMiddleware } from '../middleware/auth.js';
+import { prisma } from '../index';
+import { type AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
 

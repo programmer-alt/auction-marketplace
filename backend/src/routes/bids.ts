@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
-import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
-import { io } from '../index.js';
+import { prisma } from '../index';
+import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.post('/:auctionId/bids', authMiddleware, async (req: AuthRequest, res) =>
       res.status(400).json({ error: 'Некорректный ID аукциона' });
       return;
     }
-
+    // 
     const { amount } = createBidSchema.parse(req.body);
 
     // Получаем аукцион с текущей ценой

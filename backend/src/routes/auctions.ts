@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
-import { type AuthRequest, authMiddleware } from '../middleware/auth.js';
-import { io } from '../index.js';
+import { prisma } from '../index';
+import { type AuthRequest, authMiddleware } from '../middleware/auth';
+import { io } from '../index';
 
 const router = Router();
 
@@ -144,7 +144,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       },
     });
 
-    // Уведомление через WebSocket о новом аукционе
+    // Отправка уведомления о создании нового аукциона через WebSocket всем подключённым клиентам
     io.emit('auction:new', auction);
 
     res.status(201).json({
@@ -184,14 +184,14 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
       updateData.currency = data.currency.toLowerCase();
     }
 
-    // Perform a conditional update to avoid TOCTOU: only update if id matches, seller is the current user and status is ACTIVE
+    // Условное обновление для предотвращения гонки условий (TOCTOU): обновляем только если ID совпадает, пользователь является продавцом и статус аукциона — АКТИВНЫЙ
     const result = await prisma.auction.updateMany({
       where: { id, sellerId: req.user!.id, status: 'ACTIVE' },
       data: updateData,
     });
 
     if (result.count === 0) {
-      // Determine the exact reason to return the appropriate error
+      // Определяем точную причину ошибки, чтобы вернуть соответствующее сообщение
       const existingAuction = await prisma.auction.findUnique({ where: { id } });
       if (!existingAuction) {
         res.status(404).json({ error: 'Аукцион не найден' });
@@ -211,7 +211,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Fetch the updated auction with seller info
+    // Получение обновлённого аукциона с информацией о продавце
     const auction = await prisma.auction.findUnique({
       where: { id },
       include: {
@@ -221,7 +221,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
       },
     });
 
-    // Уведомление об обновлении
+    // Отправка уведомления об обновлении через WebSocket только пользователям, подключённым к комнате данного аукциона
     io.to(`auction:${id}`).emit('auction:updated', auction);
 
     res.json({
@@ -265,7 +265,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
       where: { id },
     });
 
-    // Уведомление об удалении
+    // Отправка уведомления об удалении через WebSocket только пользователям, подключённым к комнате данного аукциона
     io.to(`auction:${id}`).emit('auction:deleted', { id });
 
     res.json({ message: 'Аукцион успешно удалён' });
