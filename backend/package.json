@@ -8,6 +8,8 @@
     "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -21,8 +23,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "7.4.2",
     "@prisma/adapter-pg": "7.4.2",
+    "@prisma/client": "7.4.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -41,9 +43,13 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.5",
     "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^2.0.5",
     "nodemon": "^3.0.2",
     "prisma": "7.4.2",
+    "supertest": "^6.3.4",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.0.5"
   }
 }
