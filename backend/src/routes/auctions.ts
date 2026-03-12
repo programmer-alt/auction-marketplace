@@ -13,7 +13,7 @@ const createAuctionSchema = z.object({
   description: z.string().optional(),
   imageUrl: z.string().url('Некорректный URL изображения').optional().or(z.literal('')),
   startingPrice: z.number().positive('Начальная цена должна быть положительной'),
-  currency: z.string().length(3, 'Валюта должна быть трёхбуквенным кодом (например, USD, RUB)').optional().default('usd'),
+  currency: z.string().length(3, 'Валюта должна быть трёхбуквенным кодом (например, USD, RUB)').optional(),
   endsAt: z.string().datetime('Некорректная дата окончания'),
 });
  // Схема для обновления аукциона
@@ -125,6 +125,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       return;
     }
 
+    // Валюта по умолчанию — usd
+    const auctionCurrency = currency ? currency.toLowerCase() : 'usd';
+
     const auction = await prisma.auction.create({
       data: {
         title,
@@ -132,7 +135,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
         imageUrl: imageUrl || null,
         startingPrice,
         currentPrice: startingPrice,
-        currency: currency.toLowerCase(),
+        currency: auctionCurrency,
         sellerId: req.user!.id,
         endsAt: endsAtDate,
         status: 'ACTIVE',
