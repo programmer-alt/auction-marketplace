@@ -18,7 +18,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       res.status(401).json({ error: 'Unauthorized: No token' });
       return;
