@@ -30,11 +30,6 @@ export interface UpdateAuctionData {
   endsAt?: string;
 }
 
-// ========================================
-// Функции (вместо класса)
-// ========================================
-
-/**
  * Получение списка аукционов
  */
 export async function getAuctions(options: GetAuctionsOptions) {

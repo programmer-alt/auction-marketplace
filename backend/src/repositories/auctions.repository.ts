@@ -1,9 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+ import { PrismaClient } from "@prisma/client";
 
-/**
- * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
- * Чистые функции для работы с аукционами
- */
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (prisma: PrismaClient, where: any, skip: number, take: number) => {
