@@ -1,9 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-/**
- * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
- * Чистые функции для работы с платежами
- */
+
 
 // Создание платежа
 export const createPayment = async (prisma: PrismaClient, data: any) => {

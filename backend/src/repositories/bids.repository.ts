@@ -1,9 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
-/**
- * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
- * Чистые функции для работы со ставками
- */
+
 
 // Создание ставки
 export const createBid = async (prisma: PrismaClient, data: any) => {
@@ -60,7 +57,7 @@ export const getBidById = async (prisma: PrismaClient, id: number) => {
 };
 
 // Удаление ставки
-export const deleteBid = async (id: number) => {
+export const deleteBid = async (prisma: PrismaClient, id: number) => {
   return await prisma.bid.delete({
     where: { id },
   });
