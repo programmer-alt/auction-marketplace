@@ -1,4 +1,4 @@
-import { prisma } from "../index.js";
+import { PrismaClient } from "@prisma/client";
 
 /**
  * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
@@ -6,7 +6,7 @@ import { prisma } from "../index.js";
  */
 
 // Создание платежа
-export const createPayment = async (data: any) => {
+export const createPayment = async (prisma: PrismaClient, data: any) => {
   return await prisma.payment.create({
     data,
     include: {
@@ -21,14 +21,14 @@ export const createPayment = async (data: any) => {
 };
 
 // Поиск платежа по stripePaymentId
-export const getPaymentByStripeId = async (stripePaymentId: string) => {
+export const getPaymentByStripeId = async (prisma: PrismaClient, stripePaymentId: string) => {
   return await prisma.payment.findFirst({
     where: { stripePaymentId },
   });
 };
 
 // Обновление платежа
-export const updatePayment = async (id: number, data: any) => {
+export const updatePayment = async (prisma: PrismaClient, id: number, data: any) => {
   return await prisma.payment.update({
     where: { id },
     data,
@@ -36,7 +36,7 @@ export const updatePayment = async (id: number, data: any) => {
 };
 
 // Получение списка платежей пользователя
-export const getPaymentsByUserId = async (
+export const getPaymentsByUserId = async (prisma: PrismaClient,
   userId: number,
   skip: number,
   take: number,
@@ -60,12 +60,12 @@ export const getPaymentsByUserId = async (
 };
 
 // Подсчет количества платежей пользователя
-export const getPaymentsCountByUserId = async (userId: number) => {
+export const getPaymentsCountByUserId = async (prisma: PrismaClient, userId: number) => {
   return await prisma.payment.count({ where: { userId } });
 };
 
 // Получение платежа по ID
-export const getPaymentById = async (id: number) => {
+export const getPaymentById = async (prisma: PrismaClient, id: number) => {
   return await prisma.payment.findUnique({
     where: { id },
     include: {
@@ -80,7 +80,7 @@ export const getPaymentById = async (id: number) => {
 };
 
 // Удаление платежа
-export const deletePayment = async (id: number) => {
+export const deletePayment = async (prisma: PrismaClient, id: number) => {
   return await prisma.payment.delete({
     where: { id },
   });

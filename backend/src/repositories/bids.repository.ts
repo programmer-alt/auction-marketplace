@@ -1,4 +1,4 @@
-import { prisma } from "../index.js";
+import { PrismaClient } from '@prisma/client';
 
 /**
  * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
@@ -6,7 +6,7 @@ import { prisma } from "../index.js";
  */
 
 // Создание ставки
-export const createBid = async (data: any) => {
+export const createBid = async (prisma: PrismaClient, data: any) => {
   return await prisma.bid.create({
     data,
     include: {
@@ -21,7 +21,7 @@ export const createBid = async (data: any) => {
 };
 
 // Получение списка ставок по аукциону
-export const getBidsByAuctionId = async (
+export const getBidsByAuctionId = async (prisma: PrismaClient,
   auctionId: number,
   skip: number,
   take: number,
@@ -40,12 +40,12 @@ export const getBidsByAuctionId = async (
 };
 
 // Подсчет количества ставок по аукциону
-export const getBidsCountByAuctionId = async (auctionId: number) => {
+export const getBidsCountByAuctionId = async (prisma: PrismaClient, auctionId: number) => {
   return await prisma.bid.count({ where: { auctionId } });
 };
 
 // Получение ставки по ID
-export const getBidById = async (id: number) => {
+export const getBidById = async (prisma: PrismaClient, id: number) => {
   return await prisma.bid.findUnique({
     where: { id },
     include: {

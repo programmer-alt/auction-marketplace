@@ -1,7 +1,7 @@
-import { prisma } from '../index.js';
+import { PrismaClient } from "@prisma/client";
 
 /**
- * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД 
+ * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
  * Чистые функции для работы с пользователями
  */
 
@@ -47,4 +47,3 @@ export const deleteUser = async (id: number) => {
     where: { id },
   });
 };
-

@@ -1,4 +1,4 @@
-import { prisma } from "../index.js";
+import { PrismaClient } from "@prisma/client";
 
 /**
  * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД
@@ -6,7 +6,7 @@ import { prisma } from "../index.js";
  */
 
 // Получение списка аукционов с пагинацией
-export const getAuctions = async (where: any, skip: number, take: number) => {
+export const getAuctions = async (prisma: PrismaClient, where: any, skip: number, take: number) => {
   return await prisma.auction.findMany({
     where,
     include: {
@@ -27,12 +27,12 @@ export const getAuctions = async (where: any, skip: number, take: number) => {
 };
 
 // Подсчет количества аукционов
-export const getAuctionsCount = async (where: any) => {
+export const getAuctionsCount = async (prisma: PrismaClient, where: any) => {
   return await prisma.auction.count({ where });
 };
 
 // Получение аукциона по ID
-export const getAuctionById = async (id: number) => {
+export const getAuctionById = async (prisma: PrismaClient, id: number) => {
   return await prisma.auction.findUnique({
     where: { id },
     include: {
@@ -55,7 +55,7 @@ export const getAuctionById = async (id: number) => {
 };
 
 // Создание нового аукциона
-export const createAuction = async (data: any) => {
+export const createAuction = async (prisma: PrismaClient, data: any) => {
   return await prisma.auction.create({
     data,
     include: {
@@ -67,7 +67,7 @@ export const createAuction = async (data: any) => {
 };
 
 // Условное обновление аукциона
-export const updateAuctionMany = async (where: any, data: any) => {
+export const updateAuctionMany = async (prisma: PrismaClient, where: any, data: any) => {
   return await prisma.auction.updateMany({
     where,
     data,
@@ -75,7 +75,7 @@ export const updateAuctionMany = async (where: any, data: any) => {
 };
 
 // Обновление аукциона по ID
-export const updateAuctionById = async (id: number, data: any) => {
+export const updateAuctionById = async (prisma: PrismaClient, id: number, data: any) => {
   return await prisma.auction.update({
     where: { id },
     data,
@@ -88,7 +88,7 @@ export const updateAuctionById = async (id: number, data: any) => {
 };
 
 // Удаление аукциона
-export const deleteAuction = async (id: number) => {
+export const deleteAuction = async (prisma: PrismaClient, id: number) => {
   return await prisma.auction.delete({
     where: { id },
   });
