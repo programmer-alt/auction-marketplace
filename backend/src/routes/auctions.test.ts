@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
-import jwt from "jsonwebtoken";
 
 // Мокаем модули ДО импорта роутеров
 vi.mock("../index.js", async () => {
@@ -34,7 +33,7 @@ vi.mock("../index.js", async () => {
 });
 
 // Мокаем auth middleware
-vi.mock("../middleware/auth.js", () => ({
+vi.mock("../middleware/auth.middleware.js", () => ({
   authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
     // Симулируем авторизованного пользователя
     req.user = { id: 1, email: "test@test.com" };
@@ -44,7 +43,7 @@ vi.mock("../middleware/auth.js", () => ({
 
 // Импортируем моканые модули
 import { prisma, io } from "../index";
-import auctionsRouter from "./auctions";
+import auctionsRouter from "./auctions.routes";
 
 // Создаём тестовое Express приложение
 const app = express();
@@ -54,13 +53,6 @@ app.use("/api/auctions", auctionsRouter);
 // Типы для моков
 const mockPrisma = prisma as any;
 const mockIo = io as any;
-
-// Генерация тестового JWT токена
-const _generateToken = (payload: object)=> {
-  return jwt.sign(payload, process.env.JWT_SECRET || "test-secret", {
-    expiresIn: "1h",
-  });
-};
 
 describe("Auctions Routes", () => {
   beforeEach(() => {
@@ -379,7 +371,7 @@ describe("Auctions Routes", () => {
 
     it("должен вернуть 401 без авторизации", async () => {
       // Переопределяем мок authMiddleware чтобы он не добавлял user
-      const { authMiddleware } = await import("../middleware/auth.js");
+      const { authMiddleware } = await import("../middleware/auth.middleware.js");
       vi.mocked(authMiddleware).mockImplementationOnce(
         async (_req: any, res: any, _next: any) => {
           res.status(401).json({ error: "Unauthorized" });

@@ -1,20 +1,21 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { BidsService } from '../services/bids.service';
-import { AuthRequest } from '../middleware/auth';
+import * as bidsService from '../services/bids.service';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-export class BidsController {
-  private bidsService: BidsService;
+// ========================================
+// Схемы валидации
+// ========================================
 
-  constructor() {
-    this.bidsService = new BidsService();
-  }
+const createBidSchema = z.object({
+  amount: z.number().positive('Сумма ставки должна быть положительной'),
+});
 
-  // Схема валидации для создания ставки
-  private createBidSchema = z.object({
-    amount: z.number().positive('Сумма ставки должна быть положительной'),
-  });
+// ========================================
+// Контроллер (объект с функциями)
+// ========================================
 
+export const bidsController = {
   // Создание ставки
   async createBid(req: AuthRequest, res: Response) {
     try {
@@ -24,9 +25,9 @@ export class BidsController {
         return;
       }
 
-      const { amount } = this.createBidSchema.parse(req.body);
+      const { amount } = createBidSchema.parse(req.body);
       const userId = req.user!.id;
-      const result = await this.bidsService.createBid(auctionId, userId, amount);
+      const result = await bidsService.createBid(auctionId, userId, amount);
       res.status(201).json({
         message: 'Ставка успешно размещена',
         bid: result.bid,
@@ -40,7 +41,7 @@ export class BidsController {
       console.error('Ошибка размещения ставки:', error);
       res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
-  }
+  },
 
   // Получение истории ставок по аукциону
   async getBidsByAuction(req: AuthRequest, res: Response) {
@@ -52,7 +53,7 @@ export class BidsController {
       }
 
       const { page = '1', limit = '50' } = req.query;
-      const result = await this.bidsService.getBidsByAuction(auctionId, {
+      const result = await bidsService.getBidsByAuction(auctionId, {
         page: parseInt(page as string, 10),
         limit: parseInt(limit as string, 10),
       });
@@ -61,5 +62,5 @@ export class BidsController {
       console.error('Ошибка получения истории ставок:', error);
       res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
-  }
-}
+  },
+};

@@ -1,46 +1,50 @@
-import { prisma } from '../index';
+import { prisma } from '../index.js';
 
-export class UsersRepository {
-  // Поиск пользователя по email
-  async findByEmail(email: string) {
-    return await prisma.user.findUnique({
-      where: { email },
-    });
-  }
+/**
+ * ✅ ФУНКЦИОНАЛЬНЫЙ ПОДХОД 
+ * Чистые функции для работы с пользователями
+ */
 
-  // Поиск пользователя по ID
-  async findById(id: number) {
-    return await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        balance: true,
-        createdAt: true,
-      },
-    });
-  }
+// Поиск пользователя по email
+export const getUserByEmail = async (email: string) => {
+  return await prisma.user.findUnique({
+    where: { email },
+  });
+};
 
-  // Создание пользователя
-  async create(data: any) {
-    return await prisma.user.create({
-      data,
-    });
-  }
+// Поиск пользователя по ID
+export const getUserById = async (id: number) => {
+  return await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      balance: true,
+      createdAt: true,
+    },
+  });
+};
 
-  // Обновление пользователя
-  async update(id: number, data: any) {
-    return await prisma.user.update({
-      where: { id },
-      data,
-    });
-  }
+// Создание пользователя
+export const createUser = async (data: any) => {
+  return await prisma.user.create({
+    data,
+  });
+};
 
-  // Удаление пользователя
-  async delete(id: number) {
-    return await prisma.user.delete({
-      where: { id },
-    });
-  }
-}
+// Обновление пользователя
+export const updateUser = async (id: number, data: any) => {
+  return await prisma.user.update({
+    where: { id },
+    data,
+  });
+};
+
+// Удаление пользователя
+export const deleteUser = async (id: number) => {
+  return await prisma.user.delete({
+    where: { id },
+  });
+};
+

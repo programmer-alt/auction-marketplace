@@ -1,17 +1,16 @@
 import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller';
+import { authController } from '../controllers/auth.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
-const authController = new AuthController();
 
 // POST /api/auth/register - Регистрация
-router.post('/register', authController.register.bind(authController));
+router.post('/register', authController.register);
 
 // POST /api/auth/login - Вход
-router.post('/login', authController.login.bind(authController));
+router.post('/login', authController.login);
 
 // GET /api/auth/me - Текущий пользователь
-router.get('/me', authMiddleware, authController.getCurrentUser.bind(authController));
+router.get('/me', authMiddleware, authController.getCurrentUser);
 
 export default router;
