@@ -1,5 +1,12 @@
-import { prisma } from '../index';
-import { io } from '../index';
+import { prisma } from "../index";
+import {
+  getAuctions as getAuctionsRepo,
+  getAuctionsCount,
+  getAuctionById as getAuctionByIdRepo,
+  createAuction as createAuctionRepo,
+  updateAuctionById as updateAuctionByIdRepo,
+  deleteAuction as deleteAuctionRepo,
+} from "../repositories/auctions.repository";
 
 // ========================================
 // Типы
@@ -30,6 +37,7 @@ export interface UpdateAuctionData {
   endsAt?: string;
 }
 
+/**
  * Получение списка аукционов
  */
 export async function getAuctions(options: GetAuctionsOptions) {
@@ -40,25 +48,9 @@ export async function getAuctions(options: GetAuctionsOptions) {
   if (status) where.status = status;
   if (sellerId) where.sellerId = sellerId;
 
-  const auctions = await prisma.auction.findMany({
-    where,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      _count: {
-        select: { bids: true },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    skip,
-    take: limit,
-  });
+  const auctions = await getAuctionsRepo(prisma, where, skip, limit);
 
-  const total = await prisma.auction.count({ where });
+  const total = await getAuctionsCount(prisma, where);
 
   return {
     auctions,
@@ -75,62 +67,35 @@ export async function getAuctions(options: GetAuctionsOptions) {
  * Получение конкретного аукциона
  */
 export async function getAuctionById(id: number) {
-  return await prisma.auction.findUnique({
-    where: { id },
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      bids: {
-        include: {
-          user: {
-            select: { id: true, email: true, name: true },
-          },
-        },
-        orderBy: { amount: 'desc' },
-      },
-    },
-  });
+  return await getAuctionByIdRepo(prisma, id);
 }
 
 /**
  * Создание нового аукциона
  */
 export async function createAuction(data: CreateAuctionData, userId: number) {
-  const { title, description, imageUrl, startingPrice, currency, endsAt } = data;
+  const { title, description, imageUrl, startingPrice, currency, endsAt } =
+    data;
 
   const endsAtDate = new Date(endsAt);
   if (endsAtDate <= new Date()) {
-    throw new Error('Дата окончания должна быть в будущем');
+    throw new Error("Дата окончания должна быть в будущем");
   }
 
   // Валюта по умолчанию — usd
-  const auctionCurrency = currency ? currency.toLowerCase() : 'usd';
+  const auctionCurrency = currency ? currency.toLowerCase() : "usd";
 
-  const auction = await prisma.auction.create({
-    data: {
-      title,
-      description,
-      imageUrl: imageUrl || null,
-      startingPrice,
-      currentPrice: startingPrice,
-      currency: auctionCurrency,
-      sellerId: userId,
-      endsAt: endsAtDate,
-      status: 'ACTIVE',
-    },
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-    },
+  const auction = await createAuctionRepo(prisma, {
+    title,
+    description,
+    imageUrl: imageUrl || null,
+    startingPrice,
+    currentPrice: startingPrice,
+    currency: auctionCurrency,
+    sellerId: userId,
+    endsAt: endsAtDate,
+    status: "ACTIVE",
   });
-
-  // Отправка уведомления о создании нового аукциона через WebSocket всем подключённым клиентам
-  io.emit('auction:new', auction);
 
   return auction;
 }
@@ -138,12 +103,16 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
 /**
  * Обновление аукциона
  */
-export async function updateAuction(id: number, data: UpdateAuctionData, userId: number) {
+export async function updateAuction(
+  id: number,
+  data: UpdateAuctionData,
+  userId: number,
+) {
   const updateData: any = { ...data };
   if (data.endsAt) {
     const endsAtDate = new Date(data.endsAt);
     if (endsAtDate <= new Date()) {
-      throw new Error('Дата окончания должна быть в будущем');
+      throw new Error("Дата окончания должна быть в будущем");
     }
     updateData.endsAt = endsAtDate;
   }
@@ -151,39 +120,19 @@ export async function updateAuction(id: number, data: UpdateAuctionData, userId:
     updateData.currency = data.currency.toLowerCase();
   }
 
-  // Условное обновление для предотвращения гонки условий (TOCTOU)
-  const result = await prisma.auction.updateMany({
-    where: { id, sellerId: userId, status: 'ACTIVE' },
-    data: updateData,
-  });
-
-  if (result.count === 0) {
-    // Определяем точную причину ошибки
-    const existingAuction = await prisma.auction.findUnique({ where: { id } });
-    if (!existingAuction) {
-      throw new Error('Аукцион не найден');
-    }
-    if (existingAuction.sellerId !== userId) {
-      throw new Error('Недостаточно прав для редактирования этого аукциона');
-    }
-    if (existingAuction.status !== 'ACTIVE') {
-      throw new Error('Можно редактировать только активные аукционы');
-    }
-    throw new Error('Не удалось обновить аукцион');
+  // Проверяем, существует ли аукцион и принадлежит ли он пользователю
+  const existingAuction = await getAuctionByIdRepo(prisma, id);
+  if (!existingAuction) {
+    throw new Error("Аукцион не найден");
+  }
+  if (existingAuction.sellerId !== userId) {
+    throw new Error("Недостаточно прав для редактирования этого аукциона");
+  }
+  if (existingAuction.status !== "ACTIVE") {
+    throw new Error("Можно редактировать только активные аукционы");
   }
 
-  // Получение обновлённого аукциона
-  const auction = await prisma.auction.findUnique({
-    where: { id },
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-    },
-  });
-
-  // Отправка уведомления об обновлении через WebSocket
-  io.to(`auction:${id}`).emit('auction:updated', auction);
+  const auction = await updateAuctionByIdRepo(prisma, id, updateData);
 
   return auction;
 }
@@ -192,22 +141,15 @@ export async function updateAuction(id: number, data: UpdateAuctionData, userId:
  * Удаление аукциона
  */
 export async function deleteAuction(id: number, userId: number) {
-  const existingAuction = await prisma.auction.findUnique({
-    where: { id },
-  });
+  const existingAuction = await getAuctionByIdRepo(prisma, id);
 
   if (!existingAuction) {
-    throw new Error('Аукцион не найден');
+    throw new Error("Аукцион не найден");
   }
 
   if (existingAuction.sellerId !== userId) {
-    throw new Error('Недостаточно прав для удаления этого аукциона');
+    throw new Error("Недостаточно прав для удаления этого аукциона");
   }
 
-  await prisma.auction.delete({
-    where: { id },
-  });
-
-  // Отправка уведомления об удалении через WebSocket
-  io.to(`auction:${id}`).emit('auction:deleted', { id });
+  await deleteAuctionRepo(prisma, id);
 }

@@ -1,5 +1,10 @@
-import { prisma } from '../index';
-import { io } from '../index';
+import { prisma } from "../index";
+import { io } from "../index";
+import {
+  createBid as createBidRepo,
+  getBidsByAuctionId as getBidsByAuctionIdRepo,
+  getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
+} from "../repositories/bids.repository";
 
 // ========================================
 // Типы
@@ -25,11 +30,14 @@ export interface GetBidsResult {
   };
 }
 
-
 /**
  * Создание ставки
  */
-export async function createBid(auctionId: number, userId: number, amount: number): Promise<CreateBidResult> {
+export async function createBid(
+  auctionId: number,
+  userId: number,
+  amount: number,
+): Promise<CreateBidResult> {
   // Получаем аукцион с текущей ценой
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -40,31 +48,31 @@ export async function createBid(auctionId: number, userId: number, amount: numbe
   });
 
   if (!auction) {
-    throw new Error('Аукцион не найден');
+    throw new Error("Аукцион не найден");
   }
 
   // Проверка статуса аукциона
-  if (auction.status !== 'ACTIVE') {
-    throw new Error('Аукцион не активен');
+  if (auction.status !== "ACTIVE") {
+    throw new Error("Аукцион не активен");
   }
 
   // Проверка, что аукцион ещё не завершился
   if (auction.endsAt < new Date()) {
-    throw new Error('Аукцион уже завершён');
+    throw new Error("Аукцион уже завершён");
   }
 
   // Проверка, что ставка выше текущей цены
   if (amount <= auction.currentPrice.toNumber()) {
-    throw new Error('Ставка должна быть выше текущей цены');
+    throw new Error("Ставка должна быть выше текущей цены");
   }
 
   // Проверка, что пользователь не является продавцом
   if (auction.sellerId === userId) {
-    throw new Error('Вы не можете делать ставки на свои аукционы');
+    throw new Error("Вы не можете делать ставки на свои аукционы");
   }
 
   // Создание ставки
-  const bid = await prisma.bid.create({
+  const bid = await createBidRepo(prisma, {
     data: {
       auctionId,
       userId,
@@ -95,7 +103,7 @@ export async function createBid(auctionId: number, userId: number, amount: numbe
   });
 
   // Уведомление через WebSocket о новой ставке
-  io.to(`auction:${auctionId}`).emit('bid:new', {
+  io.to(`auction:${auctionId}`).emit("bid:new", {
     bid,
     auction: updatedAuction,
   });
@@ -109,7 +117,10 @@ export async function createBid(auctionId: number, userId: number, amount: numbe
 /**
  * Получение истории ставок по аукциону
  */
-export async function getBidsByAuction(auctionId: number, options: GetBidsOptions): Promise<GetBidsResult> {
+export async function getBidsByAuction(
+  auctionId: number,
+  options: GetBidsOptions,
+): Promise<GetBidsResult> {
   const { page, limit } = options;
   const skip = (page - 1) * limit;
 
@@ -120,22 +131,12 @@ export async function getBidsByAuction(auctionId: number, options: GetBidsOption
   });
 
   if (!auctionExists) {
-    throw new Error('Аукцион не найден');
+    throw new Error("Аукцион не найден");
   }
 
-  const bids = await prisma.bid.findMany({
-    where: { auctionId },
-    include: {
-      user: {
-        select: { id: true, email: true, name: true },
-      },
-    },
-    orderBy: { amount: 'desc' },
-    skip,
-    take: limit,
-  });
+  const bids = await getBidsByAuctionIdRepo(prisma, auctionId, skip, limit);
 
-  const total = await prisma.bid.count({ where: { auctionId } });
+  const total = await getBidsCountByAuctionIdRepo(prisma, auctionId);
 
   return {
     bids,

@@ -10,6 +10,8 @@ yarn-debug.log
 /build
 /out
 /.next
+# Distribution
+/dist/*
 
 # Environment variables
 .env.local

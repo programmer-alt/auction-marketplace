@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-
+import { PrismaClient } from "@prisma/client";
 
 // Создание ставки
 export const createBid = async (prisma: PrismaClient, data: any) => {
@@ -18,7 +16,8 @@ export const createBid = async (prisma: PrismaClient, data: any) => {
 };
 
 // Получение списка ставок по аукциону
-export const getBidsByAuctionId = async (prisma: PrismaClient,
+export const getBidsByAuctionId = async (
+  prisma: PrismaClient,
   auctionId: number,
   skip: number,
   take: number,
@@ -37,7 +36,10 @@ export const getBidsByAuctionId = async (prisma: PrismaClient,
 };
 
 // Подсчет количества ставок по аукциону
-export const getBidsCountByAuctionId = async (prisma: PrismaClient, auctionId: number) => {
+export const getBidsCountByAuctionId = async (
+  prisma: PrismaClient,
+  auctionId: number,
+) => {
   return await prisma.bid.count({ where: { auctionId } });
 };
 

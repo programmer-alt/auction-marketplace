@@ -1,6 +1,11 @@
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../index';
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { prisma } from "../index";
+import {
+  getUserByEmail,
+  createUser,
+  getUserById,
+} from "../repositories/users.repository";
 
 // ========================================
 // Типы
@@ -27,34 +32,31 @@ export interface AuthResult {
   token: string;
 }
 
-
 /**
  * Регистрация пользователя
  */
 export async function register(email: string, password: string, name?: string) {
   // Проверка, существует ли пользователь
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    throw new Error('Пользователь уже существует');
+    throw new Error("Пользователь уже существует");
   }
 
   // Хеширование пароля
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // Создание пользователя
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      name,
-    },
+  const user = await createUser(prisma, {
+    email,
+    password: hashedPassword,
+    name,
   });
 
   // Генерация JWT токена
   const token = jwt.sign(
     { id: user.id, email: user.email },
     process.env.JWT_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn: "7d" },
   );
 
   return {
@@ -72,22 +74,22 @@ export async function register(email: string, password: string, name?: string) {
  */
 export async function login(email: string, password: string) {
   // Поиск пользователя
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await getUserByEmail(prisma, email);
   if (!user) {
-    throw new Error('Неверные учетные данные');
+    throw new Error("Неверные учетные данные");
   }
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
-    throw new Error('Неверные учетные данные');
+    throw new Error("Неверные учетные данные");
   }
 
   // Генерация JWT токена
   const token = jwt.sign(
     { id: user.id, email: user.email },
     process.env.JWT_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn: "7d" },
   );
 
   return {
@@ -105,14 +107,5 @@ export async function login(email: string, password: string) {
  * Получение текущего пользователя
  */
 export async function getCurrentUser(userId: number) {
-  return await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      balance: true,
-      createdAt: true,
-    },
-  });
+  return await getUserById(prisma, userId);
 }

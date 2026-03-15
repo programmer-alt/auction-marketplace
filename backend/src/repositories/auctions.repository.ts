@@ -1,8 +1,12 @@
- import { PrismaClient } from "@prisma/client";
-
+import { PrismaClient } from "@prisma/client";
 
 // Получение списка аукционов с пагинацией
-export const getAuctions = async (prisma: PrismaClient, where: any, skip: number, take: number) => {
+export const getAuctions = async (
+  prisma: PrismaClient,
+  where: any,
+  skip: number,
+  take: number,
+) => {
   return await prisma.auction.findMany({
     where,
     include: {
@@ -63,7 +67,11 @@ export const createAuction = async (prisma: PrismaClient, data: any) => {
 };
 
 // Условное обновление аукциона
-export const updateAuctionMany = async (prisma: PrismaClient, where: any, data: any) => {
+export const updateAuctionMany = async (
+  prisma: PrismaClient,
+  where: any,
+  data: any,
+) => {
   return await prisma.auction.updateMany({
     where,
     data,
@@ -71,7 +79,11 @@ export const updateAuctionMany = async (prisma: PrismaClient, where: any, data: 
 };
 
 // Обновление аукциона по ID
-export const updateAuctionById = async (prisma: PrismaClient, id: number, data: any) => {
+export const updateAuctionById = async (
+  prisma: PrismaClient,
+  id: number,
+  data: any,
+) => {
   return await prisma.auction.update({
     where: { id },
     data,

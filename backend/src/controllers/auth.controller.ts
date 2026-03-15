@@ -1,7 +1,7 @@
-import { Response } from 'express';
+ import { Response } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/auth.service';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { AuthRequest } from '../middleware/auth';
 
 // ========================================
 // Схемы валидации

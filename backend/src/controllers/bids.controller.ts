@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import * as bidsService from '../services/bids.service';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { AuthRequest } from '../middleware/auth';
 
 // ========================================
 // Схемы валидации

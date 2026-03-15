@@ -1,7 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-
-
 // Поиск пользователя по email
 export const getUserByEmail = async (prisma: PrismaClient, email: string) => {
   return await prisma.user.findUnique({
@@ -31,7 +29,11 @@ export const createUser = async (prisma: PrismaClient, data: any) => {
 };
 
 // Обновление пользователя
-export const updateUser = async (prisma: PrismaClient, id: number, data: any) => {
+export const updateUser = async (
+  prisma: PrismaClient,
+  id: number,
+  data: any,
+) => {
   return await prisma.user.update({
     where: { id },
     data,

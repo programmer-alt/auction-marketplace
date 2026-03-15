@@ -33,7 +33,7 @@ vi.mock("../index.js", async () => {
 });
 
 // Мокаем auth middleware
-vi.mock("../middleware/auth.middleware.js", () => ({
+vi.mock("../middleware/auth.js", () => ({
   authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
     // Симулируем авторизованного пользователя
     req.user = { id: 1, email: "test@test.com" };
@@ -64,7 +64,7 @@ describe("Auctions Routes", () => {
   // ========================================
   describe("GET /api/auctions", () => {
     const futureDate = "2027-12-31T23:59:59.000Z";
-    
+
     it("должен вернуть пустой массив, если аукционов нет", async () => {
       mockPrisma.auction.findMany.mockResolvedValue([]);
       mockPrisma.auction.count.mockResolvedValue(0);
@@ -244,7 +244,7 @@ describe("Auctions Routes", () => {
   describe("POST /api/auctions", () => {
     // Дата в будущем (сейчас март 2026)
     const futureDate = "2027-12-31T23:59:59.000Z";
-    
+
     const validAuctionData = {
       title: "New Auction",
       description: "Test Description",
@@ -371,7 +371,7 @@ describe("Auctions Routes", () => {
 
     it("должен вернуть 401 без авторизации", async () => {
       // Переопределяем мок authMiddleware чтобы он не добавлял user
-      const { authMiddleware } = await import("../middleware/auth.middleware.js");
+      const { authMiddleware } = await import("../middleware/auth.js");
       vi.mocked(authMiddleware).mockImplementationOnce(
         async (_req: any, res: any, _next: any) => {
           res.status(401).json({ error: "Unauthorized" });

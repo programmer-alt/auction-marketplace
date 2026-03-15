@@ -1,12 +1,19 @@
-import Stripe from 'stripe';
-import { prisma } from '../index';
+import Stripe from "stripe";
+import { prisma } from "../index";
+import {
+  createPayment,
+  getPaymentByStripeId,
+  updatePayment,
+  getPaymentsByUserId,
+  getPaymentsCountByUserId,
+} from "../repositories/payments.repository";
 
 // ========================================
 // Инициализация Stripe
 // ========================================
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: "2023-10-16",
 });
 
 // ========================================
@@ -28,16 +35,18 @@ export interface GetPaymentHistoryResult {
   pagination: {
     page: number;
     limit: number;
-    total: number;
     totalPages: number;
+    total: number;
   };
 }
-
 
 /**
  * Создание Payment Intent
  */
-export async function createPaymentIntent(auctionId: number, userId: number): Promise<CreatePaymentIntentResult> {
+export async function createPaymentIntent(
+  auctionId: number,
+  userId: number,
+): Promise<CreatePaymentIntentResult> {
   // Проверяем аукцион
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -48,16 +57,16 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
   });
 
   if (!auction) {
-    throw new Error('Аукцион не найден');
+    throw new Error("Аукцион не найден");
   }
 
   // Проверяем, что аукцион завершён и пользователь — победитель
-  if (auction.status !== 'COMPLETED') {
-    throw new Error('Аукцион ещё не завершён');
+  if (auction.status !== "COMPLETED") {
+    throw new Error("Аукцион ещё не завершён");
   }
 
   if (auction.winnerId !== userId) {
-    throw new Error('Вы не являетесь победителем этого аукциона');
+    throw new Error("Вы не являетесь победителем этого аукциона");
   }
 
   // Проверяем, не оплачен ли уже этот аукцион
@@ -65,12 +74,12 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     where: {
       auctionId,
       userId,
-      status: 'COMPLETED',
+      status: "COMPLETED",
     },
   });
 
   if (existingPayment) {
-    throw new Error('Этот аукцион уже оплачен');
+    throw new Error("Этот аукцион уже оплачен");
   }
 
   // Сумма к оплате (текущая цена аукциона)
@@ -89,14 +98,14 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
   });
 
   // Создаём запись о платеже в БД
-  const payment = await prisma.payment.create({
+  const payment = await createPayment(prisma, {
     data: {
       userId,
       auctionId,
       amount: auction.currentPrice,
       currency,
       stripePaymentId: paymentIntent.id,
-      status: 'PENDING',
+      status: "PENDING",
     },
     include: {
       user: {
@@ -123,43 +132,37 @@ export async function handleWebhook(body: any, sig: string) {
 
   // Обрабатываем события
   switch (event.type) {
-    case 'payment_intent.succeeded': {
+    case "payment_intent.succeeded": {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const stripePaymentId = paymentIntent.id;
 
       // Находим платеж по stripePaymentId
-      const payment = await prisma.payment.findFirst({
-        where: { stripePaymentId },
-      });
+      const payment = await getPaymentByStripeId(prisma, stripePaymentId);
 
       if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'COMPLETED' },
-        });
+        await updatePayment(prisma, payment.id, { status: "COMPLETED" });
         console.log(`Платёж ${stripePaymentId} успешно завершён`);
       } else {
-        console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+        console.warn(
+          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
+        );
       }
       break;
     }
 
-    case 'payment_intent.payment_failed': {
+    case "payment_intent.payment_failed": {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const stripePaymentId = paymentIntent.id;
 
-      const payment = await prisma.payment.findFirst({
-        where: { stripePaymentId },
-      });
+      const payment = await getPaymentByStripeId(prisma, stripePaymentId);
 
       if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'FAILED' },
-        });
+        await updatePayment(prisma, payment.id, { status: "FAILED" });
         console.log(`Платёж ${stripePaymentId} не удался`);
       } else {
-        console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+        console.warn(
+          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
+        );
       }
       break;
     }
@@ -172,28 +175,16 @@ export async function handleWebhook(body: any, sig: string) {
 /**
  * Получение истории платежей пользователя
  */
-export async function getPaymentHistory(userId: number, options: GetPaymentHistoryOptions): Promise<GetPaymentHistoryResult> {
+export async function getPaymentHistory(
+  userId: number,
+  options: GetPaymentHistoryOptions,
+): Promise<GetPaymentHistoryResult> {
   const { page, limit } = options;
   const skip = (page - 1) * limit;
 
-  const payments = await prisma.payment.findMany({
-    where: { userId },
-    include: {
-      auction: {
-        select: {
-          id: true,
-          title: true,
-          imageUrl: true,
-          seller: { select: { id: true, name: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    skip,
-    take: limit,
-  });
+  const payments = await getPaymentsByUserId(prisma, userId, skip, limit);
 
-  const total = await prisma.payment.count({ where: { userId } });
+  const total = await getPaymentsCountByUserId(prisma, userId);
 
   return {
     payments,

@@ -1,7 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-
-
 // Создание платежа
 export const createPayment = async (prisma: PrismaClient, data: any) => {
   return await prisma.payment.create({
@@ -18,14 +16,21 @@ export const createPayment = async (prisma: PrismaClient, data: any) => {
 };
 
 // Поиск платежа по stripePaymentId
-export const getPaymentByStripeId = async (prisma: PrismaClient, stripePaymentId: string) => {
+export const getPaymentByStripeId = async (
+  prisma: PrismaClient,
+  stripePaymentId: string,
+) => {
   return await prisma.payment.findFirst({
     where: { stripePaymentId },
   });
 };
 
 // Обновление платежа
-export const updatePayment = async (prisma: PrismaClient, id: number, data: any) => {
+export const updatePayment = async (
+  prisma: PrismaClient,
+  id: number,
+  data: any,
+) => {
   return await prisma.payment.update({
     where: { id },
     data,
@@ -33,7 +38,8 @@ export const updatePayment = async (prisma: PrismaClient, id: number, data: any)
 };
 
 // Получение списка платежей пользователя
-export const getPaymentsByUserId = async (prisma: PrismaClient,
+export const getPaymentsByUserId = async (
+  prisma: PrismaClient,
   userId: number,
   skip: number,
   take: number,
@@ -57,7 +63,10 @@ export const getPaymentsByUserId = async (prisma: PrismaClient,
 };
 
 // Подсчет количества платежей пользователя
-export const getPaymentsCountByUserId = async (prisma: PrismaClient, userId: number) => {
+export const getPaymentsCountByUserId = async (
+  prisma: PrismaClient,
+  userId: number,
+) => {
   return await prisma.payment.count({ where: { userId } });
 };
 

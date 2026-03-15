@@ -1,9 +1,15 @@
 import jwt from "jsonwebtoken";
 
 // Типы
+import { Request } from 'express';
+
 export interface AuthContext {
   id: number;
   email: string;
+}
+
+export interface AuthRequest extends Request {
+  user?: AuthContext;
 }
 
 export type AuthResult =
