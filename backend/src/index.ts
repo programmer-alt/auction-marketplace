@@ -90,10 +90,17 @@ io.on('connection', (socket) => {
 export { io };
 
 // Функция корректного завершения работы
-async function shutdown() {
-  console.log('\n🛑 Завершение работы...');
+async function shutdown(signal: string) {
+  console.log(`\n🛑 Получен сигнал ${signal}. Завершение работы...`);
+
+  // Даём серверу 5 секунд на корректное закрытие
+  const shutdownTimeout = setTimeout(() => {
+    console.warn('⚠️ Принудительное завершение из-за таймаута');
+    process.exit(1);
+  }, 5000);
 
   httpServer.close(async () => {
+    clearTimeout(shutdownTimeout);
     // Закрываем подключение Prisma
     await prisma.$disconnect();
 
@@ -103,6 +110,11 @@ async function shutdown() {
     console.log('✅ Все подключения закрыты');
     process.exit(0);
   });
+
+  // Принудительно закрываем все соединения через 1 секунду
+  setTimeout(() => {
+    httpServer.closeAllConnections();
+  }, 1000);
 }
 
 // Запуск сервера
@@ -120,4 +132,5 @@ httpServer.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', shutdown);
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

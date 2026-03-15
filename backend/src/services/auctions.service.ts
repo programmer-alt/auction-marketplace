@@ -5,7 +5,6 @@ import {
   getAuctionById as getAuctionByIdRepo,
   createAuction as createAuctionRepo,
   updateAuctionById as updateAuctionByIdRepo,
-  deleteAuction as deleteAuctionRepo,
 } from "../repositories/auctions.repository";
 
 // ========================================
@@ -78,6 +77,9 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
     data;
 
   const endsAtDate = new Date(endsAt);
+  if (isNaN(endsAtDate.getTime())) {
+    throw new Error("Некорректная дата окончания");
+  }
   if (endsAtDate <= new Date()) {
     throw new Error("Дата окончания должна быть в будущем");
   }
@@ -108,16 +110,28 @@ export async function updateAuction(
   data: UpdateAuctionData,
   userId: number,
 ) {
-  const updateData: any = { ...data };
-  if (data.endsAt) {
-    const endsAtDate = new Date(data.endsAt);
+  // Разрешённые поля для обновления
+  const allowedFields = ['title', 'description', 'imageUrl', 'startingPrice', 'currency', 'endsAt'];
+  const updateData: any = {};
+  
+  for (const field of allowedFields) {
+    if (data[field as keyof UpdateAuctionData] !== undefined) {
+      updateData[field] = data[field as keyof UpdateAuctionData];
+    }
+  }
+
+  if (updateData.endsAt) {
+    const endsAtDate = new Date(updateData.endsAt);
+    if (isNaN(endsAtDate.getTime())) {
+      throw new Error("Некорректная дата окончания");
+    }
     if (endsAtDate <= new Date()) {
       throw new Error("Дата окончания должна быть в будущем");
     }
     updateData.endsAt = endsAtDate;
   }
-  if (data.currency) {
-    updateData.currency = data.currency.toLowerCase();
+  if (updateData.currency) {
+    updateData.currency = updateData.currency.toLowerCase();
   }
 
   // Проверяем, существует ли аукцион и принадлежит ли он пользователю
@@ -141,15 +155,21 @@ export async function updateAuction(
  * Удаление аукциона
  */
 export async function deleteAuction(id: number, userId: number) {
-  const existingAuction = await getAuctionByIdRepo(prisma, id);
+  // Атомарное удаление с проверкой владельца
+  const deleted = await prisma.auction.deleteMany({
+    where: {
+      id,
+      sellerId: userId,
+    },
+  });
 
-  if (!existingAuction) {
-    throw new Error("Аукцион не найден");
+  if (deleted.count === 0) {
+    // Проверяем, существует ли аукцион вообще
+    const exists = await getAuctionByIdRepo(prisma, id);
+    if (!exists) {
+      throw new Error("Аукцион не найден");
+    } else {
+      throw new Error("Недостаточно прав для удаления этого аукциона");
+    }
   }
-
-  if (existingAuction.sellerId !== userId) {
-    throw new Error("Недостаточно прав для удаления этого аукциона");
-  }
-
-  await deleteAuctionRepo(prisma, id);
 }

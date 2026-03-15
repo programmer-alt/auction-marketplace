@@ -180,6 +180,15 @@ export async function getPaymentHistory(
   options: GetPaymentHistoryOptions,
 ): Promise<GetPaymentHistoryResult> {
   const { page, limit } = options;
+  
+  // Валидация параметров пагинации
+  if (limit <= 0 || !Number.isInteger(limit)) {
+    throw new Error("Limit must be a positive integer");
+  }
+  if (page < 1 || !Number.isInteger(page)) {
+    throw new Error("Page must be a positive integer");
+  }
+  
   const skip = (page - 1) * limit;
 
   const payments = await getPaymentsByUserId(prisma, userId, skip, limit);

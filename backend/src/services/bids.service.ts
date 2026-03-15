@@ -1,7 +1,6 @@
 import { prisma } from "../index";
 import { io } from "../index";
 import {
-  createBid as createBidRepo,
   getBidsByAuctionId as getBidsByAuctionIdRepo,
   getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
 } from "../repositories/bids.repository";
@@ -38,80 +37,63 @@ export async function createBid(
   userId: number,
   amount: number,
 ): Promise<CreateBidResult> {
-  // Получаем аукцион с текущей ценой
-  const auction = await prisma.auction.findUnique({
-    where: { id: auctionId },
-    include: {
-      seller: true,
-      winner: true,
-    },
-  });
+  try {
+    const [updatedAuction, bid] = await prisma.$transaction([
+      // Атомарное обновление аукциона с проверкой всех условий
+      prisma.auction.update({
+        where: {
+          id: auctionId,
+          status: 'ACTIVE',
+          endsAt: { gt: new Date() },
+          currentPrice: { lt: amount },
+          sellerId: { not: userId },
+        },
+        data: { currentPrice: amount },
+        include: {
+          seller: {
+            select: { id: true, email: true, name: true },
+          },
+          winner: {
+            select: { id: true, email: true, name: true },
+          },
+        },
+      }),
+      // Создание ставки
+      prisma.bid.create({
+        data: {
+          auctionId,
+          userId,
+          amount,
+        },
+        include: {
+          user: {
+            select: { id: true, email: true, name: true },
+          },
+          auction: {
+            select: { id: true, title: true, currentPrice: true },
+          },
+        },
+      }),
+    ]);
 
-  if (!auction) {
-    throw new Error("Аукцион не найден");
+    // Уведомление через WebSocket о новой ставке
+    io.to(`auction:${auctionId}`).emit("bid:new", {
+      bid,
+      auction: updatedAuction,
+    });
+
+    return {
+      bid,
+      auction: updatedAuction,
+    };
+  } catch (error: any) {
+    // Обработка ошибок Prisma
+    if (error.code === 'P2025') {
+      // Record not found - аукцион не удовлетворяет условиям
+      throw new Error("Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом");
+    }
+    throw error;
   }
-
-  // Проверка статуса аукциона
-  if (auction.status !== "ACTIVE") {
-    throw new Error("Аукцион не активен");
-  }
-
-  // Проверка, что аукцион ещё не завершился
-  if (auction.endsAt < new Date()) {
-    throw new Error("Аукцион уже завершён");
-  }
-
-  // Проверка, что ставка выше текущей цены
-  if (amount <= auction.currentPrice.toNumber()) {
-    throw new Error("Ставка должна быть выше текущей цены");
-  }
-
-  // Проверка, что пользователь не является продавцом
-  if (auction.sellerId === userId) {
-    throw new Error("Вы не можете делать ставки на свои аукционы");
-  }
-
-  // Создание ставки
-  const bid = await createBidRepo(prisma, {
-    data: {
-      auctionId,
-      userId,
-      amount,
-    },
-    include: {
-      user: {
-        select: { id: true, email: true, name: true },
-      },
-      auction: {
-        select: { id: true, title: true, currentPrice: true },
-      },
-    },
-  });
-
-  // Обновление текущей цены аукциона
-  const updatedAuction = await prisma.auction.update({
-    where: { id: auctionId },
-    data: { currentPrice: amount },
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-    },
-  });
-
-  // Уведомление через WebSocket о новой ставке
-  io.to(`auction:${auctionId}`).emit("bid:new", {
-    bid,
-    auction: updatedAuction,
-  });
-
-  return {
-    bid,
-    auction: updatedAuction,
-  };
 }
 
 /**

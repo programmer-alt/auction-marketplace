@@ -53,9 +53,13 @@ export async function register(email: string, password: string, name?: string) {
   });
 
   // Генерация JWT токена
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is not configured");
+  }
   const token = jwt.sign(
     { id: user.id, email: user.email },
-    process.env.JWT_SECRET!,
+    jwtSecret,
     { expiresIn: "7d" },
   );
 
@@ -86,9 +90,13 @@ export async function login(email: string, password: string) {
   }
 
   // Генерация JWT токена
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is not configured");
+  }
   const token = jwt.sign(
     { id: user.id, email: user.email },
-    process.env.JWT_SECRET!,
+    jwtSecret,
     { expiresIn: "7d" },
   );
 

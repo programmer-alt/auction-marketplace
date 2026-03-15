@@ -7,6 +7,10 @@ export const getAuctions = async (
   skip: number,
   take: number,
 ) => {
+  // Валидация параметров пагинации
+  if (skip < 0 || take < 0 || !Number.isInteger(skip) || !Number.isInteger(take)) {
+    throw new Error("Invalid pagination parameters");
+  }
   return await prisma.auction.findMany({
     where,
     include: {
@@ -84,20 +88,34 @@ export const updateAuctionById = async (
   id: number,
   data: any,
 ) => {
-  return await prisma.auction.update({
-    where: { id },
-    data,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
+  try {
+    return await prisma.auction.update({
+      where: { id },
+      data,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
       },
-    },
-  });
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      throw new Error(`Auction with id ${id} not found`);
+    }
+    throw error;
+  }
 };
 
 // Удаление аукциона
 export const deleteAuction = async (prisma: PrismaClient, id: number) => {
-  return await prisma.auction.delete({
-    where: { id },
-  });
+  try {
+    return await prisma.auction.delete({
+      where: { id },
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      throw new Error(`Auction with id ${id} not found`);
+    }
+    throw error;
+  }
 };
