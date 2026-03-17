@@ -33,6 +33,12 @@ vi.mock("../index.js", async () => {
   };
 });
 
+// Мокаем auction completion queue
+vi.mock("../queues/auctionCompletionQueue.js", () => ({
+  scheduleAuctionCompletion: vi.fn(),
+  removeScheduledAuctionCompletion: vi.fn(),
+}));
+
 // Мокаем auth middleware
 vi.mock("../middleware/auth.js", () => ({
   authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
