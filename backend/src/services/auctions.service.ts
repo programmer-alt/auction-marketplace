@@ -1,4 +1,4 @@
-import { prisma } from "../index";
+import { prisma, io } from "../index";
 import {
   getAuctions as getAuctionsRepo,
   getAuctionsCount,
@@ -99,6 +99,9 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
     status: "ACTIVE",
   });
 
+  // Уведомление через WebSocket о новом аукционе
+  io.emit("auction:new", auction);
+
   return auction;
 }
 
@@ -148,6 +151,9 @@ export async function updateAuction(
 
   const auction = await updateAuctionByIdRepo(prisma, id, updateData);
 
+  // Уведомление через WebSocket об обновлении аукциона
+  io.to(`auction:${id}`).emit("auction:updated", auction);
+
   return auction;
 }
 
@@ -172,4 +178,7 @@ export async function deleteAuction(id: number, userId: number) {
       throw new Error("Недостаточно прав для удаления этого аукциона");
     }
   }
+
+  // Уведомление через WebSocket об удалении аукциона
+  io.to(`auction:${id}`).emit("auction:deleted", { id });
 }
