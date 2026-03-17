@@ -3,9 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import Redis from 'ioredis';
 
 // Routes
 import authRouter from './routes/auth.routes';
@@ -30,12 +32,21 @@ const adapter = new PrismaPg(pool);
 // Prisma клиент с адаптером
 export const prisma = new PrismaClient({ adapter });
 
-// Socket.io
+// Redis клиент для адаптера
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const pubClient = new Redis(redisUrl);
+const subClient = pubClient.duplicate();
+
+pubClient.on('error', (err) => console.error('Redis pub client error:', err));
+subClient.on('error', (err) => console.error('Redis sub client error:', err));
+
+// Socket.io с Redis адаптером
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
   },
+  adapter: createAdapter(pubClient, subClient),
 });
 
 // Middleware
@@ -49,6 +60,10 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
 // Parse JSON for all other routes
 app.use(express.json());
+
+// Rate limiting middleware (применяется ко всем маршрутам, кроме health)
+import { rateLimit } from './middleware/rateLimit';
+app.use(rateLimit);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -107,6 +122,15 @@ async function shutdown(signal: string) {
     // Закрываем пул подключений PostgreSQL
     await pool.end();
 
+    // Закрываем Redis клиенты
+    try {
+      await pubClient.quit();
+      await subClient.quit();
+      console.log('✅ Redis подключения закрыты');
+    } catch (error) {
+      console.warn('⚠️ Не удалось корректно закрыть Redis подключения:', error);
+    }
+
     console.log('✅ Все подключения закрыты');
     process.exit(0);
   });
@@ -129,6 +153,18 @@ httpServer.listen(PORT, async () => {
   } catch (error) {
     console.error('❌ Подключение к базе данных не удалось:', error);
   }
+
+  // Проверка подключения к Redis
+  try {
+    await pubClient.ping();
+    console.log('🔗 Redis подключен (облачный)');
+  } catch (error) {
+    console.error('❌ Подключение к Redis не удалось:', error);
+  }
+
+  // Планирование завершения существующих активных аукционов
+  const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
+  await scheduleExistingAuctions();
 });
 
 // Graceful shutdown

@@ -6,6 +6,10 @@ import {
   createAuction as createAuctionRepo,
   updateAuctionById as updateAuctionByIdRepo,
 } from "../repositories/auctions.repository";
+import {
+  scheduleAuctionCompletion,
+  removeScheduledAuctionCompletion,
+} from "../queues/auctionCompletionQueue";
 
 // ========================================
 // Типы
@@ -102,6 +106,9 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
   // Уведомление через WebSocket о новом аукционе
   io.emit("auction:new", auction);
 
+  // Планирование завершения аукциона по времени
+  scheduleAuctionCompletion(auction.id, endsAtDate);
+
   return auction;
 }
 
@@ -132,6 +139,10 @@ export async function updateAuction(
       throw new Error("Дата окончания должна быть в будущем");
     }
     updateData.endsAt = endsAtDate;
+
+    // Обновляем запланированное завершение аукциона
+    await removeScheduledAuctionCompletion(id);
+    scheduleAuctionCompletion(id, endsAtDate);
   }
   if (updateData.currency) {
     updateData.currency = updateData.currency.toLowerCase();
@@ -161,6 +172,9 @@ export async function updateAuction(
  * Удаление аукциона
  */
 export async function deleteAuction(id: number, userId: number) {
+  // Удаляем запланированное завершение аукциона
+  await removeScheduledAuctionCompletion(id);
+
   // Атомарное удаление с проверкой владельца
   const deleted = await prisma.auction.deleteMany({
     where: {
