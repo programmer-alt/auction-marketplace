@@ -2,7 +2,7 @@
 
 **Дата начала:** 4 марта 2026  
 **Срок:** 2 месяца  
-**Статус:** Не начат
+
 
 ---
 
@@ -24,18 +24,7 @@
 - [ ] Настроить `tsconfig.json`
 - [ ] Создать `.env` файл с переменными окружения
 
-### 1.3. Frontend: Базовая настройка
-- [ ] Создать папку `frontend/`
-- [ ] Инициализировать Vite + React проект:
-  ```bash
-  npm create vite@latest . -- --template react-ts
-  ```
-- [ ] Установить зависимости:
-  ```bash
-  npm install react-router-dom axios socket.io-client zod @hookform/resolvers zod
-  npm install -D tailwindcss postcss autoprefixer
-  ```
-- [ ] Настроить Tailwind CSS (`npx tailwindcss init -p`)
+### 1.3. Frontend: Базовая настройка\n- [ ] Создать папку `frontend/`\n- [ ] Инициализировать Next.js + React проект:\n  ```bash\n  npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\"\n  ```\n- [ ] Установить дополнительные зависимости:\n  ```bash\n  npm i @tanstack/react-query axios socket.io-client zod @hookform/resolvers react-hook-form lucide-react\n  ```\n- [ ] Настроить Tailwind CSS (уже включен)
 
 ### 1.4. База данных
 - [ ] Установить PostgreSQL (если не установлен)
@@ -126,6 +115,13 @@
   - `auction:ended` — аукцион завершён
   - `auction:updated` — обновление аукциона
 
+### 3.7. Redis Integration
+- [ ] Установить и настроить Redis клиент (`ioredis` или `redis`)
+- [ ] Настроить Socket.io адаптер Redis для масштабирования
+- [ ] Реализовать кэширование часто запрашиваемых данных (список аукционов)
+- [ ] Настроить очередь задач (Bull) для отложенных операций (завершение аукционов, отправка email)
+- [ ] Добавить rate limiting middleware с использованием Redis
+
 ---
 
 ## Этап 4: Frontend — Основной интерфейс (Дни 15-28)
@@ -142,16 +138,7 @@
   └── utils/
   ```
 
-### 4.2. Настройка роутинга
-- [ ] Настроить React Router
-- [ ] Создать страницы:
-  - `HomePage` — список аукционов
-  - `LoginPage` — вход
-  - `RegisterPage` — регистрация
-  - `AuctionDetailPage` — детали аукциона
-  - `CreateAuctionPage` — создание лота
-  - `ProfilePage` — профиль пользователя
-  - `PaymentsHistoryPage` — история платежей
+### 4.2. Настройка роутинга\n- [ ] Настроить Next.js App Router (`src/app/`)\n- [ ] Создать страницы в `src/app/`:\n  - `page.tsx` — главная (список аукционов)\n  - `auctions/[id]/page.tsx` — детали аукциона\n  - `auctions/new/page.tsx` — создание лота\n  - `profile/page.tsx` — профиль\n  - `login/page.tsx` — вход\n  - `register/page.tsx` — регистрация\n  - `payments/page.tsx` — история платежей\n- [ ] Добавить `layout.tsx` с QueryClientProvider
 
 ### 4.3. Компоненты
 - [ ] Создать базовые компоненты:
@@ -205,6 +192,7 @@
 ### 5.1. WebSocket клиент
 - [ ] Настроить Socket.io клиент в `services/socket.ts`
 - [ ] Подключение к WebSocket серверу
+- [ ] Убедиться, что клиент поддерживает Redis адаптер (для масштабирования)
 - [ ] Слушать события:
   - `bid:new` — обновление списка ставок
   - `auction:ended` — уведомление о завершении
@@ -286,6 +274,7 @@
 | История транзакций | ⬜ |
 | Профиль пользователя | ⬜ |
 | Архитектура проекта реализована с использованием функционального подхода | ✅ |
+| Redis интеграция (кэш, очереди, адаптер) | ⬜ |
 
 ---
 
