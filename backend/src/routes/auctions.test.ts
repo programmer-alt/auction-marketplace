@@ -12,6 +12,7 @@ vi.mock("../index.js", async () => {
       updateMany: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       count: vi.fn(),
     },
     user: {
@@ -414,9 +415,17 @@ describe("Auctions Routes", () => {
   // ========================================
   describe("PUT /api/auctions/:id", () => {
     it("должен обновить аукцион", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.auction.update.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        title: "Updated Title",
+        seller: { id: 1, email: "test@test.com", name: null },
+      });
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
         title: "Updated Title",
         seller: { id: 1, email: "test@test.com", name: null },
       });
@@ -498,9 +507,17 @@ describe("Auctions Routes", () => {
     });
 
     it("должен отправить WebSocket уведомление при обновлении", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.auction.update.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        title: "Updated",
+        seller: { id: 1, email: "test@test.com", name: null },
+      });
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
         title: "Updated",
         seller: { id: 1, email: "test@test.com", name: null },
       });
@@ -524,19 +541,20 @@ describe("Auctions Routes", () => {
         id: 1,
         sellerId: 1,
       });
-      mockPrisma.auction.delete.mockResolvedValue({ id: 1 });
+      mockPrisma.auction.deleteMany.mockResolvedValue({ count: 1 });
 
       const response = await request(app).delete("/api/auctions/1");
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Аукцион успешно удалён");
-      expect(mockPrisma.auction.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(mockPrisma.auction.deleteMany).toHaveBeenCalledWith({
+        where: { id: 1, sellerId: 1 },
       });
     });
 
     it("должен вернуть 404, если аукцион не найден", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue(null);
+      mockPrisma.auction.deleteMany.mockResolvedValue({ count: 0 });
 
       const response = await request(app).delete("/api/auctions/999");
 
@@ -549,6 +567,7 @@ describe("Auctions Routes", () => {
         id: 1,
         sellerId: 2, // Другой пользователь
       });
+      mockPrisma.auction.deleteMany.mockResolvedValue({ count: 0 });
 
       const response = await request(app).delete("/api/auctions/1");
 
@@ -570,7 +589,7 @@ describe("Auctions Routes", () => {
         id: 1,
         sellerId: 1,
       });
-      mockPrisma.auction.delete.mockResolvedValue({ id: 1 });
+      mockPrisma.auction.deleteMany.mockResolvedValue({ count: 1 });
 
       await request(app).delete("/api/auctions/1");
 
