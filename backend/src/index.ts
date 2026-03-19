@@ -7,7 +7,6 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
-import Redis from 'ioredis';
 import { rateLimit } from './middleware/rateLimit';
 
 // Routes
@@ -33,12 +32,10 @@ const adapter = new PrismaPg(pool);
 // Prisma клиент с адаптером
 export const prisma = new PrismaClient({ adapter });
 
-// Redis клиент для адаптера
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-const pubClient = new Redis(redisUrl);
+// Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
+import { redis as pubClient } from './redis';
 const subClient = pubClient.duplicate();
 
-pubClient.on('error', (err) => console.error('Redis pub client error:', err));
 subClient.on('error', (err) => console.error('Redis sub client error:', err));
 
 // Socket.io с Redis адаптером
@@ -119,8 +116,8 @@ async function shutdown(signal: string) {
     clearTimeout(shutdownTimeout);
     // Закрываем Redis клиенты
     try {
-      await pubClient.quit();
       await subClient.quit();
+      await pubClient.quit(); // общий redis из redis.ts
       console.log('✅ Redis подключения закрыты');
     } catch (error) {
       console.warn('⚠️ Не удалось корректно закрыть Redis подключения:', error);
