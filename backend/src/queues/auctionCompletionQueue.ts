@@ -3,10 +3,7 @@ import { prisma } from '../index';
 import { io } from '../index';
 
 export const auctionCompletionQueue = new Queue('auctionCompletion', {
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-  },
+  redis: process.env.REDIS_URL || 'redis://localhost:6379',
   defaultJobOptions: {
     attempts: 3,
     backoff: {
