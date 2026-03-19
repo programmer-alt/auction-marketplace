@@ -10,6 +10,125 @@ import {
   scheduleAuctionCompletion,
   removeScheduledAuctionCompletion,
 } from "../queues/auctionCompletionQueue";
+import { redis } from "../redis";
+
+// ========================================
+// Безопасный парсинг JSON с валидацией
+// ========================================
+
+/**
+ * Безопасно парсит JSON строку с ограничением глубины и обработкой ошибок.
+ * @param text JSON строка
+ * @param maxDepth Максимальная допустимая глубина (по умолчанию 20)
+ * @returns Распарсенный объект или null при ошибке
+ */
+function safeJsonParse<T = any>(text: string, maxDepth = 20): T | null {
+  if (typeof text !== "string") {
+    return null;
+  }
+
+  // Проверка на чрезмерно длинную строку (защита от DoS)
+  if (text.length > 10_000_000) {
+    console.warn("JSON string too long, rejecting");
+    return null;
+  }
+
+  let depth = 0;
+  const reviver = (key: string, value: any) => {
+    // Отслеживание глубины
+    if (typeof value === "object" && value !== null) {
+      depth++;
+      if (depth > maxDepth) {
+        throw new Error("Максимум глубина аукциона превышена");
+      }
+    }
+    // Защита от прототипного загрязнения: отклоняем свойства __proto__ и constructor
+    if (key === "__proto__" || key === "constructor") {
+      return undefined;
+    }
+    return value;
+  };
+
+  try {
+    depth = 0;
+    return JSON.parse(text, reviver);
+  } catch (err) {
+    console.warn("Failed to parse JSON from cache:", err);
+    return null;
+  }
+}
+
+/**
+ * Валидирует объект аукциона (базовые проверки).
+ * @param obj Объект для проверки
+ * @returns true если объект похож на аукцион
+ */
+function validateAuction(obj: any): boolean {
+  if (!obj || typeof obj !== "object") {
+    return false;
+  }
+  // Проверяем наличие обязательных полей аукциона
+  if (
+    typeof obj.id !== "number" ||
+    typeof obj.title !== "string" ||
+    typeof obj.startingPrice !== "number" ||
+    typeof obj.sellerId !== "number" ||
+    !obj.createdAt ||
+    !obj.endsAt
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Валидирует структуру кэшированного списка аукционов.
+ * @param obj Объект для проверки
+ * @returns true если структура корректна
+ */
+function validateAuctionsList(obj: any): boolean {
+  if (!obj || typeof obj !== "object") {
+    return false;
+  }
+  if (!Array.isArray(obj.auctions) || typeof obj.pagination !== "object") {
+    return false;
+  }
+  const { pagination } = obj;
+  if (
+    typeof pagination.page !== "number" ||
+    typeof pagination.limit !== "number" ||
+    typeof pagination.total !== "number" ||
+    typeof pagination.totalPages !== "number"
+  ) {
+    return false;
+  }
+  // Дополнительно можно проверить каждый аукцион в массиве, но для производительности пропустим
+  return true;
+}
+
+// ========================================
+// Константы кэширования
+// ========================================
+const CACHE_TTL_SECONDS = 60; // 1 минута
+
+// Генерация ключа для списка аукционов
+function getAuctionsCacheKey(options: GetAuctionsOptions): string {
+  const { status, sellerId, page, limit } = options;
+  return `auctions:list:${status || "all"}:${sellerId || "all"}:${page}:${limit}`;
+}
+
+// Генерация ключа для конкретного аукциона
+function getAuctionCacheKey(id: number): string {
+  return `auction:${id}`;
+}
+
+// Удаление всех кэшированных списков аукционов
+async function invalidateAuctionsLists() {
+  const keys = await redis.keys("auctions:list:*");
+  if (keys.length > 0) {
+    await redis.del(...keys);
+  }
+}
 
 // ========================================
 // Типы
@@ -44,6 +163,19 @@ export interface UpdateAuctionData {
  * Получение списка аукционов
  */
 export async function getAuctions(options: GetAuctionsOptions) {
+  const cacheKey = getAuctionsCacheKey(options);
+
+  // Пытаемся получить данные из кэша
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    const parsed = safeJsonParse(cached);
+    if (parsed && validateAuctionsList(parsed)) {
+      return parsed;
+    }
+    // Если кэш повреждён, удаляем его
+    await redis.del(cacheKey);
+  }
+
   const { status, sellerId, page, limit } = options;
   const skip = (page - 1) * limit;
 
@@ -52,10 +184,9 @@ export async function getAuctions(options: GetAuctionsOptions) {
   if (sellerId) where.sellerId = sellerId;
 
   const auctions = await getAuctionsRepo(prisma, where, skip, limit);
-
   const total = await getAuctionsCount(prisma, where);
 
-  return {
+  const result = {
     auctions,
     pagination: {
       page,
@@ -64,13 +195,38 @@ export async function getAuctions(options: GetAuctionsOptions) {
       totalPages: Math.ceil(total / limit),
     },
   };
+
+  // Сохраняем в кэш с TTL
+  await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(result));
+
+  return result;
 }
 
 /**
  * Получение конкретного аукциона
  */
 export async function getAuctionById(id: number) {
-  return await getAuctionByIdRepo(prisma, id);
+  const cacheKey = getAuctionCacheKey(id);
+
+  // Пытаемся получить данные из кэша
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    const parsed = safeJsonParse(cached);
+    if (parsed && validateAuction(parsed)) {
+      return parsed;
+    }
+    // Если кэш повреждён, удаляем его
+    await redis.del(cacheKey);
+  }
+
+  const auction = await getAuctionByIdRepo(prisma, id);
+
+  // Сохраняем в кэш только если аукцион найден
+  if (auction) {
+    await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(auction));
+  }
+
+  return auction;
 }
 
 /**
@@ -109,6 +265,9 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
   // Планирование завершения аукциона по времени
   scheduleAuctionCompletion(auction.id, endsAtDate);
 
+  // Инвалидация кэша списков аукционов
+  await invalidateAuctionsLists();
+
   return auction;
 }
 
@@ -121,9 +280,16 @@ export async function updateAuction(
   userId: number,
 ) {
   // Разрешённые поля для обновления
-  const allowedFields = ['title', 'description', 'imageUrl', 'startingPrice', 'currency', 'endsAt'];
+  const allowedFields = [
+    "title",
+    "description",
+    "imageUrl",
+    "startingPrice",
+    "currency",
+    "endsAt",
+  ];
   const updateData: any = {};
-  
+
   for (const field of allowedFields) {
     if (data[field as keyof UpdateAuctionData] !== undefined) {
       updateData[field] = data[field as keyof UpdateAuctionData];
@@ -165,6 +331,10 @@ export async function updateAuction(
   // Уведомление через WebSocket об обновлении аукциона
   io.to(`auction:${id}`).emit("auction:updated", auction);
 
+  // Инвалидация кэша
+  await redis.del(getAuctionCacheKey(id));
+  await invalidateAuctionsLists();
+
   return auction;
 }
 
@@ -195,4 +365,8 @@ export async function deleteAuction(id: number, userId: number) {
 
   // Уведомление через WebSocket об удалении аукциона
   io.to(`auction:${id}`).emit("auction:deleted", { id });
+
+  // Инвалидация кэша
+  await redis.del(getAuctionCacheKey(id));
+  await invalidateAuctionsLists();
 }
