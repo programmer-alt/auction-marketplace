@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import Redis from 'ioredis';
+import { rateLimit } from './middleware/rateLimit';
 
 // Routes
 import authRouter from './routes/auth.routes';
@@ -62,7 +63,7 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // Rate limiting middleware (применяется ко всем маршрутам, кроме health)
-import { rateLimit } from './middleware/rateLimit';
+
 app.use(rateLimit);
 
 // Health check
