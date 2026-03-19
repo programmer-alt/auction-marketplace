@@ -117,12 +117,6 @@ async function shutdown(signal: string) {
 
   httpServer.close(async () => {
     clearTimeout(shutdownTimeout);
-    // Закрываем подключение Prisma
-    await prisma.$disconnect();
-
-    // Закрываем пул подключений PostgreSQL
-    await pool.end();
-
     // Закрываем Redis клиенты
     try {
       await pubClient.quit();
@@ -130,6 +124,15 @@ async function shutdown(signal: string) {
       console.log('✅ Redis подключения закрыты');
     } catch (error) {
       console.warn('⚠️ Не удалось корректно закрыть Redis подключения:', error);
+    }
+
+    // Закрываем подключение Prisma и пул PostgreSQL
+    try {
+      await prisma.$disconnect();
+      await pool.end();
+      console.log('✅ Подключения к БД закрыты');
+    } catch (error) {
+      console.warn('⚠️ Не удалось корректно закрыть подключения к БД:', error);
     }
 
     console.log('✅ Все подключения закрыты');
