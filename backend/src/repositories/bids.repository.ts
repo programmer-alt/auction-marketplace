@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
+import { CreateBidData, BidWithRelations } from "../types";
 
 // Создание ставки
-export const createBid = async (prisma: PrismaClient, data: any) => {
+export const createBid = async (prisma: PrismaClient, data: CreateBidData) => {
   return await prisma.bid.create({
     data,
     include: {
@@ -21,12 +22,15 @@ export const getBidsByAuctionId = async (
   auctionId: number,
   skip: number,
   take: number,
-) => {
+): Promise<BidWithRelations[]> => {
   return await prisma.bid.findMany({
     where: { auctionId },
     include: {
       user: {
         select: { id: true, email: true, name: true },
+      },
+      auction: {
+        select: { id: true, title: true, currentPrice: true },
       },
     },
     orderBy: { amount: "desc" },

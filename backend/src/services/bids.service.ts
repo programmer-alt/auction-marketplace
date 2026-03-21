@@ -4,6 +4,8 @@ import {
   getBidsByAuctionId as getBidsByAuctionIdRepo,
   getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
 } from "../repositories/bids.repository";
+import { Prisma } from "@prisma/client";
+import { BidWithRelations } from "../types";
 
 // ========================================
 // Типы
@@ -15,12 +17,28 @@ export interface GetBidsOptions {
 }
 
 export interface CreateBidResult {
-  bid: any;
-  auction: any;
+  bid: BidWithRelations;
+  auction: Prisma.AuctionGetPayload<{
+    include: {
+      seller: { select: { id: true; email: true; name: true } };
+      winner: { select: { id: true; email: true; name: true } };
+    };
+  }>;
 }
 
 export interface GetBidsResult {
-  bids: any[];
+  bids: Array<{
+    id: number;
+    auctionId: number;
+    userId: number;
+    amount: Prisma.Decimal;
+    createdAt: Date;
+    user: {
+      id: number;
+      email: string;
+      name: string | null;
+    };
+  }>;
   pagination: {
     page: number;
     limit: number;
@@ -98,9 +116,9 @@ export async function createBid(
       bid,
       auction: updatedAuction,
     };
-  } catch (error: any) {
+  } catch (error) {
     // Обработка ошибок Prisma
-    if (error.code === 'P2025') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2025') {
       // Record not found - аукцион не удовлетворяет условиям
       throw new Error("Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом");
     }

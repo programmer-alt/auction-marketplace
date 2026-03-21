@@ -12,6 +12,7 @@ import {
 } from "../queues/auctionCompletionQueue";
 import { redis } from "../redis";
 import { safeJsonParse, validateAuction, validateAuctionsList } from "../utils/json";
+import { Prisma } from "@prisma/client";
 
 // ========================================
 // Константы кэширования
@@ -48,16 +49,16 @@ export interface GetAuctionsOptions {
   limit: number;
 }
 
-export interface CreateAuctionData {
+export interface CreateAuctionInput {
   title: string;
   description?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   startingPrice: number;
   currency?: string;
   endsAt: string;
 }
 
-export interface UpdateAuctionData {
+export interface UpdateAuctionInput {
   title?: string;
   description?: string;
   imageUrl?: string;
@@ -86,8 +87,8 @@ export async function getAuctions(options: GetAuctionsOptions) {
   const { status, sellerId, page, limit } = options;
   const skip = (page - 1) * limit;
 
-  const where: any = {};
-  if (status) where.status = status;
+  const where: Prisma.AuctionWhereInput = {};
+  if (status) where.status = status as "ACTIVE" | "COMPLETED" | "CANCELLED";
   if (sellerId) where.sellerId = sellerId;
 
   const auctions = await getAuctionsRepo(prisma, where, skip, limit);
@@ -139,7 +140,7 @@ export async function getAuctionById(id: number) {
 /**
  * Создание нового аукциона
  */
-export async function createAuction(data: CreateAuctionData, userId: number) {
+export async function createAuction(data: CreateAuctionInput, userId: number) {
   const { title, description, imageUrl, startingPrice, currency, endsAt } =
     data;
 
@@ -158,8 +159,8 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
     title,
     description,
     imageUrl: imageUrl || null,
-    startingPrice,
-    currentPrice: startingPrice,
+    startingPrice: new Prisma.Decimal(startingPrice),
+    currentPrice: new Prisma.Decimal(startingPrice),
     currency: auctionCurrency,
     sellerId: userId,
     endsAt: endsAtDate,
@@ -183,28 +184,20 @@ export async function createAuction(data: CreateAuctionData, userId: number) {
  */
 export async function updateAuction(
   id: number,
-  data: UpdateAuctionData,
+  data: UpdateAuctionInput,
   userId: number,
 ) {
-  // Разрешённые поля для обновления
-  const allowedFields = [
-    "title",
-    "description",
-    "imageUrl",
-    "startingPrice",
-    "currency",
-    "endsAt",
-  ];
-  const updateData: any = {};
+  // Формируем данные для обновления
+  const updateData: Prisma.AuctionUpdateInput = {};
 
-  for (const field of allowedFields) {
-    if (data[field as keyof UpdateAuctionData] !== undefined) {
-      updateData[field] = data[field as keyof UpdateAuctionData];
-    }
-  }
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
+  if (data.startingPrice !== undefined) updateData.startingPrice = data.startingPrice;
+  if (data.currency !== undefined) updateData.currency = data.currency.toLowerCase();
 
-  if (updateData.endsAt) {
-    const endsAtDate = new Date(updateData.endsAt);
+  if (data.endsAt) {
+    const endsAtDate = new Date(data.endsAt);
     if (isNaN(endsAtDate.getTime())) {
       throw new Error("Некорректная дата окончания");
     }
@@ -216,9 +209,6 @@ export async function updateAuction(
     // Обновляем запланированное завершение аукциона
     await removeScheduledAuctionCompletion(id);
     scheduleAuctionCompletion(id, endsAtDate);
-  }
-  if (updateData.currency) {
-    updateData.currency = updateData.currency.toLowerCase();
   }
 
   // Проверяем, существует ли аукцион и принадлежит ли он пользователю

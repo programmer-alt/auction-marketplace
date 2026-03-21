@@ -1,9 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (
   prisma: PrismaClient,
-  where: any,
+  where: Prisma.AuctionWhereInput,
   skip: number,
   take: number,
 ) => {
@@ -31,7 +31,7 @@ export const getAuctions = async (
 };
 
 // Подсчет количества аукционов
-export const getAuctionsCount = async (prisma: PrismaClient, where: any) => {
+export const getAuctionsCount = async (prisma: PrismaClient, where: Prisma.AuctionWhereInput) => {
   return await prisma.auction.count({ where });
 };
 
@@ -58,8 +58,8 @@ export const getAuctionById = async (prisma: PrismaClient, id: number) => {
   });
 };
 
-// Создание нового аукциона
-export const createAuction = async (prisma: PrismaClient, data: any) => {
+// Создание нового аукциона (unchecked version supports scalar foreign keys)
+export const createAuction = async (prisma: PrismaClient, data: Prisma.AuctionUncheckedCreateInput) => {
   return await prisma.auction.create({
     data,
     include: {
@@ -73,8 +73,8 @@ export const createAuction = async (prisma: PrismaClient, data: any) => {
 // Условное обновление аукциона
 export const updateAuctionMany = async (
   prisma: PrismaClient,
-  where: any,
-  data: any,
+  where: Prisma.AuctionWhereInput,
+  data: Prisma.AuctionUpdateManyMutationInput,
 ) => {
   return await prisma.auction.updateMany({
     where,
@@ -86,7 +86,7 @@ export const updateAuctionMany = async (
 export const updateAuctionById = async (
   prisma: PrismaClient,
   id: number,
-  data: any,
+  data: Prisma.AuctionUpdateInput,
 ) => {
   try {
     return await prisma.auction.update({
@@ -98,8 +98,8 @@ export const updateAuctionById = async (
         },
       },
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
       throw new Error(`Auction with id ${id} not found`);
     }
     throw error;
@@ -112,8 +112,8 @@ export const deleteAuction = async (prisma: PrismaClient, id: number) => {
     return await prisma.auction.delete({
       where: { id },
     });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
       throw new Error(`Auction with id ${id} not found`);
     }
     throw error;

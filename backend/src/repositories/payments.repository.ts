@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
+import { CreatePaymentData, UpdatePaymentData } from "../types";
 
 // Создание платежа
-export const createPayment = async (prisma: PrismaClient, data: any) => {
+export const createPayment = async (prisma: PrismaClient, data: CreatePaymentData) => {
   return await prisma.payment.create({
     data,
     include: {
@@ -29,7 +30,7 @@ export const getPaymentByStripeId = async (
 export const updatePayment = async (
   prisma: PrismaClient,
   id: number,
-  data: any,
+  data: UpdatePaymentData,
 ) => {
   return await prisma.payment.update({
     where: { id },

@@ -43,9 +43,10 @@ export const paymentsController = {
       const sig = req.headers['stripe-signature'] as string;
       await paymentsService.handleWebhook(req.body, sig);
       res.json({ received: true });
-    } catch (error: any) {
-      console.error('Ошибка обработки вебхука:', error.message);
-      res.status(400).send(`Webhook Error: ${error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Ошибка обработки вебхука:', message);
+      res.status(400).send(`Webhook Error: ${message}`);
     }
   },
 

@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../index";
 import {
   getUserByEmail,
@@ -27,7 +28,7 @@ export interface AuthResult {
     id: number;
     email: string;
     name: string | null;
-    balance?: any;
+    balance?: Prisma.Decimal;
   };
   token: string;
 }

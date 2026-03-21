@@ -7,6 +7,7 @@ import {
   getPaymentsByUserId,
   getPaymentsCountByUserId,
 } from "../repositories/payments.repository";
+import { PaymentWithRelations, PaymentWithAuctionSeller } from "../types";
 
 // ========================================
 // Инициализация Stripe
@@ -27,11 +28,11 @@ export interface GetPaymentHistoryOptions {
 
 export interface CreatePaymentIntentResult {
   clientSecret: string | null;
-  payment: any;
+  payment: PaymentWithRelations;
 }
 
 export interface GetPaymentHistoryResult {
-  payments: any[];
+  payments: PaymentWithAuctionSeller[];
   pagination: {
     page: number;
     limit: number;
@@ -99,22 +100,12 @@ export async function createPaymentIntent(
 
   // Создаём запись о платеже в БД
   const payment = await createPayment(prisma, {
-    data: {
-      userId,
-      auctionId,
-      amount: auction.currentPrice,
-      currency,
-      stripePaymentId: paymentIntent.id,
-      status: "PENDING",
-    },
-    include: {
-      user: {
-        select: { id: true, email: true, name: true },
-      },
-      auction: {
-        select: { id: true, title: true, currentPrice: true, currency: true },
-      },
-    },
+    userId,
+    auctionId,
+    amount: auction.currentPrice,
+    currency,
+    stripePaymentId: paymentIntent.id,
+    status: "PENDING",
   });
 
   return {
@@ -126,7 +117,7 @@ export async function createPaymentIntent(
 /**
  * Обработка вебхука Stripe
  */
-export async function handleWebhook(body: any, sig: string) {
+export async function handleWebhook(body: Buffer | string, sig: string) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
   const event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
 

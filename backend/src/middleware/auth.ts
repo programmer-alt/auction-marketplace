@@ -1,7 +1,5 @@
 import jwt from "jsonwebtoken";
-
-// Типы
-import { Request } from 'express';
+import { Request, Response, NextFunction } from 'express';
 
 export interface AuthContext {
   id: number;
@@ -40,7 +38,7 @@ export function parseAuthToken(token: string | undefined): AuthResult {
 
 // Функциональный middleware-адаптер для Express
 export function createAuthMiddleware() {
-  return (req: any, res: any, next: () => void) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     const authResult = parseAuthToken(authHeader);
 
@@ -49,7 +47,7 @@ export function createAuthMiddleware() {
       return;
     }
 
-    (req as any).user = authResult.user;
+    (req as AuthRequest).user = authResult.user;
     next();
   };
 }
