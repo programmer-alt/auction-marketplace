@@ -1,19 +1,24 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-import { rateLimit } from './middleware/rateLimit';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+import helmet from "helmet";
+import hpp from "hpp";
+import compression from "compression";
+import { rateLimit } from "./middleware/rateLimit";
+import { parseAuthToken } from "./middleware/auth";
+import { generateCsrfToken, verifyCsrfToken } from "./middleware/csrf";
 
 // Routes
-import authRouter from './routes/auth.routes';
-import auctionsRouter from './routes/auctions.routes';
-import bidsRouter from './routes/bids.routes';
-import paymentsRouter from './routes/payments.routes';
+import authRouter from "./routes/auth.routes";
+import auctionsRouter from "./routes/auctions.routes";
+import bidsRouter from "./routes/bids.routes";
+import paymentsRouter from "./routes/payments.routes";
 
 dotenv.config();
 
@@ -33,69 +38,123 @@ const adapter = new PrismaPg(pool);
 export const prisma = new PrismaClient({ adapter });
 
 // Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
-import { redis as pubClient } from './redis';
+import { redis as pubClient } from "./redis";
 const subClient = pubClient.duplicate();
 
-subClient.on('error', (err) => console.error('Redis sub client error:', err));
+subClient.on("error", (err) => console.error("Redis sub client error:", err));
 
 // Socket.io с Redis адаптером
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
   },
   adapter: createAdapter(pubClient, subClient),
 });
 
-// Middleware
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:5173',
-  credentials: true,
+// ========================================
+// Middleware безопасности и производительности
+// ========================================
+
+// Helmet для security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
 }));
 
-// Stripe webhook 
-app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+// Защита от parameter pollution
+app.use(hpp() as any);
+
+// Сжатие ответов
+app.use(compression() as any);
+
+// CORS — только один origin при credentials: true
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
+      // Разрешаем запросы без origin (мобильные приложения, curl) 
+      // или если origin в списке разрешённых
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: Origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
+
+// Stripe webhook
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 
 // Parse JSON for all other routes
 app.use(express.json());
 
 // Rate limiting middleware (применяется ко всем маршрутам, кроме health)
-
 app.use(rateLimit);
 
+// CSRF protection
+app.use(generateCsrfToken);
+app.use(verifyCsrfToken);
+
 // Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // API routes
-app.get('/api', (_req, res) => {
-  res.json({ message: 'Auction Marketplace API', version: '1.0.0' });
+app.get("/api", (_req, res) => {
+  res.json({ message: "Auction Marketplace API", version: "1.0.0" });
 });
 
-app.use('/api/auth', authRouter);
-app.use('/api/auctions', auctionsRouter);
-app.use('/api/auctions', bidsRouter); // ставки находятся под /api/auctions/:auctionId/bids
-app.use('/api/payments', paymentsRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/auctions", auctionsRouter);
+app.use("/api/auctions", bidsRouter); // ставки находятся под /api/auctions/:auctionId/bids
+app.use("/api/payments", paymentsRouter);
 
-// Socket.io подключение
-io.on('connection', (socket) => {
+// Socket.io подключение с авторизацией
+io.on("connection", (socket) => {
   console.log(`⚡ Клиент соединился: ${socket.id}`);
 
-  socket.on('disconnect', () => {
-    console.log(`🔌 Клиент отключился: ${socket.id}`);
-  });
+  // Присоединение к комнате аукциона с проверкой авторизации
+  socket.on("auction:join", (data: { auctionId: number; token?: string }) => {
+    const authHeader = data.token;
+    const authResult = parseAuthToken(authHeader);
 
-  // Присоединиться к комнате аукциона
-  socket.on('auction:join', (auctionId: number) => {
-    socket.join(`auction:${auctionId}`);
-    console.log(`Клиент ${socket.id} присоединился к аукциону:${auctionId}`);
+    if (!authResult.success) {
+      socket.emit("error", { message: "Не авторизован" });
+      return;
+    }
+
+    socket.join(`auction:${data.auctionId}`);
+    console.log(
+      `Клиент ${socket.id} (пользователь ${authResult.user.id}) присоединился к аукциону:${data.auctionId}`,
+    );
   });
 
   // Покинуть комнату аукциона
-  socket.on('auction:leave', (auctionId: number) => {
+  socket.on("auction:leave", (auctionId: number) => {
     socket.leave(`auction:${auctionId}`);
     console.log(`Клиент ${socket.id} покинул аукцион:${auctionId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`🔌 Клиент отключился: ${socket.id}`);
   });
 });
 
@@ -108,7 +167,7 @@ async function shutdown(signal: string) {
 
   // Даём серверу 5 секунд на корректное закрытие
   const shutdownTimeout = setTimeout(() => {
-    console.warn('⚠️ Принудительное завершение из-за таймаута');
+    console.warn("⚠️ Принудительное завершение из-за таймаута");
     process.exit(1);
   }, 5000);
 
@@ -118,21 +177,21 @@ async function shutdown(signal: string) {
     try {
       await subClient.quit();
       await pubClient.quit(); // общий redis из redis.ts
-      console.log('✅ Redis подключения закрыты');
+      console.log("✅ Redis подключения закрыты");
     } catch (error) {
-      console.warn('⚠️ Не удалось корректно закрыть Redis подключения:', error);
+      console.warn("⚠️ Не удалось корректно закрыть Redis подключения:", error);
     }
 
     // Закрываем подключение Prisma и пул PostgreSQL
     try {
       await prisma.$disconnect();
       await pool.end();
-      console.log('✅ Подключения к БД закрыты');
+      console.log("✅ Подключения к БД закрыты");
     } catch (error) {
-      console.warn('⚠️ Не удалось корректно закрыть подключения к БД:', error);
+      console.warn("⚠️ Не удалось корректно закрыть подключения к БД:", error);
     }
 
-    console.log('✅ Все подключения закрыты');
+    console.log("✅ Все подключения закрыты");
     process.exit(0);
   });
 
@@ -150,24 +209,25 @@ httpServer.listen(PORT, async () => {
   // Проверка подключения к БД
   try {
     await prisma.$connect();
-    console.log('📦 База данных подключена');
+    console.log("📦 База данных подключена");
   } catch (error) {
-    console.error('❌ Подключение к базе данных не удалось:', error);
+    console.error("❌ Подключение к базе данных не удалось:", error);
   }
 
   // Проверка подключения к Redis
   try {
     await pubClient.ping();
-    console.log('🔗 Redis подключен (облачный)');
+    console.log("🔗 Redis подключен (облачный)");
   } catch (error) {
-    console.error('❌ Подключение к Redis не удалось:', error);
+    console.error("❌ Подключение к Redis не удалось:", error);
   }
 
   // Планирование завершения существующих активных аукционов
-  const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
+  const { scheduleExistingAuctions } =
+    await import("./queues/auctionCompletionQueue");
   await scheduleExistingAuctions();
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
