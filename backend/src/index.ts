@@ -22,7 +22,7 @@ import bidsRouter from "./routes/bids.routes";
 import paymentsRouter from "./routes/payments.routes";
 
 // Import error handler
-import { errorHandler } from "./errors";
+import { errorHandler } from "./errors/handler";
 
 dotenv.config();
 

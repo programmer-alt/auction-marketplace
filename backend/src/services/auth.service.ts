@@ -7,13 +7,13 @@ import {
   createUser,
   getUserById,
 } from "../repositories/users.repository";
-import { ValidationError, ForbiddenError } from "../errors";
+import { createValidationError, createForbiddenError } from "../errors/factories";
 
 // Helper для получения JWT секрета (проще подменять в тестах)
 function getJwtSecret(): string {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
-    throw new ValidationError("JWT_SECRET is not configured");
+    throw createValidationError("JWT_SECRET is not configured");
   }
   return jwtSecret;
 }
@@ -50,7 +50,7 @@ export async function register(email: string, password: string, name?: string) {
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    throw new ValidationError("Пользователь уже существует");
+    throw createValidationError("Пользователь уже существует");
   }
 
   // Хеширование пароля
@@ -64,11 +64,9 @@ export async function register(email: string, password: string, name?: string) {
   });
 
   // Генерация JWT токена
-  const token = jwt.sign(
-    { id: user.id, email: user.email },
-    getJwtSecret(),
-    { expiresIn: "7d" },
-  );
+  const token = jwt.sign({ id: user.id, email: user.email }, getJwtSecret(), {
+    expiresIn: "7d",
+  });
 
   return {
     user: {
@@ -87,21 +85,19 @@ export async function login(email: string, password: string) {
   // Поиск пользователя
   const user = await getUserByEmail(prisma, email);
   if (!user) {
-    throw new ForbiddenError("Неверные учетные данные");
+    throw createForbiddenError("Неверные учетные данные");
   }
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
-    throw new ForbiddenError("Неверные учетные данные");
+    throw createForbiddenError("Неверные учетные данные");
   }
 
   // Генерация JWT токена
-  const token = jwt.sign(
-    { id: user.id, email: user.email },
-    getJwtSecret(),
-    { expiresIn: "7d" },
-  );
+  const token = jwt.sign({ id: user.id, email: user.email }, getJwtSecret(), {
+    expiresIn: "7d",
+  });
 
   return {
     user: {

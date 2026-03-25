@@ -11,9 +11,17 @@ import {
   removeScheduledAuctionCompletion,
 } from "../queues/auctionCompletionQueue";
 import { redis } from "../redis";
-import { safeJsonParse, validateAuction, validateAuctionsList } from "../utils/json";
+import {
+  safeJsonParse,
+  validateAuction,
+  validateAuctionsList,
+} from "../utils/json";
 import { Prisma } from "@prisma/client";
-import { ValidationError, ForbiddenError, NotFoundError } from "../errors";
+import {
+  createValidationError,
+  createForbiddenError,
+  createNotFoundError,
+} from "../errors/factories";
 
 // ========================================
 // Константы кэширования
@@ -107,7 +115,7 @@ export async function getAuctions(options: GetAuctionsOptions) {
 
   // Преобразуем аукционы к упрощенной форме для кэширования
   const simplifiedResult = {
-    auctions: auctions.map(auction => ({
+    auctions: auctions.map((auction) => ({
       id: auction.id,
       title: auction.title,
       startingPrice: Number(auction.startingPrice),
@@ -119,7 +127,11 @@ export async function getAuctions(options: GetAuctionsOptions) {
   };
 
   // Сохраняем в кэш с TTL
-  await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedResult));
+  await redis.setex(
+    cacheKey,
+    CACHE_TTL_SECONDS,
+    JSON.stringify(simplifiedResult),
+  );
 
   return result;
 }
@@ -157,8 +169,12 @@ export async function getAuctionById(id: number) {
       createdAt: auction.createdAt.toISOString(),
       endsAt: auction.endsAt.toISOString(),
     };
-    
-    await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedAuction));
+
+    await redis.setex(
+      cacheKey,
+      CACHE_TTL_SECONDS,
+      JSON.stringify(simplifiedAuction),
+    );
   }
 
   return auction;
@@ -173,10 +189,10 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 
   const endsAtDate = new Date(endsAt);
   if (isNaN(endsAtDate.getTime())) {
-    throw new ValidationError("Некорректная дата окончания");
+    throw createValidationError("Некорректная дата окончания");
   }
   if (endsAtDate <= new Date()) {
-    throw new ValidationError("Дата окончания должна быть в будущем");
+    throw createValidationError("Дата окончания должна быть в будущем");
   }
 
   // Валюта по умолчанию — usd
@@ -220,16 +236,18 @@ export async function updateAuction(
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
-  if (data.startingPrice !== undefined) updateData.startingPrice = data.startingPrice;
-  if (data.currency !== undefined) updateData.currency = data.currency.toLowerCase();
+  if (data.startingPrice !== undefined)
+    updateData.startingPrice = data.startingPrice;
+  if (data.currency !== undefined)
+    updateData.currency = data.currency.toLowerCase();
 
   if (data.endsAt) {
     const endsAtDate = new Date(data.endsAt);
     if (isNaN(endsAtDate.getTime())) {
-      throw new ValidationError("Некорректная дата окончания");
+      throw createValidationError("Некорректная дата окончания");
     }
     if (endsAtDate <= new Date()) {
-      throw new ValidationError("Дата окончания должна быть в будущем");
+      throw createValidationError("Дата окончания должна быть в будущем");
     }
     updateData.endsAt = endsAtDate;
 
@@ -241,13 +259,15 @@ export async function updateAuction(
   // Проверяем, существует ли аукцион и принадлежит ли он пользователю
   const existingAuction = await getAuctionByIdRepo(prisma, id);
   if (!existingAuction) {
-    throw new NotFoundError("Аукцион не найден");
+    throw createNotFoundError("Аукцион не найден");
   }
   if (existingAuction.sellerId !== userId) {
-    throw new ForbiddenError("Недостаточно прав для редактирования этого аукциона");
+    throw createForbiddenError(
+      "Недостаточно прав для редактирования этого аукциона",
+    );
   }
   if (existingAuction.status !== "ACTIVE") {
-    throw new ValidationError("Можно редактировать только активные аукционы");
+    throw createValidationError("Можно редактировать только активные аукционы");
   }
 
   const auction = await updateAuctionByIdRepo(prisma, id, updateData);
@@ -281,9 +301,11 @@ export async function deleteAuction(id: number, userId: number) {
     // Проверяем, существует ли аукцион вообще
     const exists = await getAuctionByIdRepo(prisma, id);
     if (!exists) {
-      throw new NotFoundError("Аукцион не найден");
+      throw createNotFoundError("Аукцион не найден");
     } else {
-      throw new ForbiddenError("Недостаточно прав для удаления этого аукциона");
+      throw createForbiddenError(
+        "Недостаточно прав для удаления этого аукциона",
+      );
     }
   }
 

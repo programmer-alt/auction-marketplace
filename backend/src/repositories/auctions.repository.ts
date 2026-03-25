@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { ValidationError, NotFoundError } from "../errors";
+import { createValidationError, createNotFoundError } from "../errors/factories";
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (
@@ -9,8 +9,13 @@ export const getAuctions = async (
   take: number,
 ) => {
   // Валидация параметров пагинации
-  if (skip < 0 || take < 0 || !Number.isInteger(skip) || !Number.isInteger(take)) {
-    throw new ValidationError("Invalid pagination parameters");
+  if (
+    skip < 0 ||
+    take < 0 ||
+    !Number.isInteger(skip) ||
+    !Number.isInteger(take)
+  ) {
+    throw createValidationError("Invalid pagination parameters");
   }
   return await prisma.auction.findMany({
     where,
@@ -32,7 +37,10 @@ export const getAuctions = async (
 };
 
 // Подсчет количества аукционов
-export const getAuctionsCount = async (prisma: PrismaClient, where: Prisma.AuctionWhereInput) => {
+export const getAuctionsCount = async (
+  prisma: PrismaClient,
+  where: Prisma.AuctionWhereInput,
+) => {
   return await prisma.auction.count({ where });
 };
 
@@ -60,7 +68,10 @@ export const getAuctionById = async (prisma: PrismaClient, id: number) => {
 };
 
 // Создание нового аукциона (unchecked version supports scalar foreign keys)
-export const createAuction = async (prisma: PrismaClient, data: Prisma.AuctionUncheckedCreateInput) => {
+export const createAuction = async (
+  prisma: PrismaClient,
+  data: Prisma.AuctionUncheckedCreateInput,
+) => {
   return await prisma.auction.create({
     data,
     include: {
@@ -100,8 +111,12 @@ export const updateAuctionById = async (
       },
     });
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
-      throw new NotFoundError(`Auction with id ${id} not found`);
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as Record<string, unknown>).code === "P2025"
+    ) {
+      throw createNotFoundError(`Auction with id ${id} not found`);
     }
     throw error;
   }
@@ -114,8 +129,12 @@ export const deleteAuction = async (prisma: PrismaClient, id: number) => {
       where: { id },
     });
   } catch (error) {
-    if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
-      throw new NotFoundError(`Auction with id ${id} not found`);
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as Record<string, unknown>).code === "P2025"
+    ) {
+      throw createNotFoundError(`Auction with id ${id} not found`);
     }
     throw error;
   }

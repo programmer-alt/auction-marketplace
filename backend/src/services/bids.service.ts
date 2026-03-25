@@ -6,7 +6,7 @@ import {
 } from "../repositories/bids.repository";
 import { Prisma } from "@prisma/client";
 import { BidWithRelations } from "../types";
-import { ValidationError, NotFoundError } from "../errors";
+import { createValidationError, createNotFoundError } from "../errors/factories";
 
 // ========================================
 // Типы
@@ -64,7 +64,9 @@ export async function createBid(
       select: { currency: true },
     });
     if (auction && auction.currency !== currency.toLowerCase()) {
-      throw new ValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`);
+      throw createValidationError(
+        `Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`,
+      );
     }
   }
 
@@ -74,7 +76,7 @@ export async function createBid(
       prisma.auction.update({
         where: {
           id: auctionId,
-          status: 'ACTIVE',
+          status: "ACTIVE",
           endsAt: { gt: new Date() },
           currentPrice: { lt: amount },
           sellerId: { not: userId },
@@ -119,9 +121,11 @@ export async function createBid(
     };
   } catch (error) {
     // Обработка ошибок Prisma
-    if (error instanceof Error && 'code' in error && error.code === 'P2025') {
+    if (error instanceof Error && "code" in error && error.code === "P2025") {
       // Record not found - аукцион не удовлетворяет условиям
-      throw new ValidationError("Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом");
+      throw createValidationError(
+        "Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом",
+      );
     }
     throw error;
   }
@@ -144,7 +148,7 @@ export async function getBidsByAuction(
   });
 
   if (!auctionExists) {
-    throw new NotFoundError("Аукцион не найден");
+    throw createNotFoundError("Аукцион не найден");
   }
 
   const bids = await getBidsByAuctionIdRepo(prisma, auctionId, skip, limit);

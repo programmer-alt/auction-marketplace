@@ -1,57 +1,78 @@
-export class NotFoundError extends Error {
+// ========================================
+// Фабрики ошибок (функциональный подход)
+// ========================================
+
+export type AppErrorType =
+  | "NOT_FOUND"
+  | "FORBIDDEN"
+  | "VALIDATION"
+  | "INTERNAL";
+
+export interface AppError extends Error {
+  errorType: AppErrorType;
   statusCode: number;
-  constructor(message: string = "Объект не найден") {
-    super(message);
-    this.statusCode = 404;
-    this.name = "NotFoundError";
-  }
 }
 
-export class ForbiddenError extends Error {
-  statusCode: number;
-  constructor(message: string = "Недостаточно прав для выполнения операции") {
-    super(message);
-    this.statusCode = 403;
-    this.name = "ForbiddenError";
-  }
-}
+// Фабрика для создания ошибки "Не найдено" (404)
+export const createNotFoundError = (
+  message: string = "Объект не найден",
+): AppError => {
+  const error = new Error(message) as AppError;
+  error.name = "NotFoundError";
+  error.errorType = "NOT_FOUND";
+  error.statusCode = 404;
+  return error;
+};
 
-export class ValidationError extends Error {
-  statusCode: number;
-  constructor(message: string) {
-    super(message);
-    this.statusCode = 400;
-    this.name = "ValidationError";
-  }
-}
+// Фабрика для создания ошибки "Доступ запрещён" (403)
+export const createForbiddenError = (
+  message: string = "Недостаточно прав для выполнения операции",
+): AppError => {
+  const error = new Error(message) as AppError;
+  error.name = "ForbiddenError";
+  error.errorType = "FORBIDDEN";
+  error.statusCode = 403;
+  return error;
+};
 
+// Фабрика для создания ошибки "Валидация" (400)
+export const createValidationError = (message: string): AppError => {
+  const error = new Error(message) as AppError;
+  error.name = "ValidationError";
+  error.errorType = "VALIDATION";
+  error.statusCode = 400;
+  return error;
+};
+
+// ========================================
 // Централизованный обработчик ошибок
+// ========================================
 export const errorHandler = (err: any, _req: any, res: any, _next: any) => {
   console.error("Ошибка:", err);
 
-  // Определение типа ошибки и соответствующий ответ
-  if (err instanceof NotFoundError) {
+  // Обработка наших кастомных ошибок
+  if (err?.errorType === "NOT_FOUND") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  if (err instanceof ForbiddenError) {
+  if (err?.errorType === "FORBIDDEN") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  if (err instanceof ValidationError) {
+  if (err?.errorType === "VALIDATION") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  // Обработка ошибок валидации Zod, если используется
-  if (err.name === 'ZodError') {
-    return res.status(400).json({ error: 'Ошибка валидации: ' + err.message });
+  // Обработка Zod ошибок валидации
+  if (err.name === "ZodError") {
+    return res.status(400).json({ error: "Ошибка валидации: " + err.message });
   }
 
-  // Обработка ошибок Prisma, если есть
-  if (err.code === 'P2025' || err.code === 'P2001') {
-    return res.status(404).json({ error: 'Запрашиваемый объект не найден' });
+  // Обработка ошибок Prisma (запись не найдена)
+  if (err.code === "P2025" || err.code === "P2001") {
+    return res.status(404).json({ error: "Запрашиваемый объект не найден" });
   }
 
-  // Для других ошибок возвращаем общее сообщение
+  // Все остальные ошибки — 500
   return res.status(500).json({ error: "Внутренняя ошибка сервера" });
 };
