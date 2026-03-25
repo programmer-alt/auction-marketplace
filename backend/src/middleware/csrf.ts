@@ -68,13 +68,13 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
   // Double-submit: токен должен совпадать в cookie и заголовке
   if (!tokenFromCookie || !tokenFromHeader) {
     return res.status(403).json({ 
-      error: 'CSRF token missing' 
+      error: 'CSRF токен не найден' 
     });
   }
 
   if (tokenFromCookie !== tokenFromHeader || !verifyToken(tokenFromHeader)) {
     return res.status(403).json({ 
-      error: 'Invalid CSRF token' 
+      error: 'Не правильный CSRF токен' 
     });
   }
 
