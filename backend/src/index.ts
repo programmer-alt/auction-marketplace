@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -104,6 +105,9 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 
 // Parse JSON for all other routes
 app.use(express.json());
+
+// Cookie parser для CSRF и других middleware
+app.use(cookieParser() as any);
 
 // Rate limiting middleware (применяется ко всем маршрутам, кроме health)
 app.use(rateLimit);
