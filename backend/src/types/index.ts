@@ -125,6 +125,9 @@ export interface CacheAuction {
   sellerId: number;
   createdAt: string;
   endsAt: string;
+  currentPrice?: number;
+  currency?: string;
+  status?: string;
 }
 
 export interface CacheAuctionsList {
