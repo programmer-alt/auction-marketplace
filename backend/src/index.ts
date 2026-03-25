@@ -43,16 +43,22 @@ import { redis as pubClient } from "./redis";
 const subClient = pubClient.duplicate();
 
 subClient.on("error", (err) => console.error("Redis sub client error:", err));
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:5173").split(",");
 
 // Socket.io с Redis адаптером
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS (socket.io): Origin ${origin} not allowed`));
+      }
+    },
     credentials: true,
   },
   adapter: createAdapter(pubClient, subClient),
 });
-
 // ========================================
 // Middleware безопасности и производительности
 // ========================================
