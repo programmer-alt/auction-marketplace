@@ -14,6 +14,8 @@ import compression from "compression";
 import { rateLimit } from "./middleware/rateLimit";
 import { parseAuthToken } from "./middleware/auth";
 import { generateCsrfToken, verifyCsrfToken } from "./middleware/csrf";
+import { validateEnv } from "./config/env";
+import { corsOriginHandler } from "./config/cors";
 
 // Routes
 import authRouter from "./routes/auth.routes";
@@ -25,6 +27,7 @@ import paymentsRouter from "./routes/payments.routes";
 import { errorHandler } from "./errors/handler";
 
 dotenv.config();
+validateEnv();
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,18 +49,10 @@ import { redis as pubClient } from "./redis";
 const subClient = pubClient.duplicate();
 
 subClient.on("error", (err) => console.error("Redis sub client error:", err));
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:5173").split(",");
 
-// Socket.io с Redis адаптером
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS (socket.io): Origin ${origin} not allowed`));
-      }
-    },
+    origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS (socket.io)"),
     credentials: true,
   },
   adapter: createAdapter(pubClient, subClient),
@@ -90,19 +85,9 @@ app.use(hpp() as any);
 // Сжатие ответов
 app.use(compression() as any);
 
-// CORS — только один origin при credentials: true
 app.use(
   cors({
-    origin: (origin, callback) => {
-      const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
-      // Разрешаем запросы без origin (мобильные приложения, curl) 
-      // или если origin в списке разрешённых
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: Origin ${origin} not allowed`));
-      }
-    },
+    origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS"),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

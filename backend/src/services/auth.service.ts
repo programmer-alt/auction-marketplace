@@ -9,14 +9,7 @@ import {
 } from "../repositories/users.repository";
 import { createValidationError, createForbiddenError } from "../errors/factories";
 
-// Helper для получения JWT секрета (проще подменять в тестах)
-function getJwtSecret(): string {
-  const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) {
-    throw createValidationError("JWT_SECRET is not configured");
-  }
-  return jwtSecret;
-}
+import { getJwtSecret } from "../config/jwt";
 
 // ========================================
 // Типы

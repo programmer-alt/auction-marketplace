@@ -149,8 +149,7 @@ export async function getAuctionById(id: number) {
     if (parsed && validateAuction(parsed)) {
       // Если данные в кэше валидны, получаем полный объект из базы
       // Это обеспечит согласованность данных, но сэкономит время на валидации
-      const fullAuction = await getAuctionByIdRepo(prisma, id);
-      return fullAuction;
+      return await getAuctionByIdRepo(prisma, id);
     }
     // Если кэш повреждён, удаляем его
     await redis.del(cacheKey);

@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
+import { getJwtSecret } from "../config/jwt";
 
 export interface AuthContext {
   id: number;
@@ -23,7 +24,7 @@ export function parseAuthToken(token: string | undefined): AuthResult {
   try {
     const decoded = jwt.verify(
       token.replace("Bearer ", ""),
-      process.env.JWT_SECRET!,
+      getJwtSecret(),
     ) as { id: number; email: string };
 
     return {
