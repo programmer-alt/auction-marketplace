@@ -7,12 +7,13 @@ import {
   createUser,
   getUserById,
 } from "../repositories/users.repository";
+import { ValidationError, ForbiddenError } from "../errors";
 
-// Helper для получения JWT секрета 
+// Helper для получения JWT секрета (проще подменять в тестах)
 function getJwtSecret(): string {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
-    throw new Error("JWT_SECRET is not configured");
+    throw new ValidationError("JWT_SECRET is not configured");
   }
   return jwtSecret;
 }
@@ -49,7 +50,7 @@ export async function register(email: string, password: string, name?: string) {
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    throw new Error("Пользователь уже существует");
+    throw new ValidationError("Пользователь уже существует");
   }
 
   // Хеширование пароля
@@ -86,13 +87,13 @@ export async function login(email: string, password: string) {
   // Поиск пользователя
   const user = await getUserByEmail(prisma, email);
   if (!user) {
-    throw new Error("Неверные учетные данные");
+    throw new ForbiddenError("Неверные учетные данные");
   }
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
-    throw new Error("Неверные учетные данные");
+    throw new ForbiddenError("Неверные учетные данные");
   }
 
   // Генерация JWT токена

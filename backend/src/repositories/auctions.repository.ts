@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { ValidationError, NotFoundError } from "../errors";
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (
@@ -9,7 +10,7 @@ export const getAuctions = async (
 ) => {
   // Валидация параметров пагинации
   if (skip < 0 || take < 0 || !Number.isInteger(skip) || !Number.isInteger(take)) {
-    throw new Error("Invalid pagination parameters");
+    throw new ValidationError("Invalid pagination parameters");
   }
   return await prisma.auction.findMany({
     where,
@@ -100,7 +101,7 @@ export const updateAuctionById = async (
     });
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
-      throw new Error(`Auction with id ${id} not found`);
+      throw new NotFoundError(`Auction with id ${id} not found`);
     }
     throw error;
   }
@@ -114,7 +115,7 @@ export const deleteAuction = async (prisma: PrismaClient, id: number) => {
     });
   } catch (error) {
     if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'P2025') {
-      throw new Error(`Auction with id ${id} not found`);
+      throw new NotFoundError(`Auction with id ${id} not found`);
     }
     throw error;
   }

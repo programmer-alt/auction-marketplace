@@ -6,6 +6,7 @@ import {
 } from "../repositories/bids.repository";
 import { Prisma } from "@prisma/client";
 import { BidWithRelations } from "../types";
+import { ValidationError, NotFoundError } from "../errors";
 
 // ========================================
 // Типы
@@ -63,7 +64,7 @@ export async function createBid(
       select: { currency: true },
     });
     if (auction && auction.currency !== currency.toLowerCase()) {
-      throw new Error(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`);
+      throw new ValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`);
     }
   }
 
@@ -120,7 +121,7 @@ export async function createBid(
     // Обработка ошибок Prisma
     if (error instanceof Error && 'code' in error && error.code === 'P2025') {
       // Record not found - аукцион не удовлетворяет условиям
-      throw new Error("Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом");
+      throw new ValidationError("Невозможно сделать ставку: аукцион не найден, не активен, уже завершён, ставка слишком низкая или вы являетесь продавцом");
     }
     throw error;
   }
@@ -143,7 +144,7 @@ export async function getBidsByAuction(
   });
 
   if (!auctionExists) {
-    throw new Error("Аукцион не найден");
+    throw new NotFoundError("Аукцион не найден");
   }
 
   const bids = await getBidsByAuctionIdRepo(prisma, auctionId, skip, limit);

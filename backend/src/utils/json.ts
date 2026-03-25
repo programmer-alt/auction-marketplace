@@ -50,7 +50,7 @@ export function validateAuction(obj: unknown): obj is CacheAuction {
   }
   const auction = obj as Record<string, unknown>;
   if (
-    typeof auction.id !== "number" ||
+     typeof auction.id !== "number" ||
     typeof auction.title !== "string" ||
     typeof auction.startingPrice !== "number" ||
     typeof auction.sellerId !== "number" ||

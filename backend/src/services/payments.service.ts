@@ -8,6 +8,7 @@ import {
   getPaymentsCountByUserId,
 } from "../repositories/payments.repository";
 import { PaymentWithRelations, PaymentWithAuctionSeller } from "../types";
+import { NotFoundError, ValidationError, ForbiddenError } from "../errors";
 
 // ========================================
 // Инициализация Stripe
@@ -58,16 +59,16 @@ export async function createPaymentIntent(
   });
 
   if (!auction) {
-    throw new Error("Аукцион не найден");
+    throw new NotFoundError("Аукцион не найден");
   }
 
   // Проверяем, что аукцион завершён и пользователь — победитель
   if (auction.status !== "COMPLETED") {
-    throw new Error("Аукцион ещё не завершён");
+    throw new ValidationError("Аукцион ещё не завершён");
   }
 
   if (auction.winnerId !== userId) {
-    throw new Error("Вы не являетесь победителем этого аукциона");
+    throw new ForbiddenError("Вы не являетесь победителем этого аукциона");
   }
 
   // Проверяем, не оплачен ли уже этот аукцион
@@ -80,7 +81,7 @@ export async function createPaymentIntent(
   });
 
   if (existingPayment) {
-    throw new Error("Этот аукцион уже оплачен");
+    throw new ValidationError("Этот аукцион уже оплачен");
   }
 
   // Сумма к оплате (текущая цена аукциона)
@@ -174,10 +175,10 @@ export async function getPaymentHistory(
   
   // Валидация параметров пагинации
   if (limit <= 0 || !Number.isInteger(limit)) {
-    throw new Error("Limit must be a positive integer");
+    throw new ValidationError("Limit must be a positive integer");
   }
   if (page < 1 || !Number.isInteger(page)) {
-    throw new Error("Page must be a positive integer");
+    throw new ValidationError("Page must be a positive integer");
   }
   
   const skip = (page - 1) * limit;

@@ -21,6 +21,9 @@ import auctionsRouter from "./routes/auctions.routes";
 import bidsRouter from "./routes/bids.routes";
 import paymentsRouter from "./routes/payments.routes";
 
+// Import error handler
+import { errorHandler } from "./errors";
+
 dotenv.config();
 
 const app = express();
@@ -136,6 +139,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/auctions", auctionsRouter);
 app.use("/api/auctions", bidsRouter); // ставки находятся под /api/auctions/:auctionId/bids
 app.use("/api/payments", paymentsRouter);
+
+// Error handling middleware - должно быть последним
+app.use(errorHandler);
 
 // Socket.io подключение с авторизацией
 io.on("connection", (socket) => {
