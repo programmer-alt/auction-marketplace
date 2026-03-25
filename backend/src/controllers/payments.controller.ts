@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 import * as paymentsService from '../services/payments.service';
 import { AuthRequest } from '../middleware/auth';
@@ -38,7 +38,7 @@ export const paymentsController = {
   },
 
   // Обработка вебхука Stripe
-  async handleWebhook(req: AuthRequest, res: Response) {
+  async handleWebhook(req: Request, res: Response) {
     try {
       const sig = req.headers['stripe-signature'] as string;
       await paymentsService.handleWebhook(req.body, sig);
