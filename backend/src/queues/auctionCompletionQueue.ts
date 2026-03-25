@@ -1,6 +1,6 @@
 import Queue from 'bull';
-import { prisma } from '../index';
-import { io } from '../index';
+import { prisma } from '../config/db';
+import { getIo } from '../config/socket';
 
 export const auctionCompletionQueue = new Queue('auctionCompletion', {
   redis: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -31,8 +31,8 @@ auctionCompletionQueue.process(async (job) => {
     });
 
     // Отправляем WebSocket уведомление
-    io.to(`auction:${auctionId}`).emit('auction:ended', auction);
-    io.emit('auction:updated', auction);
+    getIo().to(`auction:${auctionId}`).emit('auction:ended', auction);
+    getIo().emit('auction:updated', auction);
 
     console.log(`✅ Аукцион ${auctionId} завершён`);
   } catch (error) {

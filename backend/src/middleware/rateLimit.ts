@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { redis } from "../redis";
+import { redis } from "../config/redis";
 
 const WINDOW_SIZE_IN_SECONDS = 60; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 100; // 100 requests per minute per IP

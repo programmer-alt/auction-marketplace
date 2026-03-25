@@ -1,4 +1,5 @@
-import { prisma, io } from "../index";
+import { prisma } from "../config/db";
+import { getIo } from "../config/socket";
 import {
   getAuctions as getAuctionsRepo,
   getAuctionsCount,
@@ -10,7 +11,7 @@ import {
   scheduleAuctionCompletion,
   removeScheduledAuctionCompletion,
 } from "../queues/auctionCompletionQueue";
-import { redis } from "../redis";
+import { redis } from "../config/redis";
 import {
   safeJsonParse,
   validateAuction,
@@ -210,7 +211,7 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
   });
 
   // Уведомление через WebSocket о новом аукционе
-  io.emit("auction:new", auction);
+  getIo().emit("auction:new", auction);
 
   // Планирование завершения аукциона по времени
   scheduleAuctionCompletion(auction.id, endsAtDate);
@@ -272,7 +273,7 @@ export async function updateAuction(
   const auction = await updateAuctionByIdRepo(prisma, id, updateData);
 
   // Уведомление через WebSocket об обновлении аукциона
-  io.to(`auction:${id}`).emit("auction:updated", auction);
+  getIo().to(`auction:${id}`).emit("auction:updated", auction);
 
   // Инвалидация кэша
   await redis.del(getAuctionCacheKey(id));
@@ -309,7 +310,7 @@ export async function deleteAuction(id: number, userId: number) {
   }
 
   // Уведомление через WebSocket об удалении аукциона
-  io.to(`auction:${id}`).emit("auction:deleted", { id });
+  getIo().to(`auction:${id}`).emit("auction:deleted", { id });
 
   // Инвалидация кэша
   await redis.del(getAuctionCacheKey(id));

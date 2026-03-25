@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { prisma } from "../index";
+import { prisma } from "../config/db";
 import {
   createPayment,
   getPaymentByStripeId,

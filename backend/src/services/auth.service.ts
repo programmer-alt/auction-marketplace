@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
-import { prisma } from "../index";
+import { prisma } from "../config/db";
 import {
   getUserByEmail,
   createUser,

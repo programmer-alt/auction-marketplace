@@ -39,6 +39,16 @@ vi.mock("../queues/auctionCompletionQueue.js", () => ({
   removeScheduledAuctionCompletion: vi.fn(),
 }));
 
+// Мокаем redis
+vi.mock("../config/redis.js", () => ({
+  redis: {
+    get: vi.fn(),
+    setex: vi.fn(),
+    del: vi.fn(),
+    keys: vi.fn(),
+  },
+}));
+
 // Мокаем auth middleware
 vi.mock("../middleware/auth.js", () => ({
   authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
@@ -50,6 +60,7 @@ vi.mock("../middleware/auth.js", () => ({
 
 // Импортируем моканые модули
 import { prisma, io } from "../index";
+import { redis } from "../config/redis";
 import auctionsRouter from "./auctions.routes";
 
 // Создаём тестовое Express приложение
@@ -60,10 +71,16 @@ app.use("/api/auctions", auctionsRouter);
 // Типы для моков
 const mockPrisma = prisma as any;
 const mockIo = io as any;
+const mockRedis = redis as any;
 
 describe("Auctions Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Настраиваем моки redis по умолчанию
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.setex.mockResolvedValue(undefined);
+    mockRedis.del.mockResolvedValue(undefined);
+    mockRedis.keys.mockResolvedValue([]);
   });
 
   // ========================================
@@ -446,7 +463,6 @@ describe("Auctions Routes", () => {
     });
 
     it("должен вернуть 404, если аукцион не найден", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 0 });
       mockPrisma.auction.findUnique.mockResolvedValue(null);
 
       const response = await request(app)
@@ -458,7 +474,6 @@ describe("Auctions Routes", () => {
     });
 
     it("должен вернуть 403, если пользователь не продавец", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 0 });
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
         sellerId: 2, // Другой пользователь
@@ -475,7 +490,6 @@ describe("Auctions Routes", () => {
     });
 
     it("должен вернуть 400, если аукцион не активен", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 0 });
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
         sellerId: 1,
@@ -502,7 +516,11 @@ describe("Auctions Routes", () => {
     });
 
     it("должен вернуть 400, если новая дата окончания в прошлом", async () => {
-      mockPrisma.auction.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+      });
 
       const response = await request(app)
         .put("/api/auctions/1")

@@ -3,11 +3,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { createServer } from "http";
-import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
+
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
@@ -33,30 +30,19 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Prisma 7: Создаём пул подключений к PostgreSQL
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-// Prisma 7: Создаём адаптер для PostgreSQL
-const adapter = new PrismaPg(pool);
-
-// Prisma клиент с адаптером
-export const prisma = new PrismaClient({ adapter });
+import { prisma, pool } from "./config/db";
+export { prisma };
 
 // Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
-import { redis as pubClient } from "./redis";
+import { redis as pubClient } from "./config/redis";
 const subClient = pubClient.duplicate();
 
 subClient.on("error", (err) => console.error("Redis sub client error:", err));
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS (socket.io)"),
-    credentials: true,
-  },
-  adapter: createAdapter(pubClient, subClient),
-});
+import { initSocket } from "./config/socket";
+const io = initSocket(httpServer, corsOriginHandler);
+io.adapter(createAdapter(pubClient, subClient));
+export { io };
 // ========================================
 // Middleware безопасности и производительности
 // ========================================
@@ -158,9 +144,6 @@ io.on("connection", (socket) => {
     console.log(`🔌 Клиент отключился: ${socket.id}`);
   });
 });
-
-// Экспорт io для использования в роутах
-export { io };
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {

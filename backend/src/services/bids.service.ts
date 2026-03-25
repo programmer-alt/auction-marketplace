@@ -1,5 +1,5 @@
-import { prisma } from "../index";
-import { io } from "../index";
+import { prisma } from "../config/db";
+import { getIo } from "../config/socket";
 import {
   getBidsByAuctionId as getBidsByAuctionIdRepo,
   getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
@@ -110,7 +110,7 @@ export async function createBid(
     ]);
 
     // Уведомление через WebSocket о новой ставке
-    io.to(`auction:${auctionId}`).emit("bid:new", {
+    getIo().to(`auction:${auctionId}`).emit("bid:new", {
       bid,
       auction: updatedAuction,
     });
