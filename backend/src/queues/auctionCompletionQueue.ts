@@ -10,6 +10,8 @@ export const auctionCompletionQueue = new Queue('auctionCompletion', {
       type: 'exponential',
       delay: 5000,
     },
+    removeOnComplete: true,
+    removeOnFail: false,
   },
 });
 
@@ -42,23 +44,21 @@ auctionCompletionQueue.process(async (job) => {
 // Функция добавления задачи на завершение аукциона
 export function scheduleAuctionCompletion(auctionId: number, endsAt: Date) {
   const delay = endsAt.getTime() - Date.now();
+  const jobId = `auction:${auctionId}`;
   if (delay <= 0) {
-    // Если время уже прошло, завершаем немедленно
-    auctionCompletionQueue.add({ auctionId }, { delay: 0 });
+    auctionCompletionQueue.add({ auctionId }, { delay: 0, jobId });
     return;
   }
-  auctionCompletionQueue.add({ auctionId }, { delay });
+  auctionCompletionQueue.add({ auctionId }, { delay, jobId });
   console.log(`⏰ Запланировано завершение аукциона ${auctionId} через ${delay}ms`);
 }
 
 // Функция удаления запланированной задачи (при обновлении даты окончания)
 export async function removeScheduledAuctionCompletion(auctionId: number) {
-  const jobs = await auctionCompletionQueue.getJobs(['delayed', 'waiting']);
-  for (const job of jobs) {
-    if (job.data.auctionId === auctionId) {
-      await job.remove();
-      console.log(`🗑️ Удалена запланированная задача для аукциона ${auctionId}`);
-    }
+  const job = await auctionCompletionQueue.getJob(`auction:${auctionId}`);
+  if (job) {
+    await job.remove();
+    console.log(`🗑️ Удалена запланированная задача для аукциона ${auctionId}`);
   }
 }
 
