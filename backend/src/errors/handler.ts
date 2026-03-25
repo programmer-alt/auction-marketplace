@@ -1,27 +1,39 @@
+import { Request, Response, NextFunction } from "express";
+import { AppError, ZodError, PrismaError } from "./error.types";
+import { ApiError } from "../types";
+
+// Тип для всех возможных ошибок
+type ErrorHandlerError = Error | AppError | ZodError | PrismaError;
+
 // Централизованный обработчик ошибок
-export const errorHandler = (err: any, _req: any, res: any, _next: any) => {
+export const errorHandler = (
+  err: ErrorHandlerError,
+  _req: Request,
+  res: Response<ApiError>,
+  _next: NextFunction
+) => {
   console.error("Ошибка:", err);
 
   // Обработка наших кастомных ошибок
-  if (err?.errorType === "NOT_FOUND") {
+  if ("errorType" in err && err.errorType === "NOT_FOUND") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  if (err?.errorType === "FORBIDDEN") {
+  if ("errorType" in err && err.errorType === "FORBIDDEN") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
-  if (err?.errorType === "VALIDATION") {
+  if ("errorType" in err && err.errorType === "VALIDATION") {
     return res.status(err.statusCode).json({ error: err.message });
   }
 
   // Обработка Zod ошибок валидации
-  if (err.name === "ZodError") {
+  if ("name" in err && err.name === "ZodError") {
     return res.status(400).json({ error: "Ошибка валидации: " + err.message });
   }
 
   // Обработка ошибок Prisma (запись не найдена)
-  if (err.code === "P2025" || err.code === "P2001") {
+  if ("code" in err && (err.code === "P2025" || err.code === "P2001")) {
     return res.status(404).json({ error: "Запрашиваемый объект не найден" });
   }
 

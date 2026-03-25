@@ -1,4 +1,4 @@
-import { AppError } from "./types";
+import { AppError } from "./error.types";
 
 // Фабрика для создания ошибки "Не найдено" (404)
 export const createNotFoundError = (
