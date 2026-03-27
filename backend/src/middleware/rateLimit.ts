@@ -113,37 +113,35 @@ export async function rateLimit(
   } catch (error) {
     console.error("Rate limit error (Redis unavailable):", error);
 
-    // Fail-closed: используем fallback в памяти, но блокируем при превышении лимита
+    // Упрощённый memory fallback с ленивым удалением устаревших записей
     const memoryEntry = memoryLimitStore.get(ip);
+    const windowMs = WINDOW_SIZE_IN_SECONDS * 1000;
 
-    if (memoryEntry && memoryEntry.resetAt > now) {
-      memoryEntry.count++;
-      if (memoryEntry.count >= MAX_REQUESTS_PER_WINDOW) {
+    // Если запись есть, но устарела — удаляем её
+    if (memoryEntry && memoryEntry.resetAt <= now) {
+      memoryLimitStore.delete(ip);
+    }
+
+    // Получаем актуальную запись (после возможного удаления)
+    const currentEntry = memoryLimitStore.get(ip);
+
+    if (currentEntry) {
+      // Запись активна, увеличиваем счётчик
+      currentEntry.count++;
+      if (currentEntry.count >= MAX_REQUESTS_PER_WINDOW) {
         return res.status(429).json({
           error: "Слишком много запросов от этого IP-адреса.",
-          message: `Превышен лимит запросов. Попробуйте через ${Math.ceil((memoryEntry.resetAt - now) / 1000)} секунд.`,
+          message: `Превышен лимит запросов. Попробуйте через ${Math.ceil((currentEntry.resetAt - now) / 1000)} секунд.`,
         });
       }
     } else {
+      // Нет активной записи, создаём новую
       memoryLimitStore.set(ip, {
         count: 1,
-        resetAt: now + WINDOW_SIZE_IN_SECONDS * 1000,
+        resetAt: now + windowMs,
       });
     }
 
     next();
   }
 }
-
-// Очистка устаревших записей каждые 5 минут
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, entry] of memoryLimitStore.entries()) {
-      if (entry.resetAt < now) {
-        memoryLimitStore.delete(key);
-      }
-    }
-  },
-  5 * 60 * 1000,
-);
