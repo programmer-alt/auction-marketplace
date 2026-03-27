@@ -1,0 +1,39 @@
+{
+  "name": "auction-marketplace",
+  "version": "1.0.0",
+  "description": "Full-stack auction marketplace with React, Node.js, Prisma, and Stripe",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "test": "npm run test --prefix backend",
+    "test:watch": "npm run test:watch --prefix backend"
+  },
+  "keywords": [
+    "auction",
+    "marketplace",
+    "react",
+    "nodejs",
+    "prisma",
+    "stripe"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/hpp": "^0.2.7",
+    "@types/supertest": "^7.2.0",
+    "concurrently": "^8.2.2",
+    "supertest": "^7.2.2"
+  },
+  "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3"
+  }
+}
