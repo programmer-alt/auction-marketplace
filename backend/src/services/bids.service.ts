@@ -59,17 +59,19 @@ export async function createBid(
 ): Promise<CreateBidResult> {
   // Проверяем валюту ставки относительно валюты аукциона
   if (currency) {
+    const normalizedCurrency = currency.toLowerCase();
     const auction = await prisma.auction.findUnique({
       where: { id: auctionId },
       select: { currency: true },
     });
-    if (auction && auction.currency !== currency.toLowerCase()) {
+    if (auction && auction.currency !== normalizedCurrency) {
       throw createValidationError(
         `Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`,
       );
     }
   }
 
+  const decimalAmount = new Prisma.Decimal(amount);
   try {
     const [updatedAuction, bid] = await prisma.$transaction([
       // Атомарное обновление аукциона с проверкой всех условий
@@ -78,10 +80,10 @@ export async function createBid(
           id: auctionId,
           status: "ACTIVE",
           endsAt: { gt: new Date() },
-          currentPrice: { lt: amount },
+          currentPrice: { lt: decimalAmount },
           sellerId: { not: userId },
         },
-        data: { currentPrice: amount, winnerId: userId },
+        data: { currentPrice: decimalAmount, winnerId: userId },
         include: {
           seller: {
             select: { id: true, email: true, name: true },
@@ -96,7 +98,7 @@ export async function createBid(
         data: {
           auctionId,
           userId,
-          amount,
+          amount: decimalAmount,
         },
         include: {
           user: {

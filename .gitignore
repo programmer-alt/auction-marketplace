@@ -58,3 +58,4 @@ backend/prisma/migrations/20260317171211_add_currency_to_auction/migration.sql
 backend/package-lock.json
 .codeassistant/rules/shell.mdc
 .amazonq/agents/default.json
+.fitten/rules/Уязвимости.md

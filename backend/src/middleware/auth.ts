@@ -37,11 +37,15 @@ export function parseAuthToken(token: string | undefined): AuthResult {
   }
 }
 
-// Функциональный middleware-адаптер для Express
+// Базовая функция проверки токена
+function checkAuthToken(authHeader: string | undefined): AuthResult {
+  return parseAuthToken(authHeader);
+}
+
+// Обязательная аутентификация
 export function createAuthMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const authHeader = req.headers.authorization;
-    const authResult = parseAuthToken(authHeader);
+    const authResult = checkAuthToken(req.headers.authorization);
 
     if (!authResult.success) {
       res.status(401).json({ error: authResult.error });
@@ -54,3 +58,28 @@ export function createAuthMiddleware() {
 }
 
 export const authMiddleware = createAuthMiddleware();
+
+// Опциональная аутентификация
+export function createOptionalAuthMiddleware() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    
+    // Если токен отсутствует - просто продолжаем
+    if (!authHeader) {
+      return next();
+    }
+
+    const authResult = checkAuthToken(authHeader);
+
+    // Если токен есть, но невалиден - возвращаем 401
+    if (!authResult.success) {
+      res.status(401).json({ error: authResult.error });
+      return;
+    }
+
+    (req as AuthRequest).user = authResult.user;
+    next();
+  };
+}
+
+export const optionalAuthMiddleware = createOptionalAuthMiddleware();
