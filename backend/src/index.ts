@@ -19,6 +19,7 @@ import authRouter from "./routes/auth.routes";
 import auctionsRouter from "./routes/auctions.routes";
 import bidsRouter from "./routes/bids.routes";
 import paymentsRouter from "./routes/payments.routes";
+import adminRouter from "./routes/admin.routes";
 
 // Import error handler
 import { errorHandler } from "./errors/handler";
@@ -110,6 +111,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/auctions", auctionsRouter);
 app.use("/api/auctions", bidsRouter); // ставки находятся под /api/auctions/:auctionId/bids
 app.use("/api/payments", paymentsRouter);
+app.use("/api/admin", adminRouter);
 
 // Error handling middleware - должно быть последним
 app.use(errorHandler);
@@ -117,6 +119,17 @@ app.use(errorHandler);
 // Socket.io подключение с авторизацией
 io.on("connection", (socket) => {
   console.log(`⚡ Клиент соединился: ${socket.id}`);
+
+  // Присоединение к личной комнате пользователя при подключении
+  socket.on("user:join", (data: { token: string }) => {
+    const authResult = parseAuthToken(data.token);
+    if (!authResult.success) {
+      socket.emit("error", { message: "Не авторизован" });
+      return;
+    }
+    socket.join(`user:${authResult.user.id}`);
+    console.log(`Клиент ${socket.id} вошёл в личную комнату user:${authResult.user.id}`);
+  });
 
   // Присоединение к комнате аукциона с проверкой авторизации
   socket.on("auction:join", (data: { auctionId: number; token?: string }) => {

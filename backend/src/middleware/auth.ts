@@ -5,6 +5,7 @@ import { getJwtSecret } from "../config/jwt";
 export interface AuthContext {
   id: number;
   email: string;
+  role: string;
 }
 
 export interface AuthRequest extends Request {
@@ -25,11 +26,11 @@ export function parseAuthToken(token: string | undefined): AuthResult {
     const decoded = jwt.verify(
       token.replace("Bearer ", ""),
       getJwtSecret(),
-    ) as { id: number; email: string };
+    ) as { id: number; email: string; role: string };
 
     return {
       success: true,
-      user: { id: decoded.id, email: decoded.email },
+      user: { id: decoded.id, email: decoded.email, role: decoded.role ?? 'USER' },
     };
   } catch (error) {
     console.error("Auth error:", error);

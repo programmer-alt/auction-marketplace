@@ -13,6 +13,7 @@ model User {
   email        String       @unique
   password     String
   name         String?
+  role         UserRole     @default(USER)
   balance      Decimal      @default(0) @db.Decimal(10, 2)
   auctions     Auction[]    @relation("SellerAuctions")
   wonAuctions  Auction[]    @relation("WinnerAuctions")
@@ -89,4 +90,9 @@ enum PaymentStatus {
   PENDING
   COMPLETED
   FAILED
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }

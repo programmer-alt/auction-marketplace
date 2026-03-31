@@ -16,12 +16,14 @@ vi.mock("bull", () => {
 // Мок Prisma
 const mockAuctionUpdate = vi.fn();
 const mockAuctionFindMany = vi.fn();
+const mockAuctionFindUnique = vi.fn();
 
 vi.mock("../config/db", () => ({
   prisma: {
     auction: {
       update: mockAuctionUpdate,
       findMany: mockAuctionFindMany,
+      findUnique: mockAuctionFindUnique,
     },
   },
 }));
@@ -49,6 +51,8 @@ describe("auctionCompletionQueue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTo.mockReturnValue({ emit: mockRoomEmit });
+    // findUnique по умолчанию возвращает ACTIVE — чтобы process handler проходил проверку статуса
+    mockAuctionFindUnique.mockResolvedValue({ status: 'ACTIVE' });
   });
 
   // ─── scheduleAuctionCompletion ───────────────────────────────────────────────
@@ -135,10 +139,11 @@ describe("auctionCompletionQueue", () => {
       await scheduleExistingAuctions();
 
       expect(mockAuctionFindMany).toHaveBeenCalledWith({
-        where: {
-          status: "ACTIVE",
-          endsAt: { gt: expect.any(Date) },
-        },
+        where: { status: "ACTIVE" },
+        select: { id: true, endsAt: true },
+        take: 100,
+        skip: 0,
+        orderBy: { endsAt: "asc" },
       });
       expect(mockAdd).toHaveBeenCalledTimes(2);
       expect(mockAdd.mock.calls[0][0]).toEqual({ auctionId: 1 });
@@ -168,7 +173,7 @@ describe("auctionCompletionQueue", () => {
       await runProcessHandler(1);
 
       expect(mockAuctionUpdate).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: 1, status: "ACTIVE" },
         data: { status: "COMPLETED" },
         include: { seller: true, winner: true },
       });

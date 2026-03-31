@@ -57,7 +57,7 @@ export async function register(email: string, password: string, name?: string) {
   });
 
   // Генерация JWT токена
-  const token = jwt.sign({ id: user.id, email: user.email }, getJwtSecret(), {
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, getJwtSecret(), {
     expiresIn: "7d",
   });
 
@@ -88,7 +88,7 @@ export async function login(email: string, password: string) {
   }
 
   // Генерация JWT токена
-  const token = jwt.sign({ id: user.id, email: user.email }, getJwtSecret(), {
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, getJwtSecret(), {
     expiresIn: "7d",
   });
 
