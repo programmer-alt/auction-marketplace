@@ -92,6 +92,17 @@ export async function rateLimit(
   const now = Date.now();
 
   try {
+    // Синхронизация: Redis восстановился — переносим счётчик из памяти
+    const memoryEntry = memoryLimitStore.get(ip);
+    if (memoryEntry && memoryEntry.resetAt > now) {
+      const remainingSeconds = Math.ceil((memoryEntry.resetAt - now) / 1000);
+      const existing = await redis.get(key);
+      if (existing === null) {
+        await redis.setex(key, remainingSeconds, String(memoryEntry.count));
+      }
+      memoryLimitStore.delete(ip);
+    }
+
     const current = await redis.get(key);
     if (current === null) {
       // First request in the window
