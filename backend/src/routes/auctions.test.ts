@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
 
-// Мокаем модули ДО импорта роутеров
-vi.mock("../index.js", async () => {
+// Создаём моки Prisma и Io, которые будут использоваться в обоих моках
+const { mockPrisma, mockIo } = vi.hoisted(() => {
   const mockPrisma = {
     auction: {
       findMany: vi.fn(),
@@ -27,11 +27,20 @@ vi.mock("../index.js", async () => {
     }),
   };
 
-  return {
-    prisma: mockPrisma,
-    io: mockIo,
-  };
+  return { mockPrisma, mockIo };
 });
+
+// Мокаем модули ДО импорта роутеров
+vi.mock("../index.js", () => ({
+  prisma: mockPrisma,
+  io: mockIo,
+}));
+
+// Мокаем config/db (чтобы перекрыть импорт prisma в сервисах)
+vi.mock("../config/db.js", () => ({
+  prisma: mockPrisma,
+  pool: {},
+}));
 
 // Мокаем auction completion queue
 vi.mock("../queues/auctionCompletionQueue.js", () => ({
@@ -47,6 +56,11 @@ vi.mock("../config/redis.js", () => ({
     del: vi.fn(),
     keys: vi.fn(),
   },
+}));
+
+// Мокаем socket.io config
+vi.mock("../config/socket.js", () => ({
+  getIo: vi.fn(() => mockIo),
 }));
 
 // Мокаем auth middleware
@@ -69,8 +83,6 @@ app.use(express.json());
 app.use("/api/auctions", auctionsRouter);
 
 // Типы для моков
-const mockPrisma = prisma as any;
-const mockIo = io as any;
 const mockRedis = redis as any;
 
 describe("Auctions Routes", () => {
@@ -326,14 +338,12 @@ describe("Auctions Routes", () => {
         .send(minimalData);
 
       expect(response.status).toBe(201);
-      expect(mockPrisma.auction.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            title: "Minimal Auction",
-            startingPrice: 50,
-          }),
-        }),
-      );
+      expect(mockPrisma.auction.create).toHaveBeenCalled();
+      const callArgs = mockPrisma.auction.create.mock.calls[0][0];
+      expect(callArgs.data.title).toBe("Minimal Auction");
+      expect(callArgs.data.startingPrice).toBeDefined();
+      // startingPrice может быть Decimal объектом, проверяем его строковое представление
+      expect(callArgs.data.startingPrice.toString()).toBe("50");
     });
 
     it("должен вернуть 400, если название пустое", async () => {

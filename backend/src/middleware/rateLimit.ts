@@ -85,7 +85,7 @@ export async function rateLimit(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
   const key = `rate_limit:${ip}`;
