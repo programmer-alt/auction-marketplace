@@ -26,8 +26,11 @@ const logger = {
   },
 };
 
+import { redis } from '../config/redis';
+
 export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>('auctionCompletion', {
-  redis: process.env.REDIS_URL || 'redis://localhost:6379',
+  // Переиспользуем единый Redis клиент из config/redis.ts
+  createClient: () => redis,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
