@@ -1,80 +1,60 @@
- import { Response } from 'express';
-import { z } from 'zod';
-import * as authService from '../services/auth.service';
-import { AuthRequest } from '../middleware/auth';
+import { z } from "zod";
+import * as authService from "../services/auth.service";
+import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { createNotFoundError } from "../errors/factories";
 
 // ========================================
 // Схемы валидации
 // ========================================
 
 const registerSchema = z.object({
-  email: z.string().email('Некорректный email'),
-  password: z.string().min(6, 'Пароль должен содержать не менее 6 символов'),
+  email: z.string().email("Некорректный email"),
+  password: z.string().min(6, "Пароль должен содержать не менее 6 символов"),
   name: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Некорректный email'),
-  password: z.string().min(1, 'Пароль обязателен'),
+  email: z.string().email("Некорректный email"),
+  password: z.string().min(1, "Пароль обязателен"),
 });
 
 // ========================================
-// Контроллер (объект с функциями)
+// Контроллер
 // ========================================
 
 export const authController = {
-  // Регистрация
-  async register(req: AuthRequest, res: Response) {
-    try {
-      const { email, password, name } = registerSchema.parse(req.body);
-      const result = await authService.register(email, password, name);
-      res.status(201).json({
-        message: 'Пользователь успешно зарегистрирован',
-        user: result.user,
-        token: result.token,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-        return;
-      }
-      console.error('Ошибка регистрации:', error);
-      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-  },
+  register: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) return next(parsed.error);
 
-  // Вход
-  async login(req: AuthRequest, res: Response) {
-    try {
-      const { email, password } = loginSchema.parse(req.body);
-      const result = await authService.login(email, password);
-      res.json({
-        message: 'Вход выполнен успешно',
-        user: result.user,
-        token: result.token,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-        return;
-      }
-      console.error('Ошибка входа:', error);
-      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-  },
+    const result = await authService.register(
+      parsed.data.email,
+      parsed.data.password,
+      parsed.data.name,
+    );
+    res.status(201).json({
+      message: "Пользователь успешно зарегистрирован",
+      user: result.user,
+      token: result.token,
+    });
+  }),
 
-  // Получение текущего пользователя
-  async getCurrentUser(req: AuthRequest, res: Response) {
-    try {
-      const user = await authService.getCurrentUser(req.user!.id);
-      if (!user) {
-        res.status(404).json({ error: 'Пользователь не найден' });
-        return;
-      }
-      res.json({ user });
-    } catch (error) {
-      console.error('Ошибка получения пользователя:', error);
-      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-  },
+  login: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) return next(parsed.error);
+
+    const result = await authService.login(parsed.data.email, parsed.data.password);
+    res.json({
+      message: "Вход выполнен успешно",
+      user: result.user,
+      token: result.token,
+    });
+  }),
+
+  getCurrentUser: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const user = await authService.getCurrentUser(req.user!.id);
+    if (!user) return next(createNotFoundError("Пользователь не найден"));
+    res.json({ user });
+  }),
 };
