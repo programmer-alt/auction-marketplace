@@ -59,3 +59,7 @@ backend/package-lock.json
 .codeassistant/rules/shell.mdc
 .amazonq/agents/default.json
 .fitten/rules/Уязвимости.md
+.qwen/settings.json
+.fitten/rules/code.md
+.qwen/settings.json
+.qwen/settings.json

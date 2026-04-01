@@ -1,12 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import { redis } from "../config/redis";
 import ipaddr from "ipaddr.js";
+import { LRUCache } from "lru-cache";
 
 const WINDOW_SIZE_IN_SECONDS = 60; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 100; // 100 requests per minute per IP
 
-// Fallback: если Redis недоступен, используем встроенный счётчик в памяти
-const memoryLimitStore = new Map<string, { count: number; resetAt: number }>();
+// Fallback: если Redis недоступен, используем LRU-кэш с ограничением размера и TTL
+const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }>({
+  max: 10_000,           // максимум 10k уникальных IP
+  ttl: WINDOW_SIZE_IN_SECONDS * 1000, // автоматическое удаление по истечении окна
+  ttlAutopurge: false,   // очистка только при обращении, не по таймеру
+});
 
 // Список доверенных прокси-подсетей (локальная сеть, Docker, CDN)
 const TRUSTED_PROXY_RANGES = [
@@ -124,20 +129,10 @@ export async function rateLimit(
   } catch (error) {
     console.error("Rate limit error (Redis unavailable):", error);
 
-    // Упрощённый memory fallback с ленивым удалением устаревших записей
-    const memoryEntry = memoryLimitStore.get(ip);
-    const windowMs = WINDOW_SIZE_IN_SECONDS * 1000;
-
-    // Если запись есть, но устарела — удаляем её
-    if (memoryEntry && memoryEntry.resetAt <= now) {
-      memoryLimitStore.delete(ip);
-    }
-
-    // Получаем актуальную запись (после возможного удаления)
+    // Memory fallback: LRUCache автоматически удаляет записи по TTL
     const currentEntry = memoryLimitStore.get(ip);
 
     if (currentEntry) {
-      // Запись активна, увеличиваем счётчик
       currentEntry.count++;
       if (currentEntry.count >= MAX_REQUESTS_PER_WINDOW) {
         return res.status(429).json({
@@ -146,11 +141,7 @@ export async function rateLimit(
         });
       }
     } else {
-      // Нет активной записи, создаём новую
-      memoryLimitStore.set(ip, {
-        count: 1,
-        resetAt: now + windowMs,
-      });
+      memoryLimitStore.set(ip, { count: 1, resetAt: now + WINDOW_SIZE_IN_SECONDS * 1000 });
     }
 
     next();
