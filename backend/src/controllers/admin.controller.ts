@@ -1,17 +1,18 @@
-import { Request, Response } from 'express';
-import { auctionCompletionQueue } from '../queues/auctionCompletionQueue';
+import { Request, Response } from "express";
+import { auctionCompletionQueue } from "../queues/auctionCompletionQueue";
+import { asyncHandler } from "../utils/asyncHandler";
 
-export async function getQueueStats(_req: Request, res: Response): Promise<void> {
+export const getQueueStats = asyncHandler(async (_req: Request, res: Response) => {
   const counts = await auctionCompletionQueue.getJobCounts();
   res.json({
-    queue: 'auctionCompletion',
+    queue: "auctionCompletion",
     stats: {
-      waiting:   counts.waiting,   // ждут выполнения
-      active:    counts.active,    // выполняются прямо сейчас
-      delayed:   counts.delayed,   // запланированы на будущее
-      completed: counts.completed, // успешно завершены
-      failed:    counts.failed,    // упали с ошибкой
+      waiting: counts.waiting,
+      active: counts.active,
+      delayed: counts.delayed,
+      completed: counts.completed,
+      failed: counts.failed,
     },
     timestamp: new Date().toISOString(),
   });
-}
+});
