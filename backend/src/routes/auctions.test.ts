@@ -76,11 +76,13 @@ vi.mock("../middleware/auth.js", () => ({
 import { prisma, io } from "../index";
 import { redis } from "../config/redis";
 import auctionsRouter from "./auctions.routes";
+import { errorHandler } from "../errors/handler";
 
 // Создаём тестовое Express приложение
 const app = express();
 app.use(express.json());
 app.use("/api/auctions", auctionsRouter);
+app.use(errorHandler);
 
 // Типы для моков
 const mockRedis = redis as any;
