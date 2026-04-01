@@ -77,7 +77,7 @@ app.use(
     origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS"),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   }),
 );
 
@@ -170,6 +170,16 @@ async function shutdown(signal: string) {
 
   httpServer.close(async () => {
     clearTimeout(shutdownTimeout);
+
+    // Закрываем Bull queue
+    try {
+      const { auctionCompletionQueue } = await import("./queues/auctionCompletionQueue");
+      await auctionCompletionQueue.close();
+      console.log("✅ Bull queue закрыт");
+    } catch (error) {
+      console.warn("⚠️ Не удалось закрыть Bull queue:", error);
+    }
+
     // Закрываем Redis клиенты
     try {
       await subClient.quit();
@@ -228,3 +238,15 @@ httpServer.listen(PORT, async () => {
 // Graceful shutdown
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// Необработанные отклонения промисов
+process.on("unhandledRejection", (reason: unknown) => {
+  console.error("Необработанное отклонение промиса:", reason);
+  shutdown("unhandledRejection").catch(() => process.exit(1));
+});
+
+// Необработанные исключения (синхронные)
+process.on("uncaughtException", (error: Error) => {
+  console.error("Необработанное исключение:", error);
+  shutdown("uncaughtException").catch(() => process.exit(1));
+});
