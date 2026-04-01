@@ -1,7 +1,8 @@
-import { Response } from "express";
 import { z } from "zod";
 import * as auctionsService from "../services/auctions.service";
 import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { createValidationError, createNotFoundError } from "../errors/factories";
 
 // ========================================
 // Схемы валидации
@@ -46,143 +47,55 @@ const updateAuctionSchema = z.object({
 });
 
 // ========================================
-// Контроллер (объект с функциями)
+// Контроллер
 // ========================================
 
 export const auctionsController = {
-  // Получение списка аукционов
-  async getAuctions(req: AuthRequest, res: Response) {
-    try {
-      const { status, sellerId, page = "1", limit = "20" } = req.query;
-      const result = await auctionsService.getAuctions({
-        status: status as string,
-        sellerId: sellerId ? parseInt(sellerId as string, 10) : undefined,
-        page: parseInt(page as string, 10),
-        limit: parseInt(limit as string, 10),
-      });
-      res.json(result);
-    } catch (error) {
-      console.error("Ошибка получения списка аукционов:", error);
-      res.status(500).json({ error: "Внутренняя ошибка сервера" });
-    }
-  },
+  getAuctions: asyncHandler<AuthRequest>(async (req, res) => {
+    const { status, sellerId, page = "1", limit = "20" } = req.query;
+    const result = await auctionsService.getAuctions({
+      status: status as string,
+      sellerId: sellerId ? parseInt(sellerId as string, 10) : undefined,
+      page: parseInt(page as string, 10),
+      limit: parseInt(limit as string, 10),
+    });
+    res.json(result);
+  }),
 
-  // Получение конкретного аукциона
-  async getAuctionById(req: AuthRequest, res: Response) {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) {
-        res.status(400).json({ error: "Некорректный ID аукциона" });
-        return;
-      }
-      const result = await auctionsService.getAuctionById(id);
-      if (!result) {
-        res.status(404).json({ error: "Аукцион не найден" });
-        return;
-      }
-      res.json({ auction: result });
-    } catch (error) {
-      console.error("Ошибка получения аукциона:", error);
-      res.status(500).json({ error: "Внутренняя ошибка сервера" });
-    }
-  },
+  getAuctionById: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
 
-  // Создание нового аукциона
-  async createAuction(req: AuthRequest, res: Response) {
-    try {
-      const data = createAuctionSchema.parse(req.body);
-      const userId = req.user!.id;
-      const result = await auctionsService.createAuction(data, userId);
-      res.status(201).json({
-        message: "Аукцион успешно создан",
-        auction: result,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-        return;
-      }
-      if (error instanceof Error) {
-        // Обработка ошибок из сервиса
-        if (error.message.includes("Дата окончания")) {
-          res.status(400).json({ error: error.message });
-          return;
-        }
-      }
-      console.error("Ошибка создания аукциона:", error);
-      res.status(500).json({ error: "Внутренняя ошибка сервера" });
-    }
-  },
+    const result = await auctionsService.getAuctionById(id);
+    if (!result) return next(createNotFoundError("Аукцион не найден"));
 
-  // Обновление аукциона
-  async updateAuction(req: AuthRequest, res: Response) {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) {
-        res.status(400).json({ error: "Некорректный ID аукциона" });
-        return;
-      }
-      const data = updateAuctionSchema.parse(req.body);
-      const userId = req.user!.id;
-      const result = await auctionsService.updateAuction(id, data, userId);
-      res.json({
-        message: "Аукцион успешно обновлён",
-        auction: result,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-        return;
-      }
-      if (error instanceof Error) {
-        // Обработка ошибок из сервиса
-        if (error.message.includes("Аукцион не найден")) {
-          res.status(404).json({ error: error.message });
-          return;
-        }
-        if (error.message.includes("Недостаточно прав")) {
-          res.status(403).json({ error: error.message });
-          return;
-        }
-        if (error.message.includes("Дата окончания")) {
-          res.status(400).json({ error: error.message });
-          return;
-        }
-        if (error.message.includes("активные аукционы")) {
-          res.status(400).json({ error: error.message });
-          return;
-        }
-      }
-      console.error("Ошибка обновления аукциона:", error);
-      res.status(500).json({ error: "Внутренняя ошибка сервера" });
-    }
-  },
+    res.json({ auction: result });
+  }),
 
-  // Удаление аукциона
-  async deleteAuction(req: AuthRequest, res: Response) {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) {
-        res.status(400).json({ error: "Некорректный ID аукциона" });
-        return;
-      }
-      const userId = req.user!.id;
-      await auctionsService.deleteAuction(id, userId);
-      res.json({ message: "Аукцион успешно удалён" });
-    } catch (error) {
-      if (error instanceof Error) {
-        // Обработка ошибок из сервиса
-        if (error.message.includes("Аукцион не найден")) {
-          res.status(404).json({ error: error.message });
-          return;
-        }
-        if (error.message.includes("Недостаточно прав")) {
-          res.status(403).json({ error: error.message });
-          return;
-        }
-      }
-      console.error("Ошибка удаления аукциона:", error);
-      res.status(500).json({ error: "Внутренняя ошибка сервера" });
-    }
-  },
+  createAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const parsed = createAuctionSchema.safeParse(req.body);
+    if (!parsed.success) return next(parsed.error);
+
+    const result = await auctionsService.createAuction(parsed.data, req.user!.id);
+    res.status(201).json({ message: "Аукцион успешно создан", auction: result });
+  }),
+
+  updateAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
+
+    const parsed = updateAuctionSchema.safeParse(req.body);
+    if (!parsed.success) return next(parsed.error);
+
+    const result = await auctionsService.updateAuction(id, parsed.data, req.user!.id);
+    res.json({ message: "Аукцион успешно обновлён", auction: result });
+  }),
+
+  deleteAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
+
+    await auctionsService.deleteAuction(id, req.user!.id);
+    res.json({ message: "Аукцион успешно удалён" });
+  }),
 };
