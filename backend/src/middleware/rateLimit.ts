@@ -105,7 +105,7 @@ export async function rateLimit(
 
     const current = await redis.get(key);
     if (current === null) {
-      // First request in the window
+      // Первый запрос в окне
       await redis.setex(key, WINDOW_SIZE_IN_SECONDS, "1");
       return next();
     }

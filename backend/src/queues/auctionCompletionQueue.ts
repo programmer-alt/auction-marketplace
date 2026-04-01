@@ -42,6 +42,12 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>('aucti
 // Обработчик задачи
 auctionCompletionQueue.process(async (job) => {
   const { auctionId } = job.data;
+
+  if (!auctionId || typeof auctionId !== 'number') {
+    logger.error(`Некорректный auctionId: ${auctionId}`);
+    return;
+  }
+
   logger.info(`🔄 Завершение аукциона ${auctionId}`);
 
   try {
@@ -61,22 +67,47 @@ auctionCompletionQueue.process(async (job) => {
       return;
     }
 
-    const auction = await prisma.auction.update({
+    let auction = await prisma.auction.update({
       where: { id: auctionId, status: 'ACTIVE' as AuctionStatus },
       data: { status: 'COMPLETED' as AuctionStatus },
       include: {
-        seller: true,
-        winner: true,
+        winner: { select: { id: true, email: true } },
       },
     });
 
+    // Fallback: если победитель не установлен — берём из последней ставки
+    let winnerId = auction.winnerId;
+    if (!winnerId) {
+      const lastBid = await prisma.bid.findFirst({
+        where: { auctionId },
+        orderBy: { amount: 'desc' },
+        select: { userId: true },
+      });
+      if (lastBid) {
+        auction = await prisma.auction.update({
+          where: { id: auctionId },
+          data: { winnerId: lastBid.userId },
+          include: { winner: { select: { id: true, email: true } } },
+        });
+        winnerId = lastBid.userId;
+        logger.info(`🏆 Победитель аукциона ${auctionId} определён из ставок: ${winnerId}`);
+      }
+    }
+
+    const payload = {
+      auctionId: auction.id,
+      status: auction.status,
+      winner: auction.winner,
+      finalPrice: auction.currentPrice,
+      endedAt: auction.endsAt,
+    };
+
     const io = getIo();
+    io.to(`auction:${auctionId}`).emit(WS_AUCTION_ENDED, payload);
+    io.emit(WS_AUCTION_UPDATED, payload);
 
-    io.to(`auction:${auctionId}`).emit(WS_AUCTION_ENDED, auction);
-    io.emit(WS_AUCTION_UPDATED, auction);
-
-    if (auction.winnerId) {
-      io.to(`user:${auction.winnerId}`).emit(WS_AUCTION_WON, {
+    if (winnerId) {
+      io.to(`user:${winnerId}`).emit(WS_AUCTION_WON, {
         auctionId: auction.id,
         title: auction.title,
         amount: auction.currentPrice,
@@ -86,11 +117,11 @@ auctionCompletionQueue.process(async (job) => {
     io.to(`user:${auction.sellerId}`).emit(WS_AUCTION_SOLD, {
       auctionId: auction.id,
       title: auction.title,
-      winnerId: auction.winnerId,
+      winnerId,
       amount: auction.currentPrice,
     });
 
-    logger.info(`✅ Аукцион ${auctionId} завершён`);
+    logger.info(`✅ Аукцион ${auctionId} завершён, победитель: ${winnerId ?? 'нет'}, цена: ${auction.currentPrice}`);
   } catch (error) {
     logger.error(`❌ Ошибка завершения аукциона ${auctionId}:`, error);
     throw error instanceof Error ? error : new Error(`Unknown error completing auction ${auctionId}`);
@@ -100,29 +131,36 @@ auctionCompletionQueue.process(async (job) => {
 /**
  * Добавляет задачу на завершение аукциона
  */
-export function scheduleAuctionCompletion(auctionId: number, endsAt: Date): void {
+export async function scheduleAuctionCompletion(auctionId: number, endsAt: Date): Promise<void> {
   const delay = endsAt.getTime() - Date.now();
   const jobId = `auction:${auctionId}`;
 
-  if (delay <= 0) {
-    auctionCompletionQueue.add({ auctionId }, { delay: 0, jobId });
-    logger.info(`Аукцион ${auctionId} просрочен, добавляем немедленно`);
+  // Защита от дубликатов
+  const existing = await auctionCompletionQueue.getJob(jobId);
+  if (existing) {
+    logger.warn(`Задача для аукциона ${auctionId} уже существует, пропускаем`);
     return;
   }
 
-  auctionCompletionQueue.add({ auctionId }, { delay, jobId });
-  logger.info(`⏰ Запланировано завершение аукциона ${auctionId} через ${Math.round(delay / 1000)} сек`);
+  await auctionCompletionQueue.add({ auctionId }, { delay: Math.max(delay, 0), jobId });
+  logger.info(
+    delay <= 0
+      ? `Аукцион ${auctionId} просрочен, добавляем немедленно`
+      : `⏰ Запланировано завершение аукциона ${auctionId} через ${Math.round(delay / 1000)} сек`
+  );
 }
 
 /**
  * Удаляет запланированную задачу завершения аукциона
  */
-export async function removeScheduledAuctionCompletion(auctionId: number): Promise<void> {
+export async function removeScheduledAuctionCompletion(auctionId: number): Promise<boolean> {
   const job = await auctionCompletionQueue.getJob(`auction:${auctionId}`);
   if (job) {
     await job.remove();
     logger.info(`🗑️ Удалена задача для аукциона ${auctionId}`);
+    return true;
   }
+  return false;
 }
 
 /**
@@ -151,7 +189,7 @@ export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
     logger.debug(`Пачка: ${auctions.length} аукционов (просрочено: ${overdue}, предстоит: ${upcoming})`);
 
     for (const auction of auctions) {
-      scheduleAuctionCompletion(auction.id, auction.endsAt);
+      await scheduleAuctionCompletion(auction.id, auction.endsAt);
     }
 
     total += auctions.length;
