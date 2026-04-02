@@ -145,7 +145,7 @@ export interface CacheAuctionsList {
 // ========================================
 
 export interface ApiError {
-  error: string;
+  error: string | unknown[];
 }
 
 export interface ApiSuccess<T> {
