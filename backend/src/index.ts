@@ -196,10 +196,14 @@ async function shutdown(signal: string) {
     }
 
     // Синхронный вывод логов ПЕРЕД process.exit()
-    console.log("✅ Bull queue закрыт");
-    console.log("✅ Redis подключения закрыты");
-    console.log("✅ Подключения к БД закрыты");
-    console.log("✅ Все подключения закрыты");
+    // Используем process.stdout.write + sync для гарантии вывода
+    const logs = [
+      "✅ Bull queue закрыт",
+      "✅ Redis подключения закрыты",
+      "✅ Подключения к БД закрыты",
+      "✅ Все подключения закрыты",
+    ];
+    logs.forEach((log) => process.stdout.write(log + "\n"));
 
     process.exit(0);
   });
