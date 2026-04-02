@@ -161,57 +161,28 @@ io.on("connection", (socket) => {
 async function shutdown(signal: string) {
   console.log(`\n🛑 Получен сигнал ${signal}. Завершение работы...`);
 
-  // Даём серверу 5 секунд на корректное закрытие
-  const shutdownTimeout = setTimeout(() => {
-    console.warn("⚠️ Принудительное завершение из-за таймаута");
-    process.exit(1);
-  }, 5000);
+  httpServer.closeAllConnections();
+  httpServer.close();
 
-  httpServer.close(async () => {
-    clearTimeout(shutdownTimeout);
+  // Закрываем Bull queue
+  try {
+    const { auctionCompletionQueue } = await import("./queues/auctionCompletionQueue");
+    await auctionCompletionQueue.close();
+  } catch {}
 
-    // Закрываем Bull queue
-    try {
-      const { auctionCompletionQueue } =
-        await import("./queues/auctionCompletionQueue");
-      await auctionCompletionQueue.close();
-    } catch (error) {
-      console.warn("⚠️ Не удалось закрыть Bull queue:", error);
-    }
+  // Закрываем Redis клиенты
+  try {
+    await subClient.quit();
+    await pubClient.quit();
+  } catch {}
 
-    // Закрываем Redis клиенты
-    try {
-      await subClient.quit();
-      await pubClient.quit(); // общий redis из redis.ts
-    } catch (error) {
-      console.warn("⚠️ Не удалось корректно закрыть Redis подключения:", error);
-    }
+  // Закрываем подключение Prisma и пул PostgreSQL
+  try {
+    await prisma.$disconnect();
+    await pool.end();
+  } catch {}
 
-    // Закрываем подключение Prisma и пул PostgreSQL
-    try {
-      await prisma.$disconnect();
-      await pool.end();
-    } catch (error) {
-      console.warn("⚠️ Не удалось корректно закрыть подключения к БД:", error);
-    }
-
-    // Синхронный вывод логов ПЕРЕД process.exit()
-    // Используем process.stdout.write + sync для гарантии вывода
-    const logs = [
-      "✅ Bull queue закрыт",
-      "✅ Redis подключения закрыты",
-      "✅ Подключения к БД закрыты",
-      "✅ Все подключения закрыты",
-    ];
-    logs.forEach((log) => process.stdout.write(log + "\n"));
-
-    process.exit(0);
-  });
-
-  // Принудительно закрываем все соединения через 1 секунду
-  setTimeout(() => {
-    httpServer.closeAllConnections();
-  }, 1000);
+  process.exit(0);
 }
 
 // Запуск сервера
