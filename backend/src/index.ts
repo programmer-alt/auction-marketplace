@@ -8,6 +8,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
+import { compressionOptions } from "./config/compression";
 import { rateLimit } from "./middleware/rateLimit";
 import { parseAuthToken } from "./middleware/auth";
 import { generateCsrfToken, verifyCsrfToken } from "./middleware/csrf";
@@ -67,10 +68,10 @@ app.use(helmet({
 }));
 
 // Защита от parameter pollution
-app.use(hpp() as any);
+app.use(hpp());
 
 // Сжатие ответов
-app.use(compression() as any);
+app.use(compression(compressionOptions));
 
 app.use(
   cors({
@@ -88,7 +89,7 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
 // Cookie parser для CSRF и других middleware
-app.use(cookieParser() as any);
+app.use(cookieParser());
 
 // Rate limiting middleware (применяется ко всем маршрутам, кроме health)
 app.use(rateLimit);
@@ -116,35 +117,29 @@ app.use("/api/admin", adminRouter);
 // Error handling middleware - должно быть последним
 app.use(errorHandler);
 
-// Socket.io подключение с авторизацией
+// Socket.io middleware — проверяет токен один раз при подключении
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token as string | undefined;
+  const authResult = parseAuthToken(token);
+  if (!authResult.success) {
+    return next(new Error("Не авторизован"));
+  }
+  socket.data.user = authResult.user;
+  next();
+});
+
+// Socket.io подключение — токен уже проверен middleware выше
 io.on("connection", (socket) => {
-  console.log(`⚡ Клиент соединился: ${socket.id}`);
+  const user = socket.data.user;
+  console.log(`⚡ Клиент соединился: ${socket.id} (пользователь ${user.id})`);
 
-  // Присоединение к личной комнате пользователя при подключении
-  socket.on("user:join", (data: { token: string }) => {
-    const authResult = parseAuthToken(data.token);
-    if (!authResult.success) {
-      socket.emit("error", { message: "Не авторизован" });
-      return;
-    }
-    socket.join(`user:${authResult.user.id}`);
-    console.log(`Клиент ${socket.id} вошёл в личную комнату user:${authResult.user.id}`);
-  });
+  // Автоматически входим в личную комнату пользователя
+  socket.join(`user:${user.id}`);
 
-  // Присоединение к комнате аукциона с проверкой авторизации
-  socket.on("auction:join", (data: { auctionId: number; token?: string }) => {
-    const authHeader = data.token;
-    const authResult = parseAuthToken(authHeader);
-
-    if (!authResult.success) {
-      socket.emit("error", { message: "Не авторизован" });
-      return;
-    }
-
+  // Присоединение к комнате аукциона
+  socket.on("auction:join", (data: { auctionId: number }) => {
     socket.join(`auction:${data.auctionId}`);
-    console.log(
-      `Клиент ${socket.id} (пользователь ${authResult.user.id}) присоединился к аукциону:${data.auctionId}`,
-    );
+    console.log(`Клиент ${socket.id} (пользователь ${user.id}) присоединился к аукциону:${data.auctionId}`);
   });
 
   // Покинуть комнату аукциона
@@ -154,7 +149,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`🔌 Клиент отключился: ${socket.id}`);
+    console.log(`🔌 Клиент отключился: ${socket.id} (пользователь ${user.id})`);
   });
 });
 
