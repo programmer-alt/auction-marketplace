@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { Prisma, UserRole } from "@prisma/client";
 import * as authService from "./auth.service";
 import { getUserByEmail, createUser, getUserById } from "../repositories/users.repository";
 import { getJwtSecret } from "../config/jwt";
@@ -38,7 +39,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        balance: 0 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(0),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -54,7 +56,7 @@ describe("Auth Service", () => {
         name: "Test User",
       });
       expect(mockJwtSign).toHaveBeenCalledWith(
-        { id: 1, email: "test@example.com" },
+        { id: 1, email: "test@example.com", role: UserRole.USER },
         "test-secret",
         { expiresIn: "7d" },
       );
@@ -74,7 +76,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: "Existing User",
         password: "hashed",
-        balance: 0 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(0),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -92,7 +95,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: null,
         password: "hashed-password",
-        balance: 0 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(0),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -105,6 +109,11 @@ describe("Auth Service", () => {
         password: "hashed-password",
         name: undefined,
       });
+      expect(mockJwtSign).toHaveBeenCalledWith(
+        { id: 1, email: "test@example.com", role: UserRole.USER },
+        "test-secret",
+        { expiresIn: "7d" },
+      );
       expect(result.user.name).toBeNull();
     });
   });
@@ -116,7 +125,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        balance: 100 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(100),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -129,7 +139,7 @@ describe("Auth Service", () => {
       expect(mockGetUserByEmail).toHaveBeenCalledWith({}, "test@example.com");
       expect(mockBcryptCompare).toHaveBeenCalledWith("password123", "hashed-password");
       expect(mockJwtSign).toHaveBeenCalledWith(
-        { id: 1, email: "test@example.com" },
+        { id: 1, email: "test@example.com", role: UserRole.USER },
         "test-secret",
         { expiresIn: "7d" },
       );
@@ -138,7 +148,7 @@ describe("Auth Service", () => {
           id: 1,
           email: "test@example.com",
           name: "Test User",
-          balance: 100 as any,
+          balance: new Prisma.Decimal(100),
         },
         token: "fake-jwt-token",
       });
@@ -158,7 +168,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        balance: 0 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(0),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -178,7 +189,8 @@ describe("Auth Service", () => {
         email: "test@example.com",
         name: "Test User",
         password: "hashed",
-        balance: 0 as any,
+        role: UserRole.USER,
+        balance: new Prisma.Decimal(0),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
