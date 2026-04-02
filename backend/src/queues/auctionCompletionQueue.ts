@@ -43,7 +43,7 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
     maxRetriesPerRequest: null,
     // Для blocking client отключаем retryStrategy (не нужен для BRPOP)
     retryStrategy: isBlockingClient
-      ? null
+      ? undefined
       : (times) => {
           return Math.min(times * 50, 2000);
         },
