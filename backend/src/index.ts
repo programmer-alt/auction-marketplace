@@ -50,22 +50,24 @@ export { io };
 // ========================================
 
 // Helmet для security headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false,
-}));
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 // Защита от parameter pollution
 app.use(hpp());
@@ -77,8 +79,8 @@ app.use(
   cors({
     origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS"),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   }),
 );
 
@@ -139,7 +141,9 @@ io.on("connection", (socket) => {
   // Присоединение к комнате аукциона
   socket.on("auction:join", (data: { auctionId: number }) => {
     socket.join(`auction:${data.auctionId}`);
-    console.log(`Клиент ${socket.id} (пользователь ${user.id}) присоединился к аукциону:${data.auctionId}`);
+    console.log(
+      `Клиент ${socket.id} (пользователь ${user.id}) присоединился к аукциону:${data.auctionId}`,
+    );
   });
 
   // Покинуть комнату аукциона
@@ -168,9 +172,9 @@ async function shutdown(signal: string) {
 
     // Закрываем Bull queue
     try {
-      const { auctionCompletionQueue } = await import("./queues/auctionCompletionQueue");
+      const { auctionCompletionQueue } =
+        await import("./queues/auctionCompletionQueue");
       await auctionCompletionQueue.close();
-      console.log("✅ Bull queue закрыт");
     } catch (error) {
       console.warn("⚠️ Не удалось закрыть Bull queue:", error);
     }
@@ -179,7 +183,6 @@ async function shutdown(signal: string) {
     try {
       await subClient.quit();
       await pubClient.quit(); // общий redis из redis.ts
-      console.log("✅ Redis подключения закрыты");
     } catch (error) {
       console.warn("⚠️ Не удалось корректно закрыть Redis подключения:", error);
     }
@@ -188,12 +191,16 @@ async function shutdown(signal: string) {
     try {
       await prisma.$disconnect();
       await pool.end();
-      console.log("✅ Подключения к БД закрыты");
     } catch (error) {
       console.warn("⚠️ Не удалось корректно закрыть подключения к БД:", error);
     }
 
+    // Синхронный вывод логов ПЕРЕД process.exit()
+    console.log("✅ Bull queue закрыт");
+    console.log("✅ Redis подключения закрыты");
+    console.log("✅ Подключения к БД закрыты");
     console.log("✅ Все подключения закрыты");
+
     process.exit(0);
   });
 
