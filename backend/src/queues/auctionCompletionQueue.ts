@@ -1,4 +1,5 @@
 import Queue from 'bull';
+import Redis from 'ioredis';
 import { prisma } from '../config/db';
 import { getIo } from '../config/socket';
 import { AuctionStatus } from '@prisma/client';
@@ -26,11 +27,23 @@ const logger = {
   },
 };
 
-import { redis } from '../config/redis';
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+
+// Создаём отдельные Redis клиенты для Bull с отключенными проблемными опциями
+const createBullClient = (type: 'client' | 'subscriber' | 'bclient') => {
+  return new Redis(redisUrl, {
+    enableReadyCheck: false,
+    maxRetriesPerRequest: null,
+    // Дополнительные настройки для стабильности
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+  });
+};
 
 export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>('auctionCompletion', {
-  // Переиспользуем единый Redis клиент из config/redis.ts
-  createClient: () => redis,
+  createClient: createBullClient,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
