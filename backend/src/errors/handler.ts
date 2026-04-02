@@ -29,7 +29,8 @@ export const errorHandler = (
 
   // Обработка Zod ошибок валидации
   if ("name" in err && err.name === "ZodError") {
-    return res.status(400).json({ error: (err as ZodError).errors ?? err.message });
+    const zodErr = err as import("zod").ZodError;
+    return res.status(400).json({ error: zodErr.errors });
   }
 
   // Обработка ошибок Prisma (запись не найдена)
