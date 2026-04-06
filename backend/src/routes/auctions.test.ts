@@ -49,12 +49,41 @@ vi.mock("../queues/auctionCompletionQueue.js", () => ({
 }));
 
 // Мокаем redis
+const {
+  mockRedisGet,
+  mockRedisSetex,
+  mockRedisDel,
+  mockRedisKeys,
+  mockRedisIncr,
+  mockSafeRedisGet,
+  mockSafeRedisSetex,
+  mockSafeRedisDel,
+  mockSafeRedisKeys,
+} = vi.hoisted(() => ({
+  mockRedisGet: vi.fn(),
+  mockRedisSetex: vi.fn(),
+  mockRedisDel: vi.fn(),
+  mockRedisKeys: vi.fn(),
+  mockRedisIncr: vi.fn(),
+  mockSafeRedisGet: vi.fn(),
+  mockSafeRedisSetex: vi.fn(),
+  mockSafeRedisDel: vi.fn(),
+  mockSafeRedisKeys: vi.fn(),
+}));
+
 vi.mock("../config/redis.js", () => ({
   redis: {
-    get: vi.fn(),
-    setex: vi.fn(),
-    del: vi.fn(),
-    keys: vi.fn(),
+    get: mockRedisGet,
+    setex: mockRedisSetex,
+    del: mockRedisDel,
+    keys: mockRedisKeys,
+    incr: mockRedisIncr,
+  },
+  safeRedis: {
+    get: mockSafeRedisGet,
+    setex: mockSafeRedisSetex,
+    del: mockSafeRedisDel,
+    keys: mockSafeRedisKeys,
   },
 }));
 
@@ -74,7 +103,6 @@ vi.mock("../middleware/auth.js", () => ({
 
 // Импортируем моканые модули
 import { prisma, io } from "../index";
-import { redis } from "../config/redis";
 import auctionsRouter from "./auctions.routes";
 import { errorHandler } from "../errors/handler";
 
@@ -84,17 +112,14 @@ app.use(express.json());
 app.use("/api/auctions", auctionsRouter);
 app.use(errorHandler);
 
-// Типы для моков
-const mockRedis = redis as any;
-
 describe("Auctions Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Настраиваем моки redis по умолчанию
-    mockRedis.get.mockResolvedValue(null);
-    mockRedis.setex.mockResolvedValue(undefined);
-    mockRedis.del.mockResolvedValue(undefined);
-    mockRedis.keys.mockResolvedValue([]);
+    // Настраиваем safeRedis моки по умолчанию
+    mockSafeRedisGet.mockResolvedValue(null);
+    mockSafeRedisSetex.mockResolvedValue(undefined);
+    mockSafeRedisDel.mockResolvedValue(undefined);
+    mockSafeRedisKeys.mockResolvedValue([]);
   });
 
   // ========================================

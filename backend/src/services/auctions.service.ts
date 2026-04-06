@@ -11,13 +11,13 @@ import {
   scheduleAuctionCompletion,
   removeScheduledAuctionCompletion,
 } from "../queues/auctionCompletionQueue";
-import { redis } from "../config/redis";
+import { safeRedis } from "../config/redis";
 import {
   safeJsonParse,
   validateAuction,
   validateAuctionsList,
 } from "../utils/json";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../types";
 import {
   createValidationError,
   createForbiddenError,
@@ -42,10 +42,8 @@ function getAuctionCacheKey(id: number): string {
 
 // Удаление всех кэшированных списков аукционов
 async function invalidateAuctionsLists() {
-  const keys = await redis.keys("auctions:list:*");
-  if (keys.length > 0) {
-    await redis.del(...keys);
-  }
+  const keys = await safeRedis.keys("auctions:list:*");
+  await safeRedis.del(...keys);
 }
 
 // ========================================
@@ -83,15 +81,13 @@ export interface UpdateAuctionInput {
 export async function getAuctions(options: GetAuctionsOptions) {
   const cacheKey = getAuctionsCacheKey(options);
 
-  // Пытаемся получить данные из кэша
-  const cached = await redis.get(cacheKey);
+  const cached = await safeRedis.get(cacheKey);
   if (cached) {
     const parsed = safeJsonParse(cached);
     if (parsed && validateAuctionsList(parsed)) {
       return parsed;
     }
-    // Если кэш повреждён, удаляем его
-    await redis.del(cacheKey);
+    await safeRedis.del(cacheKey);
   }
 
   const { status, sellerId, page, limit } = options;
@@ -116,7 +112,7 @@ export async function getAuctions(options: GetAuctionsOptions) {
 
   // Преобразуем аукционы к упрощенной форме для кэширования
   const simplifiedResult = {
-    auctions: auctions.map((auction) => ({
+    auctions: auctions.map((auction: any) => ({
       id: auction.id,
       title: auction.title,
       startingPrice: Number(auction.startingPrice),
@@ -127,12 +123,7 @@ export async function getAuctions(options: GetAuctionsOptions) {
     pagination: result.pagination,
   };
 
-  // Сохраняем в кэш с TTL
-  await redis.setex(
-    cacheKey,
-    CACHE_TTL_SECONDS,
-    JSON.stringify(simplifiedResult),
-  );
+  await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedResult));
 
   return result;
 }
@@ -143,24 +134,18 @@ export async function getAuctions(options: GetAuctionsOptions) {
 export async function getAuctionById(id: number) {
   const cacheKey = getAuctionCacheKey(id);
 
-  // Пытаемся получить данные из кэша
-  const cached = await redis.get(cacheKey);
+  const cached = await safeRedis.get(cacheKey);
   if (cached) {
     const parsed = safeJsonParse(cached);
     if (parsed && validateAuction(parsed)) {
-      // Если данные в кэше валидны, получаем полный объект из базы
-      // Это обеспечит согласованность данных, но сэкономит время на валидации
-      return await getAuctionByIdRepo(prisma, id);
+      return parsed;
     }
-    // Если кэш повреждён, удаляем его
-    await redis.del(cacheKey);
+    await safeRedis.del(cacheKey);
   }
 
   const auction = await getAuctionByIdRepo(prisma, id);
 
-  // Сохраняем в кэш только если аукцион найден
   if (auction) {
-    // Преобразуем аукцион к упрощенной форме для кэширования
     const simplifiedAuction = {
       id: auction.id,
       title: auction.title,
@@ -169,12 +154,7 @@ export async function getAuctionById(id: number) {
       createdAt: auction.createdAt.toISOString(),
       endsAt: auction.endsAt.toISOString(),
     };
-
-    await redis.setex(
-      cacheKey,
-      CACHE_TTL_SECONDS,
-      JSON.stringify(simplifiedAuction),
-    );
+    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedAuction));
   }
 
   return auction;
@@ -275,8 +255,7 @@ export async function updateAuction(
   // Уведомление через WebSocket об обновлении аукциона
   getIo().to(`auction:${id}`).emit("auction:updated", auction);
 
-  // Инвалидация кэша
-  await redis.del(getAuctionCacheKey(id));
+  await safeRedis.del(getAuctionCacheKey(id));
   await invalidateAuctionsLists();
 
   return auction;
@@ -312,7 +291,6 @@ export async function deleteAuction(id: number, userId: number) {
   // Уведомление через WebSocket об удалении аукциона
   getIo().to(`auction:${id}`).emit("auction:deleted", { id });
 
-  // Инвалидация кэша
-  await redis.del(getAuctionCacheKey(id));
+  await safeRedis.del(getAuctionCacheKey(id));
   await invalidateAuctionsLists();
 }

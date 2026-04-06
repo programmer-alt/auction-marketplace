@@ -2,7 +2,7 @@ import Queue from "bull";
 import Redis from "ioredis";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
-import { AuctionStatus } from "@prisma/client";
+
 
 // Типизация данных задачи
 interface AuctionCompletionJobData {
@@ -97,15 +97,15 @@ auctionCompletionQueue.process(async (job) => {
     }
 
     let auction = await prisma.auction.update({
-      where: { id: auctionId, status: "ACTIVE" as AuctionStatus },
-      data: { status: "COMPLETED" as AuctionStatus },
+      where: { id: auctionId, status: "ACTIVE" },
+      data: { status: "COMPLETED" },
       include: {
         winner: { select: { id: true, email: true } },
       },
     });
 
     // Fallback: если победитель не установлен — берём из последней ставки
-    let winnerId = auction.winnerId;
+    let {winnerId} = auction;
     if (!winnerId) {
       const lastBid = await prisma.bid.findFirst({
         where: { auctionId },
@@ -227,8 +227,8 @@ export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
     if (auctions.length === 0) break;
 
     const now = new Date();
-    const overdue = auctions.filter((a) => a.endsAt <= now).length;
-    const upcoming = auctions.filter((a) => a.endsAt > now).length;
+    const overdue = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt <= now).length;
+    const upcoming = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt > now).length;
     logger.debug(
       `Пачка: ${auctions.length} аукционов (просрочено: ${overdue}, предстоит: ${upcoming})`,
     );

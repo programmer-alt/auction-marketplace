@@ -11,7 +11,7 @@ import compression from "compression";
 import { compressionOptions } from "./config/compression";
 import { rateLimit } from "./middleware/rateLimit";
 import { parseAuthToken } from "./middleware/auth";
-import { generateCsrfToken, verifyCsrfToken } from "./middleware/csrf";
+import { generateCsrfToken, verifyCsrfToken, generateToken } from "./middleware/csrf";
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
 
@@ -105,6 +105,18 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// CSRF токен эндпоинт — фронтенд вызывает при старте
+app.get("/api/csrf-token", (req, res) => {
+  const token = generateToken();
+  res.cookie('csrfToken', token, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+  res.json({ csrfToken: token });
+});
+
 // API routes
 app.get("/api", (_req, res) => {
   res.json({ message: "Auction Marketplace API", version: "1.0.0" });
@@ -132,7 +144,7 @@ io.use((socket, next) => {
 
 // Socket.io подключение — токен уже проверен middleware выше
 io.on("connection", (socket) => {
-  const user = socket.data.user;
+  const {user} = socket.data;
   console.log(`⚡ Клиент соединился: ${socket.id} (пользователь ${user.id})`);
 
   // Автоматически входим в личную комнату пользователя

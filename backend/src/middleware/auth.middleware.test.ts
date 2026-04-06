@@ -38,23 +38,33 @@ describe("Auth Middleware", () => {
     });
 
     it("должен успешно декодировать валидный токен", () => {
-      mockJwtVerify.mockImplementation(() => ({ id: 1, email: "test@example.com" }));
+      mockJwtVerify.mockImplementation(() => ({
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+      }));
       const result = parseAuthToken("Bearer valid-token");
       expect(mockJwtVerify).toHaveBeenCalledWith("valid-token", "test-secret");
       expect(result).toEqual({
         success: true,
-        user: { id: 1, email: "test@example.com" },
+        user: { id: 1, email: "test@example.com", role: "USER" },
       });
     });
 
     it("должен удалить префикс Bearer", () => {
-      mockJwtVerify.mockImplementation(() => ({ id: 1, email: "test@example.com" }));
+      mockJwtVerify.mockImplementation(() => ({
+        id: 1,
+        email: "test@example.com",
+      }));
       parseAuthToken("Bearer token123");
       expect(mockJwtVerify).toHaveBeenCalledWith("token123", "test-secret");
     });
 
     it("должен обработать токен без префикса Bearer", () => {
-      mockJwtVerify.mockImplementation(() => ({ id: 1, email: "test@example.com" }));
+      mockJwtVerify.mockImplementation(() => ({
+        id: 1,
+        email: "test@example.com",
+      }));
       parseAuthToken("token123");
       expect(mockJwtVerify).toHaveBeenCalledWith("token123", "test-secret");
     });
@@ -73,7 +83,11 @@ describe("Auth Middleware", () => {
 
   describe("createAuthMiddleware", () => {
     it("должен установить req.user и вызвать next() при валидном токене", () => {
-      mockJwtVerify.mockImplementation(() => ({ id: 1, email: "test@example.com" }));
+      mockJwtVerify.mockImplementation(() => ({
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+      }));
       const middleware = createAuthMiddleware();
       const req = {
         headers: {
@@ -88,7 +102,11 @@ describe("Auth Middleware", () => {
 
       middleware(req, res, next);
 
-      expect((req as any).user).toEqual({ id: 1, email: "test@example.com" });
+      expect((req as any).user).toEqual({
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+      });
       expect(next).toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).not.toHaveBeenCalled();
@@ -138,7 +156,11 @@ describe("Auth Middleware", () => {
 
   describe("createOptionalAuthMiddleware", () => {
     it("должен установить req.user и вызвать next() при валидном токене", () => {
-      mockJwtVerify.mockImplementation(() => ({ id: 1, email: "test@example.com" }));
+      mockJwtVerify.mockImplementation(() => ({
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+      }));
       const middleware = createOptionalAuthMiddleware();
       const req = {
         headers: {
@@ -153,7 +175,11 @@ describe("Auth Middleware", () => {
 
       middleware(req, res, next);
 
-      expect((req as any).user).toEqual({ id: 1, email: "test@example.com" });
+      expect((req as any).user).toEqual({
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+      });
       expect(next).toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).not.toHaveBeenCalled();

@@ -4,7 +4,7 @@ import {
   getBidsByAuctionId as getBidsByAuctionIdRepo,
   getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
 } from "../repositories/bids.repository";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../types";
 import { BidWithRelations } from "../types";
 import { createValidationError, createNotFoundError } from "../errors/factories";
 

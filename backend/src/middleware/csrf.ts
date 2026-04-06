@@ -5,7 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 
 const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
 
-function generateToken(): string {
+export function generateToken(): string {
   const random = Math.random().toString(36).substring(2) + Date.now().toString(36);
   const signature = Buffer.from(random + CSRF_SECRET).toString('base64');
   return `${Buffer.from(random).toString('base64')}.${signature}`;
@@ -62,20 +62,20 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
     return next();
   }
 
+  // Пропускаем auth маршруты — они защищены JWT
+  if (req.path.startsWith('/auth')) {
+    return next();
+  }
+
   const tokenFromCookie = req.cookies?.csrfToken;
   const tokenFromHeader = req.headers['x-csrf-token'] as string;
 
-  // Double-submit: токен должен совпадать в cookie и заголовке
   if (!tokenFromCookie || !tokenFromHeader) {
-    return res.status(403).json({ 
-      error: 'CSRF токен не найден' 
-    });
+    return res.status(403).json({ error: 'CSRF токен не найден' });
   }
 
   if (tokenFromCookie !== tokenFromHeader || !verifyToken(tokenFromHeader)) {
-    return res.status(403).json({ 
-      error: 'Не правильный CSRF токен' 
-    });
+    return res.status(403).json({ error: 'Неверный CSRF токен' });
   }
 
   next();
