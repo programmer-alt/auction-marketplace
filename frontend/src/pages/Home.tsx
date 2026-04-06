@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/auth.store";
 import { auctionsApi } from "../api/auctions";
@@ -12,6 +12,8 @@ export default function Home() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -23,7 +25,7 @@ export default function Home() {
         page,
         limit: 12,
         status: statusFilter || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
       });
       setAuctions((data as any).auctions || data.items || []);
       setTotalPages(data.totalPages || 1);
@@ -36,7 +38,16 @@ export default function Home() {
 
   useEffect(() => {
     fetchAuctions();
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, debouncedSearch]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search]);
 
   const getStatusBadge = (status: Auction["status"]) => {
     const map: Record<string, { label: string; cls: string }> = {
@@ -66,10 +77,7 @@ export default function Home() {
             placeholder="Поиск аукционов..."
             className="input-field pl-10"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select
