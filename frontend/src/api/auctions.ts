@@ -13,8 +13,8 @@ export const auctionsApi = {
   },
 
   getAuctionById: async (id: number) => {
-    const response = await api.get<Auction>(`/auctions/${id}`)
-    return response.data
+    const response = await api.get<{ auction: Auction }>(`/auctions/${id}`)
+    return response.data.auction
   },
 
   createAuction: async (data: CreateAuctionData) => {
@@ -25,6 +25,15 @@ export const auctionsApi = {
   updateAuction: async (id: number, data: Partial<CreateAuctionData>) => {
     const response = await api.put<Auction>(`/auctions/${id}`, data)
     return response.data
+  },
+
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('image', file)
+    const response = await api.post<{ imageUrl: string }>('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data.imageUrl
   },
 
   deleteAuction: async (id: number) => {
