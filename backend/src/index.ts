@@ -11,7 +11,11 @@ import compression from "compression";
 import { compressionOptions } from "./config/compression";
 import { rateLimit } from "./middleware/rateLimit";
 import { parseAuthToken } from "./middleware/auth";
-import { generateCsrfToken, verifyCsrfToken, generateToken } from "./middleware/csrf";
+import {
+  generateCsrfToken,
+  verifyCsrfToken,
+  generateToken,
+} from "./middleware/csrf";
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
 
@@ -106,12 +110,12 @@ app.get("/health", (_req, res) => {
 });
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
-app.get("/api/csrf-token", (req, res) => {
+app.get("/api/csrf-token", (_req, res) => {
   const token = generateToken();
-  res.cookie('csrfToken', token, {
+  res.cookie("csrfToken", token, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
     maxAge: 24 * 60 * 60 * 1000,
   });
   res.json({ csrfToken: token });
@@ -144,7 +148,7 @@ io.use((socket, next) => {
 
 // Socket.io подключение — токен уже проверен middleware выше
 io.on("connection", (socket) => {
-  const {user} = socket.data;
+  const { user } = socket.data;
   console.log(`⚡ Клиент соединился: ${socket.id} (пользователь ${user.id})`);
 
   // Автоматически входим в личную комнату пользователя
@@ -171,14 +175,24 @@ io.on("connection", (socket) => {
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
-  console.log(`\n🛑 Получен сигнал ${signal}. Завершение работы...`);
+  // Используем ASCII-only сообщения для совместимости с Windows консолями
+  const messages: Record<string, string> = {
+    SIGINT: "Received SIGINT (Ctrl+C). Shutting down gracefully...",
+    SIGTERM: "Received SIGTERM. Shutting down gracefully...",
+    unhandledRejection: "Unhandled promise rejection. Shutting down...",
+    uncaughtException: "Uncaught exception. Shutting down...",
+  };
+  console.log(
+    `\n[shutdown] ${messages[signal] || `Received ${signal}. Shutting down...`}`,
+  );
 
   httpServer.closeAllConnections();
   httpServer.close();
 
   // Закрываем Bull queue
   try {
-    const { auctionCompletionQueue } = await import("./queues/auctionCompletionQueue");
+    const { auctionCompletionQueue } =
+      await import("./queues/auctionCompletionQueue");
     await auctionCompletionQueue.close();
   } catch {}
 
@@ -199,23 +213,23 @@ async function shutdown(signal: string) {
 
 // Запуск сервера
 httpServer.listen(PORT, async () => {
-  console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
-  console.log(`📝 Окружение: ${process.env.NODE_ENV}`);
+  console.log(`\n[server] Server running on http://localhost:${PORT}`);
+  console.log(`[server] Environment: ${process.env.NODE_ENV}`);
 
   // Проверка подключения к БД
   try {
     await prisma.$connect();
-    console.log("📦 База данных подключена");
+    console.log("[server] Database connected");
   } catch (error) {
-    console.error("❌ Подключение к базе данных не удалось:", error);
+    console.error("[server] Database connection failed:", error);
   }
 
   // Проверка подключения к Redis
   try {
     await pubClient.ping();
-    console.log("🔗 Redis подключен (облачный)");
+    console.log("[server] Redis connected");
   } catch (error) {
-    console.error("❌ Подключение к Redis не удалось:", error);
+    console.error("[server] Redis connection failed:", error);
   }
 
   // Планирование завершения существующих активных аукционов
@@ -230,12 +244,12 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // Необработанные отклонения промисов
 process.on("unhandledRejection", (reason: unknown) => {
-  console.error("Необработанное отклонение промиса:", reason);
+  console.error("[server] Unhandled promise rejection:", reason);
   shutdown("unhandledRejection").catch(() => process.exit(1));
 });
 
 // Необработанные исключения (синхронные)
 process.on("uncaughtException", (error: Error) => {
-  console.error("Необработанное исключение:", error);
+  console.error("[server] Uncaught exception:", error);
   shutdown("uncaughtException").catch(() => process.exit(1));
 });
