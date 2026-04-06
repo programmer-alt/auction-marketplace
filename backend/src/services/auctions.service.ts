@@ -146,15 +146,7 @@ export async function getAuctionById(id: number) {
   const auction = await getAuctionByIdRepo(prisma, id);
 
   if (auction) {
-    const simplifiedAuction = {
-      id: auction.id,
-      title: auction.title,
-      startingPrice: Number(auction.startingPrice),
-      sellerId: auction.sellerId,
-      createdAt: auction.createdAt.toISOString(),
-      endsAt: auction.endsAt.toISOString(),
-    };
-    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedAuction));
+    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(auction));
   }
 
   return auction;
