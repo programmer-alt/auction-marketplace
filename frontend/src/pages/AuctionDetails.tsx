@@ -13,6 +13,7 @@ import {
   Send,
   Trash2,
   CreditCard,
+  Pencil,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -207,6 +208,15 @@ export default function AuctionDetails() {
 
             {/* Actions */}
             <div className="flex gap-3 mt-6">
+              {isOwner && isActive && (
+                <Link
+                  to={`/auctions/${auction.id}/edit`}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Редактировать
+                </Link>
+              )}
               {isOwner && isActive && (
                 <button
                   onClick={handleDelete}
