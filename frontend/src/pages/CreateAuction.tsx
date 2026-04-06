@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { auctionsApi } from '../api/auctions'
-import { ArrowLeft, Plus, Calendar } from 'lucide-react'
+import { ArrowLeft, Plus, Calendar, Upload, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface FormData {
   title: string
   description: string
-  imageUrl: string
   startingPrice: string
   endsAt: string
 }
@@ -16,28 +15,40 @@ interface FormData {
 export default function CreateAuction() {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>({
-    defaultValues: {
-      title: '',
-      description: '',
-      imageUrl: '',
-      startingPrice: '',
-      endsAt: '',
-    },
+    defaultValues: { title: '', description: '', startingPrice: '', endsAt: '' },
   })
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const removeImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+  }
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
+      let imageUrl: string | undefined
+      if (imageFile) {
+        imageUrl = await auctionsApi.uploadImage(imageFile)
+      }
       await auctionsApi.createAuction({
         title: data.title,
         description: data.description || undefined,
-        imageUrl: data.imageUrl || undefined,
+        imageUrl,
         startingPrice: parseFloat(data.startingPrice),
         endsAt: new Date(data.endsAt).toISOString(),
       })
@@ -103,17 +114,30 @@ export default function CreateAuction() {
             />
           </div>
 
-          {/* Image URL */}
+          {/* Image upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              URL изображения
+              Фотография
             </label>
-            <input
-              type="url"
-              className="input-field"
-              placeholder="https://example.com/image.jpg"
-              {...register('imageUrl')}
-            />
+            {imagePreview ? (
+              <div className="relative">
+                <img src={imagePreview} alt="preview" className="w-full h-48 object-cover rounded-lg" />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                <span className="text-sm text-gray-500">Нажмите для загрузки</span>
+                <span className="text-xs text-gray-400 mt-1">PNG, JPG, WEBP до 5MB</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </label>
+            )}
           </div>
 
           {/* Starting price + End date */}
