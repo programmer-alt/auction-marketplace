@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
@@ -10,7 +10,7 @@ import hpp from "hpp";
 import compression from "compression";
 import { compressionOptions } from "./config/compression";
 import { rateLimit } from "./middleware/rateLimit";
-import { parseAuthToken } from "./middleware/auth";
+import { parseAuthToken, authMiddleware } from "./middleware/auth";
 import {
   generateCsrfToken,
   verifyCsrfToken,
@@ -18,6 +18,9 @@ import {
 } from "./middleware/csrf";
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
+
+import { upload } from './config/upload';
+import path from 'path';
 
 // Routes
 import authRouter from "./routes/auth.routes";
@@ -61,7 +64,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
+        imgSrc: ["'self'", "data:", "https:", "http://localhost:5000"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -70,6 +73,7 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
 
@@ -109,6 +113,9 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Статические файлы (загруженные изображения)
+app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
+
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", (_req, res) => {
   const token = generateToken();
@@ -119,6 +126,16 @@ app.get("/api/csrf-token", (_req, res) => {
     maxAge: 24 * 60 * 60 * 1000,
   });
   res.json({ csrfToken: token });
+});
+
+// Загрузка изображений
+app.post('/api/upload', authMiddleware, upload.single('image'), (req: Request, res: Response) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'Файл не загружен' });
+    return;
+  }
+  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
 });
 
 // API routes
