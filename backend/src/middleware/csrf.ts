@@ -58,7 +58,7 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
   }
 
   // Пропускаем webhook-маршруты (Stripe и другие)
-  if (req.path.includes('/webhook')) {
+  if (req.path.includes('/webhook') || req.path.includes('/uploads')) {
     return next();
   }
 
