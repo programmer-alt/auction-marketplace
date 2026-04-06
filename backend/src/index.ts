@@ -166,42 +166,28 @@ io.use((socket, next) => {
 // Socket.io подключение — токен уже проверен middleware выше
 io.on("connection", (socket) => {
   const { user } = socket.data;
-  console.log(`⚡ Клиент соединился: ${socket.id} (пользователь ${user.id})`);
+  console.log(`⚡ [socket] Client connected: ${socket.id} (user ${user.id})`);
 
-  // Автоматически входим в личную комнату пользователя
   socket.join(`user:${user.id}`);
 
-  // Присоединение к комнате аукциона
-  socket.on("auction:join", (data: { auctionId: number }) => {
+  socket.on('auction:join', (data: { auctionId: number }) => {
     socket.join(`auction:${data.auctionId}`);
-    console.log(
-      `Клиент ${socket.id} (пользователь ${user.id}) присоединился к аукциону:${data.auctionId}`,
-    );
+    console.log(`🔔 [socket] Client ${socket.id} joined auction:${data.auctionId}`);
   });
 
-  // Покинуть комнату аукциона
-  socket.on("auction:leave", (auctionId: number) => {
+  socket.on('auction:leave', (auctionId: number) => {
     socket.leave(`auction:${auctionId}`);
-    console.log(`Клиент ${socket.id} покинул аукцион:${auctionId}`);
+    console.log(`👋 [socket] Client ${socket.id} left auction:${auctionId}`);
   });
 
-  socket.on("disconnect", () => {
-    console.log(`🔌 Клиент отключился: ${socket.id} (пользователь ${user.id})`);
+  socket.on('disconnect', () => {
+    console.log(`🔌 [socket] Client disconnected: ${socket.id} (user ${user.id})`);
   });
 });
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
-  // Используем ASCII-only сообщения для совместимости с Windows консолями
-  const messages: Record<string, string> = {
-    SIGINT: "Received SIGINT (Ctrl+C). Shutting down gracefully...",
-    SIGTERM: "Received SIGTERM. Shutting down gracefully...",
-    unhandledRejection: "Unhandled promise rejection. Shutting down...",
-    uncaughtException: "Uncaught exception. Shutting down...",
-  };
-  console.log(
-    `\n[shutdown] ${messages[signal] || `Received ${signal}. Shutting down...`}`,
-  );
+  console.log(`\n🛑 [shutdown] Received ${signal}. Shutting down gracefully...`);
 
   httpServer.closeAllConnections();
   httpServer.close();
@@ -230,28 +216,24 @@ async function shutdown(signal: string) {
 
 // Запуск сервера
 httpServer.listen(PORT, async () => {
-  console.log(`\n[server] Server running on http://localhost:${PORT}`);
-  console.log(`[server] Environment: ${process.env.NODE_ENV}`);
+  console.log(`\n🚀 [server] Running on http://localhost:${PORT}`);
+  console.log(`📝 [server] Environment: ${process.env.NODE_ENV}`);
 
-  // Проверка подключения к БД
   try {
     await prisma.$connect();
-    console.log("[server] Database connected");
+    console.log('📦 [server] Database connected');
   } catch (error) {
-    console.error("[server] Database connection failed:", error);
+    console.error('❌ [server] Database connection failed:', error);
   }
 
-  // Проверка подключения к Redis
   try {
     await pubClient.ping();
-    console.log("[server] Redis connected");
+    console.log('🔗 [server] Redis connected');
   } catch (error) {
-    console.error("[server] Redis connection failed:", error);
+    console.error('❌ [server] Redis connection failed:', error);
   }
 
-  // Планирование завершения существующих активных аукционов
-  const { scheduleExistingAuctions } =
-    await import("./queues/auctionCompletionQueue");
+  const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
   await scheduleExistingAuctions();
 });
 
@@ -260,13 +242,13 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // Необработанные отклонения промисов
-process.on("unhandledRejection", (reason: unknown) => {
-  console.error("[server] Unhandled promise rejection:", reason);
-  shutdown("unhandledRejection").catch(() => process.exit(1));
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('❌ [server] Unhandled promise rejection:', reason);
+  shutdown('unhandledRejection').catch(() => process.exit(1));
 });
 
 // Необработанные исключения (синхронные)
-process.on("uncaughtException", (error: Error) => {
-  console.error("[server] Uncaught exception:", error);
-  shutdown("uncaughtException").catch(() => process.exit(1));
+process.on('uncaughtException', (error: Error) => {
+  console.error('❌ [server] Uncaught exception:', error);
+  shutdown('uncaughtException').catch(() => process.exit(1));
 });
