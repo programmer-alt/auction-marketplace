@@ -3,8 +3,8 @@ import { redis } from "../config/redis";
 import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 
-const WINDOW_SIZE_IN_SECONDS = 60; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 100; // 100 requests per minute per IP
+const WINDOW_SIZE_IN_SECONDS = 60;
+const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'development' ? 500 : 100;
 
 // Fallback: если Redis недоступен, используем LRU-кэш с ограничением размера и TTL
 const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }>({
