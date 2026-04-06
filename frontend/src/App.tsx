@@ -4,6 +4,7 @@ import Layout from './components/layout/Layout'
 import Home from './pages/Home'
 import AuctionDetails from './pages/AuctionDetails'
 import CreateAuction from './pages/CreateAuction'
+import EditAuction from './pages/EditAuction'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Profile from './pages/Profile'
@@ -20,19 +21,23 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/auctions/:id" element={<AuctionDetails />} />
-          <Route 
-            path="/auctions/new" 
-            element={isAuthenticated ? <CreateAuction /> : <Navigate to="/login" />} 
+          <Route
+            path="/auctions/new"
+            element={isAuthenticated ? <CreateAuction /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/auctions/:id/edit"
+            element={isAuthenticated ? <EditAuction /> : <Navigate to="/login" />}
           />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route 
-            path="/profile" 
-            element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} 
+          <Route
+            path="/profile"
+            element={isAuthenticated ? <Profile /> : <Navigate to="/login" />}
           />
-          <Route 
-            path="/payment/:id" 
-            element={isAuthenticated ? <Payment /> : <Navigate to="/login" />} 
+          <Route
+            path="/payment/:id"
+            element={isAuthenticated ? <Payment /> : <Navigate to="/login" />}
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
