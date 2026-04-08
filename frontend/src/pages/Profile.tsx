@@ -20,7 +20,7 @@ export default function Profile() {
       setLoading(true);
       try {
         const data = await auctionsApi.getAuctions({ page: 1, limit: 50 });
-        const allAuctions = (data as any).auctions || data.items || [];
+        const allAuctions = data.auctions || [];
         const my = allAuctions.filter((a: Auction) => a.sellerId === user?.id);
         const won = allAuctions.filter(
           (a: Auction) => a.winnerId === user?.id && a.status === "COMPLETED",
