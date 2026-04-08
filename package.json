@@ -4,7 +4,7 @@
   "description": "Full-stack auction marketplace with React, Node.js, Prisma, and Stripe",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --raw --no-color --handle-input false --prefix-colors \"bgBlue,bgGreen\" --names \"backend,frontend\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently --kill-others-on-fail --kill-signal SIGKILL --raw --no-color --prefix-colors \"bgBlue,bgGreen\" --names \"backend,frontend\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
