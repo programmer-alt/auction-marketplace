@@ -1,5 +1,5 @@
 import api from './axios'
-import { Auction, PaginatedResponse, CreateAuctionData } from '../types'
+import { Auction, AuctionsListResponse, CreateAuctionData } from '../types'
 
 export const auctionsApi = {
   getAuctions: async (params?: {
@@ -8,7 +8,7 @@ export const auctionsApi = {
     status?: string
     search?: string
   }) => {
-    const response = await api.get<PaginatedResponse<Auction>>('/auctions', { params })
+    const response = await api.get<AuctionsListResponse>('/auctions', { params })
     return response.data
   },
 
