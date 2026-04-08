@@ -49,6 +49,16 @@ export interface ApiResponse<T> {
   message?: string
 }
 
+export interface AuctionsListResponse {
+  auctions: Auction[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
 export interface PaginatedResponse<T> {
   items: T[]
   total: number
