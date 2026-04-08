@@ -27,8 +27,8 @@ export default function Home() {
         status: statusFilter || undefined,
         search: debouncedSearch || undefined,
       });
-      setAuctions((data as any).auctions || data.items || []);
-      setTotalPages(data.totalPages || 1);
+      setAuctions(data.auctions || []);
+      setTotalPages(data.pagination?.totalPages || 1);
     } catch {
       setAuctions([]);
     } finally {
