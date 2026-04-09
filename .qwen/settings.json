@@ -10,7 +10,10 @@
       "Bash(findstr *)",
       "Bash(tasklist *)",
       "Bash(powershell *)",
-      "Bash(taskkill *)"
+      "Bash(taskkill *)",
+      "Bash(git pull *)",
+      "Bash(npx *)",
+      "Bash(npm install *)"
     ]
   },
   "$version": 3

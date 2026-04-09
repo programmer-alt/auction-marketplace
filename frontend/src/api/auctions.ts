@@ -1,6 +1,11 @@
 import api from './axios'
 import { Auction, AuctionsListResponse, CreateAuctionData } from '../types'
 
+interface AuctionMutationResponse {
+  message: string
+  auction: Auction
+}
+
 export const auctionsApi = {
   getAuctions: async (params?: {
     page?: number
@@ -18,13 +23,13 @@ export const auctionsApi = {
   },
 
   createAuction: async (data: CreateAuctionData) => {
-    const response = await api.post<Auction>('/auctions', data)
-    return response.data
+    const response = await api.post<AuctionMutationResponse>('/auctions', data)
+    return response.data.auction
   },
 
   updateAuction: async (id: number, data: Partial<CreateAuctionData>) => {
-    const response = await api.put<Auction>(`/auctions/${id}`, data)
-    return response.data
+    const response = await api.put<AuctionMutationResponse>(`/auctions/${id}`, data)
+    return response.data.auction
   },
 
   uploadImage: async (file: File): Promise<string> => {

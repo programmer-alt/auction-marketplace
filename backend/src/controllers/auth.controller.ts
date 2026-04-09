@@ -55,6 +55,6 @@ export const authController = {
   getCurrentUser: asyncHandler<AuthRequest>(async (req, res, next) => {
     const user = await authService.getCurrentUser(req.user!.id);
     if (!user) return next(createNotFoundError("Пользователь не найден"));
-    res.json({ user });
+    res.json(user);
   }),
 };

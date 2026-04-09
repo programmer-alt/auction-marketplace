@@ -3,7 +3,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+// Используем URL для подключения к облачному Redis
+const redisUrl = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
 
 export const redis = new Redis(redisUrl, {
   enableOfflineQueue: true,
@@ -31,10 +32,18 @@ export const safeRedis = {
     try { return await redis.get(key); }
     catch (err) { console.error("Redis get failed:", err); return null; }
   },
+  async set(key: string, value: string): Promise<void> {
+    try { await redis.set(key, value); }
+    catch (err) { console.error("Redis set failed:", err); }
+  },
   async setex(key: string, ttl: number, value: string): Promise<void> {
     try { await redis.setex(key, ttl, value); }
     catch (err) { console.error("Redis setex failed:", err); }
   },
+  async incr(key: string): Promise<number | null> {
+    try { return await redis.incr(key); }
+    catch (err) { console.error("Redis incr failed:", err); return null; }
+    },
   async del(...keys: string[]): Promise<void> {
     try { if (keys.length > 0) await redis.del(...keys); }
     catch (err) { console.error("Redis del failed:", err); }

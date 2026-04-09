@@ -1,5 +1,6 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../store/auth.store'
 
 const api = axios.create({
   baseURL: '/api',
@@ -15,7 +16,7 @@ const csrfReady = api.get('/csrf-token').catch(() => {})
 // Request interceptor для добавления токена и CSRF
 api.interceptors.request.use(
   async (config) => {
-    const token = localStorage.getItem('token')
+    const token = useAuthStore.getState().token
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -45,7 +46,7 @@ api.interceptors.response.use(
     
     if (error.response?.status === 401) {
       // Неавторизован - очищаем токен и редиректим на логин
-      localStorage.removeItem('token')
+      useAuthStore.getState().logout()
       window.location.href = '/login'
     } else if (error.response?.status === 403) {
       toast.error('Доступ запрещен')

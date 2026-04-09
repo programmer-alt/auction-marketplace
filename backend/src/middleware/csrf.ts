@@ -1,26 +1,41 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 
 // Простой CSRF-токен на основе double-submit cookie pattern
 // Генерируем случайный токен и проверяем его в заголовке/cookie
 
-const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
+const CSRF_SECRET = process.env.CSRF_SECRET;
+
+function getCsrfSecret(): string {
+  if (!CSRF_SECRET || CSRF_SECRET.trim() === '') {
+    throw new Error('CSRF_SECRET is required for CSRF protection');
+  }
+  return CSRF_SECRET;
+}
 
 export function generateToken(): string {
-  const random = Math.random().toString(36).substring(2) + Date.now().toString(36);
-  const signature = Buffer.from(random + CSRF_SECRET).toString('base64');
-  return `${Buffer.from(random).toString('base64')}.${signature}`;
+  const secret = getCsrfSecret();
+  const nonce = crypto.randomBytes(32).toString('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(nonce).digest('base64url');
+  return `${nonce}.${signature}`;
 }
 
 function verifyToken(token: string): boolean {
   try {
-    const [randomPart, signaturePart] = token.split('.');
-    if (!randomPart || !signaturePart) return false;
-    
-    const expectedSignature = Buffer.from(
-      Buffer.from(randomPart, 'base64').toString() + CSRF_SECRET
-    ).toString('base64');
-    
-    return signaturePart === expectedSignature;
+    const secret = getCsrfSecret();
+    const [nonce, signature] = token.split('.');
+    if (!nonce || !signature) return false;
+
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(nonce)
+      .digest('base64url');
+
+    const received = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (received.length !== expected.length) return false;
+
+    return crypto.timingSafeEqual(received, expected);
   } catch {
     return false;
   }

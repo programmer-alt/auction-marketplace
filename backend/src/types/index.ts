@@ -121,13 +121,15 @@ export type PaymentWithAuctionSeller = Prisma.PaymentGetPayload<{
 export interface CacheAuction {
   id: number;
   title: string;
+  description: string | null;
+  imageUrl: string | null;
   startingPrice: number;
+  currentPrice: number;
   sellerId: number;
+  currency: string;
+  status: string;
   createdAt: string;
   endsAt: string;
-  currentPrice?: number;
-  currency?: string;
-  status?: string;
 }
 
 export interface CacheAuctionsList {
