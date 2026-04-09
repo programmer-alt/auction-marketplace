@@ -3,7 +3,6 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { createServer } from "http";
-import { randomUUID } from "crypto";
 import { createAdapter } from "@socket.io/redis-adapter";
 
 import helmet from "helmet";
@@ -64,13 +63,8 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
-        imgSrc: [
-          "'self'",
-          "data:",
-          "https:",
-          ...(process.env.NODE_ENV === "development" ? ["http://localhost:5000"] : []),
-        ],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:", "http://localhost:5000"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -82,23 +76,6 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
-
-// Permissions-Policy — ограничиваем доступ к браузерным API
-app.use((_req, res, next) => {
-  res.setHeader(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=(self), usb=(), fullscreen=(self)",
-  );
-  next();
-});
-
-// X-Request-ID — уникальный ID для трассировки каждого запроса
-app.use((req, res, next) => {
-  const requestId = randomUUID();
-  req.headers["x-request-id"] = requestId;
-  res.setHeader("X-Request-ID", requestId);
-  next();
-});
 
 // Защита от parameter pollution
 app.use(hpp());
@@ -136,8 +113,8 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Статические файлы (загруженные изображения) — только для авторизованных
-app.use('/uploads', authMiddleware, express.static(path.join(process.cwd(), 'src', 'uploads')));
+// Статические файлы (загруженные изображения)
+app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", (_req, res) => {
