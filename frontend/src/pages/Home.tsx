@@ -6,6 +6,7 @@ import { Auction } from "../types";
 import { Search, Plus, Clock, Gavel, Timer } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
+import ScanLine from "../components/effects/ScanLine";
 
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
@@ -60,6 +61,14 @@ export default function Home() {
 
   return (
     <div className="relative">
+      <ScanLine
+        color="#0f0"
+        thickness={3}
+        duration={8}
+        delay={0.5}
+        highlightIntensity={0.7}
+        highlightWidth={250}
+      />
       {/* Hero section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Аукционы</h1>
