@@ -7,6 +7,7 @@ import { authApi } from '../api/auth'
 import { registerSchema, RegisterFormData } from '../utils/validation/auth.schema'
 import { UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ScanLine from '../components/effects/ScanLine'
 
 export default function Register() {
   const [isLoading, setIsLoading] = useState(false)
@@ -46,7 +47,13 @@ export default function Register() {
   }
 
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-md mx-auto relative">
+      <ScanLine
+        color="#0f0"
+        thickness={3}
+        duration={3}
+        delay={0}
+      />
       <div className="card">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-primary-100 p-3 rounded-full">
