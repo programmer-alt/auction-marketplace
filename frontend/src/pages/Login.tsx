@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from 'react-router-dom'
@@ -46,10 +46,41 @@ export default function Login() {
       <ScanLine
         color="#0f0"
         thickness={3}
-        duration={3}
+        duration={8}
         delay={0}
+        highlightIntensity={0.7}
+        highlightWidth={200}
       />
-      <div className="card">
+      <style>{`
+        @keyframes pulse-slow {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.95;
+            transform: scale(1.005);
+          }
+        }
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+          }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 3s ease-in-out infinite;
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .animate-pulse-button {
+          animation: pulse-slow 2.5s ease-in-out infinite;
+        }
+      `}</style>
+      <div className="card animate-pulse-slow">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-primary-100 p-3 rounded-full">
             <LogIn className="h-8 w-8 text-primary-600" />
@@ -69,7 +100,7 @@ export default function Login() {
             <input
               id="email"
               type="email"
-              className="input-field"
+              className="input-field animate-pulse-glow"
               placeholder="your@email.com"
               {...register('email')}
             />
@@ -85,7 +116,7 @@ export default function Login() {
             <input
               id="password"
               type="password"
-              className="input-field"
+              className="input-field animate-pulse-glow"
               placeholder="••••••••"
               {...register('password')}
             />
@@ -97,7 +128,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full btn-primary flex items-center justify-center"
+            className="w-full btn-primary flex items-center justify-center animate-pulse-button"
           >
             {isLoading ? (
               <span className="flex items-center">
