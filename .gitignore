@@ -66,3 +66,4 @@ backend/package-lock.json
 .qwen/settings.json
 .qwen/settings.json
 .qwen/  
+.amazonq/  
