@@ -9,6 +9,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Profile from './pages/Profile'
 import Payment from './pages/Payment'
+import About from './pages/About'
+import Contacts from './pages/Contacts'
 import { useAuthStore } from './store/auth.store'
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
             path="/payment/:id"
             element={isAuthenticated ? <Payment /> : <Navigate to="/login" />}
           />
+          <Route path="/about" element={<About />} />
+          <Route path="/contacts" element={<Contacts />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>
