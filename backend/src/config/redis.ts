@@ -23,10 +23,6 @@ redis.on("reconnecting", () => {
   console.log("Redis reconnecting...");
 });
 
-redis.on("connect", () => {
-  console.log("Redis connected");
-});
-
 export const safeRedis = {
   async get(key: string): Promise<string | null> {
     try { return await redis.get(key); }
