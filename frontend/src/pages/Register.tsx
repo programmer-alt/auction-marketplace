@@ -51,8 +51,10 @@ export default function Register() {
       <ScanLine
         color="#0f0"
         thickness={3}
-        duration={3}
+        duration={8}
         delay={0}
+        highlightIntensity={0.8}
+        highlightWidth={220}
       />
       <div className="card">
         <div className="flex items-center justify-center mb-6">
