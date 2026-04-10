@@ -59,7 +59,7 @@ export default function Home() {
   };
 
   return (
-    <div>
+    <div className="relative">
       {/* Hero section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Аукционы</h1>
