@@ -17,8 +17,8 @@ interface CreateBidResponse {
 }
 
 export const bidsApi = {
-  getAuctionBids: async (auctionId: number) => {
-    const response = await api.get<BidsListResponse>(`/auctions/${auctionId}/bids`)
+  getAuctionBids: async (auctionId: number, signal?: AbortSignal) => {
+    const response = await api.get<BidsListResponse>(`/auctions/${auctionId}/bids`, { signal })
     return response.data
   },
 

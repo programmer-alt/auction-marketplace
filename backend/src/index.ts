@@ -152,23 +152,27 @@ app.use("/api/admin", adminRouter);
 // Error handling middleware - должно быть последним
 app.use(errorHandler);
 
-// Socket.io middleware — проверяет токен один раз при подключении
+// Socket.io middleware — токен необязателен, гости подключаются как анонимы
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined;
-  const authResult = parseAuthToken(token);
-  if (!authResult.success) {
-    return next(new Error("Не авторизован"));
+  if (token) {
+    const authResult = parseAuthToken(token);
+    if (authResult.success) {
+      socket.data.user = authResult.user;
+    }
   }
-  socket.data.user = authResult.user;
   next();
 });
 
 // Socket.io подключение — токен уже проверен middleware выше
 io.on("connection", (socket) => {
   const { user } = socket.data;
-  console.log(`⚡ [socket] Client connected: ${socket.id} (user ${user.id})`);
-
-  socket.join(`user:${user.id}`);
+  if (user) {
+    console.log(`⚡ [socket] Client connected: ${socket.id} (user ${user.id})`);
+    socket.join(`user:${user.id}`);
+  } else {
+    console.log(`⚡ [socket] Guest connected: ${socket.id}`);
+  }
 
   socket.on('auction:join', (data: { auctionId: number }) => {
     socket.join(`auction:${data.auctionId}`);
@@ -181,7 +185,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`🔌 [socket] Client disconnected: ${socket.id} (user ${user.id})`);
+    console.log(`🔌 [socket] Client disconnected: ${socket.id} (user ${user?.id ?? 'guest'})`);
   });
 });
 

@@ -19,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import toast from "react-hot-toast";
 
+
 export default function AuctionDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -30,28 +31,55 @@ export default function AuctionDetails() {
   const [bidAmount, setBidAmount] = useState("");
   const [bidding, setBidding] = useState(false);
 
-  const fetchAuction = async () => {
-    if (!id) return;
+  const fetchAuction = async (auctionId: string, signal?: AbortSignal) => {
+    if (!auctionId) return;
     setLoading(true);
     try {
-      const data = await auctionsApi.getAuctionById(Number(id));
+      const data = await auctionsApi.getAuctionById(Number(auctionId), signal);
+      // Проверяем, не отменен ли запрос
+      if (signal?.aborted) return;
       setAuction(data);
       try {
-        const bidsData = await bidsApi.getAuctionBids(Number(id));
-        setBids((bidsData as any).bids || bidsData || []);
-      } catch {
+        const bidsData = await bidsApi.getAuctionBids(Number(auctionId), signal);
+        if (signal?.aborted) return;
+        setBids(bidsData?.bids || []);
+      } catch (error) {
+        // Игнорируем ошибку отмены запроса
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        // Ошибка отмены axios
+        const err = error as any;
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        console.error('Ошибка при загрузке ставок:', error);
         setBids([]);
       }
-    } catch {
+    } catch (error) {
+      // Игнорируем ошибку отмены запроса
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+      console.error('Ошибка при загрузке аукциона:', error);
       toast.error("Аукцион не найден");
       navigate("/");
     } finally {
-      setLoading(false);
+      // Устанавливаем loading false только если запрос не был отменен
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchAuction();
+    if (!id) return;
+    const controller = new AbortController();
+    const {signal} = controller;
+    fetchAuction(id, signal);
+    return () => {
+      controller.abort();
+    };
   }, [id]);
 
   const handleBid = async (e: React.FormEvent) => {
@@ -67,7 +95,7 @@ export default function AuctionDetails() {
       await bidsApi.createBid(Number(id), { amount });
       toast.success("Ставка размещена!");
       setBidAmount("");
-      await fetchAuction();
+      if (id) await fetchAuction(id);
     } catch {
       toast.error("Не удалось разместить ставку");
     } finally {

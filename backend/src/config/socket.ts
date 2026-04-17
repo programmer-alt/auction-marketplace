@@ -4,7 +4,7 @@ import { AuthContext } from "../middleware/auth";
 // Расширяем типы Socket.io чтобы socket.data.user был типизирован
 declare module "socket.io" {
   interface SocketData {
-    user: AuthContext;
+    user?: AuthContext;
   }
 }
 

@@ -17,8 +17,8 @@ export const auctionsApi = {
     return response.data
   },
 
-  getAuctionById: async (id: number) => {
-    const response = await api.get<{ auction: Auction }>(`/auctions/${id}`)
+  getAuctionById: async (id: number, signal?: AbortSignal) => {
+    const response = await api.get<{ auction: Auction }>(`/auctions/${id}`, { signal })
     return response.data.auction
   },
 
