@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 export const useAuctionActions = (auctionId: number | undefined, navigate: ReturnType<typeof useNavigate>) => {
   const handleDelete = useCallback(async () => {
     if (!auctionId) return;
-    if (!confirm('Вы уверены, что хотите удалить этот аукцион?')) return;
     try {
       await auctionsApi.deleteAuction(auctionId);
       toast.success('Аукцион удалён');
@@ -15,6 +14,8 @@ export const useAuctionActions = (auctionId: number | undefined, navigate: Retur
       toast.error('Не удалось удалить аукцион');
     }
   }, [auctionId, navigate]);
+
+  const handleConfirmDelete = handleDelete;
 
   const handleEdit = useCallback(() => {
     if (!auctionId) return;
@@ -30,5 +31,6 @@ export const useAuctionActions = (auctionId: number | undefined, navigate: Retur
     handleDelete,
     handleEdit,
     handlePayment,
+    handleConfirmDelete,
   };
 };

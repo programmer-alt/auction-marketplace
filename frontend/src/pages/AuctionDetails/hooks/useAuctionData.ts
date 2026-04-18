@@ -28,9 +28,11 @@ export const useAuctionData = (id: string | undefined) => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        const err = error as any;
-        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-          return;
+        if (error && typeof error === 'object' && ('name' in error || 'code' in error)) {
+          const err = error as { name?: string; code?: string };
+          if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+            return;
+          }
         }
         console.error('Ошибка при загрузке ставок:', error);
         setBids([]);
@@ -41,7 +43,7 @@ export const useAuctionData = (id: string | undefined) => {
         return;
       }
       console.error('Ошибка при загрузке аукциона:', error);
-      setError(error as Error);
+      setError(error instanceof Error ? error : new Error(String(error)));
       toast.error('Аукцион не найден');
     } finally {
       // Устанавливаем loading false только если запрос не был отменен
@@ -49,7 +51,7 @@ export const useAuctionData = (id: string | undefined) => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [setLoading, setError, setAuction, setBids]);
 
   useEffect(() => {
     if (!id) return;
@@ -63,7 +65,11 @@ export const useAuctionData = (id: string | undefined) => {
 
   const refresh = useCallback(async () => {
     if (id) {
-      await fetchAuction(id);
+      try {
+        await fetchAuction(id);
+      } catch {
+        toast.error('Не удалось обновить данные аукциона');
+      }
     }
   }, [id, fetchAuction]);
 

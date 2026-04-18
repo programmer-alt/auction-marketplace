@@ -8,6 +8,7 @@ interface BidFormProps {
   isSubmitting: boolean;
   bidAmount: string;
   setBidAmount: (value: string) => void;
+  error?: string | null;
 }
 
 const BidForm: React.FC<BidFormProps> = ({
@@ -16,6 +17,7 @@ const BidForm: React.FC<BidFormProps> = ({
   isSubmitting,
   bidAmount,
   setBidAmount,
+  error,
 }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,16 +46,19 @@ const BidForm: React.FC<BidFormProps> = ({
           <input
             type="number"
             step="0.01"
-            className="input-field"
+            className={`input-field ${error ? 'border-red-500' : ''}`}
             placeholder="Введите сумму"
             value={bidAmount}
             onChange={(e) => setBidAmount(e.target.value)}
             min={auction.currentPrice + 0.01}
           />
+          {error && (
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+          )}
         </div>
         <button
           type="submit"
-          disabled={isSubmitting || !bidAmount}
+          disabled={isSubmitting || !bidAmount || !!error}
           className="w-full btn-primary flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
