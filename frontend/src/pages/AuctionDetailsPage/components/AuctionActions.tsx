@@ -27,9 +27,18 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
 }) => {
   const isAuthenticated = !!user;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteClick = () => {
-    setIsModalOpen(true);
+  const handleDeleteClick = () => setIsModalOpen(true);
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirmDelete();
+    } finally {
+      setIsDeleting(false);
+      setIsModalOpen(false);
+    }
   };
 
   return (
@@ -38,7 +47,7 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
         {isOwner && isActive && (
           <>
             <Link
-              to={`/auctions/${auction.id}/edit`
+              to={`/auctions/${auction.id}/edit`}
               className="btn-secondary flex items-center gap-2"
               onClick={onEdit}
             >
@@ -47,7 +56,8 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
             </Link>
             <button
               onClick={handleDeleteClick}
-              className="btn-secondary flex items-center gap-2 text-red-600"
+              disabled={isDeleting}
+              className="btn-secondary flex items-center gap-2 text-red-600 disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
               Удалить
@@ -58,7 +68,7 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
           auction.status === 'COMPLETED' &&
           user?.id === auction.winnerId && (
             <Link
-              to={`/payment/${auction.id}`
+              to={`/payment/${auction.id}`}
               className="btn-primary flex items-center gap-2"
               onClick={onPayment}
             >
@@ -71,7 +81,8 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Удалить аукцион"
-        onConfirm={onConfirmDelete}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
       >
         <p>Вы уверены, что хотите удалить этот аукцион? Это действие нельзя отменить.</p>
       </Modal>

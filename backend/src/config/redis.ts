@@ -15,12 +15,14 @@ export const redis = new Redis(redisUrl, {
   connectTimeout: 10000,
 });
 
-redis.on("error", (err: Error) => {
+redis.on("error", (err: Error & { code?: string }) => {
+  if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
   console.error("Redis client error:", err);
 });
 
 redis.on("reconnecting", () => {
-  console.log("Redis reconnecting...");
+  // Подавляем сообщение о переподключении
+  // console.log("Redis reconnecting...");
 });
 
 export const safeRedis = {

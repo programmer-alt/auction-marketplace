@@ -1,26 +1,18 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
-import { useAuctionData } from './AuctionDetails/hooks/useAuctionData';
-import { useBidForm } from './AuctionDetails/hooks/useBidForm';
-import { useAuctionActions } from './AuctionDetails/hooks/useAuctionActions';
-import AuctionHeader from './AuctionDetails/components/AuctionHeader';
-import AuctionImage from './AuctionDetails/components/AuctionImage';
-import AuctionDetailsInfo from './AuctionDetails/components/AuctionDetailsInfo';
-import BidHistory from './AuctionDetails/components/BidHistory';
-import BidForm from './AuctionDetails/components/BidForm';
-import AuctionActions from './AuctionDetails/components/AuctionActions';
+import { useAuctionData } from './AuctionDetailsPage/hooks/useAuctionData';
+import { useBidForm } from './AuctionDetailsPage/hooks/useBidForm';
+import { useAuctionActions } from './AuctionDetailsPage/hooks/useAuctionActions';
+import AuctionHeader from './AuctionDetailsPage/components/AuctionHeader';
+import AuctionImage from './AuctionDetailsPage/components/AuctionImage';
+import AuctionDetailsInfo from './AuctionDetailsPage/components/AuctionDetailsInfo';
+import BidHistory from './AuctionDetailsPage/components/BidHistory';
+import BidForm from './AuctionDetailsPage/components/BidForm';
+import AuctionActions from './AuctionDetailsPage/components/AuctionActions';
 import { Auction } from '../types';
 import toast from 'react-hot-toast';
-
-const getStatusBadge = (status: Auction['status']) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    ACTIVE: { label: 'Активен', cls: 'badge-active' },
-    COMPLETED: { label: 'Завершён', cls: 'badge-completed' },
-    CANCELLED: { label: 'Отменён', cls: 'badge-cancelled' },
-  };
-  return map[status] || { label: 'Неизвестно', cls: 'badge-default' };
-};
+import { useStatusBadge } from '../hooks/useStatusBadge';
 
 const LoadingSkeleton = () => (
   <div className="max-w-4xl mx-auto">
@@ -56,27 +48,19 @@ export default function AuctionDetails() {
     navigate
   );
 
+  const { getStatusBadge } = useStatusBadge();
+
   const { isOwner, isActive, isEnded, statusInfo } = useMemo(() => {
     if (!auction) {
-      return {
-        isOwner: false,
-        isActive: false,
-        isEnded: false,
-        statusInfo: { label: '', cls: '' },
-      };
+      return { isOwner: false, isActive: false, isEnded: false, statusInfo: { label: '', cls: '' } };
     }
-
-    const isOwner = user?.id === auction.sellerId;
-    const isActive = auction.status === 'ACTIVE';
-    const isEnded = new Date(auction.endsAt) < new Date();
-
     return {
-      isOwner,
-      isActive,
-      isEnded,
+      isOwner: user?.id === auction.sellerId,
+      isActive: auction.status === 'ACTIVE',
+      isEnded: new Date(auction.endsAt) < new Date(),
       statusInfo: getStatusBadge(auction.status),
     };
-  }, [auction, user]);
+  }, [auction, user, getStatusBadge]);
 
   const handleBidSubmit = async (amount: number): Promise<boolean> => {
     const success = await submitBid(amount);

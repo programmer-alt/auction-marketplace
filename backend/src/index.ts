@@ -44,9 +44,12 @@ export { prisma };
 
 // Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
 import { redis as pubClient } from "./config/redis";
-const subClient = pubClient.duplicate();
+const subClient = pubClient.duplicate({ keepAlive: 10000 });
 
-subClient.on("error", (err) => console.error("Redis sub client error:", err));
+subClient.on("error", (err: Error & { code?: string }) => {
+  if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
+  console.error("Redis sub client error:", err);
+});
 
 import { initSocket } from "./config/socket";
 const io = initSocket(httpServer, corsOriginHandler);

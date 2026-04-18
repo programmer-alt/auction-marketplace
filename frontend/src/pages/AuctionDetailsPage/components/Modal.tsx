@@ -6,6 +6,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   onConfirm: () => void;
+  isLoading?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -14,6 +15,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   onConfirm,
+  isLoading = false,
 }) => {
   if (!isOpen) return null;
 
@@ -40,9 +42,10 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+            disabled={isLoading}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Удалить
+            {isLoading ? 'Удаление...' : 'Удалить'}
           </button>
         </div>
       </div>

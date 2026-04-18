@@ -32,22 +32,32 @@ const logger = {
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
-// Создаём отдельные Redis клиенты для Bull с разными настройками для каждого типа
-const createBullClient = (type: "client" | "subscriber" | "bclient") => {
-  // Блокирующий клиент (bclient) используется для BRPOP — отключаем retry
-  // https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md#queuegetjobcountbytype
-  const isBlockingClient = type === "bclient";
+// Создаём три клиента один раз и переиспользуем их
+const sharedClients = {
+  client: null as Redis | null,
+  subscriber: null as Redis | null,
+  bclient: null as Redis | null,
+};
 
-  return new Redis(redisUrl, {
+const createBullClient = (type: "client" | "subscriber" | "bclient") => {
+  if (sharedClients[type]) return sharedClients[type]!;
+
+  const client = new Redis(redisUrl, {
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
-    // Для blocking client отключаем retryStrategy (не нужен для BRPOP)
-    retryStrategy: isBlockingClient
+    keepAlive: 10000,
+    retryStrategy: type === "bclient"
       ? undefined
-      : (times) => {
-          return Math.min(times * 50, 2000);
-        },
+      : (times) => Math.min(times * 50, 2000),
   });
+
+  client.on("error", (err: Error & { code?: string }) => {
+    if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
+    console.error(`[bull:${type}] Redis error:`, err);
+  });
+
+  sharedClients[type] = client;
+  return client;
 };
 
 export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
