@@ -33,14 +33,14 @@ const logger = {
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
 // Создаём три клиента один раз и переиспользуем их
-const sharedClients = {
+export const sharedBullClients = {
   client: null as Redis | null,
   subscriber: null as Redis | null,
   bclient: null as Redis | null,
 };
 
 const createBullClient = (type: "client" | "subscriber" | "bclient") => {
-  if (sharedClients[type]) return sharedClients[type]!;
+  if (sharedBullClients[type]) return sharedBullClients[type]!;
 
   const client = new Redis(redisUrl, {
     enableReadyCheck: false,
@@ -56,7 +56,7 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
     console.error(`[bull:${type}] Redis error:`, err);
   });
 
-  sharedClients[type] = client;
+  sharedBullClients[type] = client;
   return client;
 };
 

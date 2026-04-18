@@ -199,11 +199,16 @@ async function shutdown(signal: string) {
   httpServer.closeAllConnections();
   httpServer.close();
 
-  // Закрываем Bull queue
+  // Закрываем Bull queue и его Redis клиенты
   try {
-    const { auctionCompletionQueue } =
+    const { auctionCompletionQueue, sharedBullClients } =
       await import("./queues/auctionCompletionQueue");
     await auctionCompletionQueue.close();
+    await Promise.all(
+      Object.values(sharedBullClients)
+        .filter(Boolean)
+        .map((c) => c!.quit())
+    );
   } catch {}
 
   // Закрываем Redis клиенты
