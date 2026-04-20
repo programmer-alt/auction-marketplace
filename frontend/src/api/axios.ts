@@ -11,25 +11,26 @@ const api = axios.create({
 })
 
 // Получаем CSRF токен при старте и сохраняем промис
-const csrfReady = api.get('/csrf-token').catch(() => {})
+const csrfReady = api.get('/csrf-token').catch((err) => {
+  console.error('CSRF token fetch failed:', err)
+})
 
 // Request interceptor для добавления токена и CSRF
 api.interceptors.request.use(
   async (config) => {
-    const token = useAuthStore.getState().token
+  const {token} = useAuthStore.getState()
     
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers.set('Authorization', `Bearer ${token}`)
     }
     
     if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
-      // Ждём получения CSRF-токена если он ещё не установлен
       if (!getCsrfToken()) {
         await csrfReady
       }
       const csrfToken = getCsrfToken()
       if (csrfToken) {
-        config.headers['X-CSRF-Token'] = csrfToken
+        config.headers.set('X-CSRF-Token', csrfToken)
       }
     }
     
@@ -38,14 +39,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+let isRedirecting = false
+
 // Response interceptor для обработки ошибок
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.error || error.response?.data?.message || 'Произошла ошибка'
     
-    if (error.response?.status === 401) {
-      // Неавторизован - очищаем токен и редиректим на логин
+    if (error.response?.status === 401 && !isRedirecting) {
+      isRedirecting = true
       useAuthStore.getState().logout()
       window.location.href = '/login'
     } else if (error.response?.status === 403) {
