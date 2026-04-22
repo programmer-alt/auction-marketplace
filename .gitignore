@@ -62,10 +62,11 @@ backend/package-lock.json
 .qwen/settings.json
 .fitten/rules/code.md
 .qwen/settings.json
-.qwen/settings.json
-.qwen/settings.json
-.qwen/settings.json
 .qwen/  
 .amazonq/  
 .codeassistant/rules_journal.json
 Technical.mmd
+.blackboxrules
+
+# Recon
+.recon/

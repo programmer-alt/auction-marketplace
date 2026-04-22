@@ -1,0 +1,45 @@
+sequenceDiagram
+    participant F as Frontend
+    participant S as Backend
+    participant DB as Database
+    participant C as Cookie
+    participant Store as AuthStore
+
+    Note over F,S: Шаг 1 - Инициализация CSRF
+    F->>S: GET /api/csrf-token
+    S->>S: generateToken = nonce + HMAC(CSRF_SECRET)
+    S->>C: Set-Cookie csrfToken=nonce.signature
+    S->>F: 200 {csrfToken: nonce.signature}
+
+    Note over F,S: Шаг 2 - Аутентификация
+    F->>S: POST /api/auth/login {email, password}
+    Note right of S: Пропускает CSRF для /auth/*
+    S->>DB: getUserByEmail(email)
+    DB->>S: user {id, email, hashedPassword}
+    S->>S: bcrypt.compare(password, hash)
+    S->>S: jwt.sign({id,email,role}, JWT_SECRET)
+    S->>F: 200 {user, token}
+    F->>Store: useAuthStore.login(token, user)
+    Store->>Store: persist to localStorage
+
+    Note over F,S: Шаг 3 - Защищенный запрос
+    F->>F: axios interceptor - читает cookie
+    F->>S: POST /api/auctions {data}
+    Note over F,S: Authorization: Bearer token + X-CSRF-Token header
+
+    S->>S: generateCsrfToken middleware
+    S->>S: verifyCsrfToken - cookie === header
+
+    alt CSRF FAIL
+        S->>F: 403 Неверный CSRF токен
+    else CSRF OK
+        S->>S: authMiddleware - jwt.verify(token)
+        alt JWT FAIL
+            S->>F: 401 Invalid token
+        else JWT OK
+            S->>S: req.user = {id, email, role}
+            S->>DB: auctions.create({userId: req.user.id})
+            DB->>S: newAuction
+            S->>F: 201 {auction}
+        end
+    end

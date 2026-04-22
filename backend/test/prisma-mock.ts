@@ -19,8 +19,6 @@ class Decimal {
 
 export const Prisma = { Decimal };
 
-export const UserRole = { USER: "USER", ADMIN: "ADMIN" };
-
 // Stub PrismaClient - tests mock it anyway
 export class PrismaClient {
   user: any = {};

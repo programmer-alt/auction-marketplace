@@ -10,6 +10,7 @@ import hpp from "hpp";
 import compression from "compression";
 import { compressionOptions } from "./config/compression";
 import { rateLimit } from "./middleware/rateLimit";
+import { socketConnectionRateLimit } from "./middleware/socketRateLimit";
 import { parseAuthToken, authMiddleware } from "./middleware/auth";
 import {
   generateCsrfToken,
@@ -156,10 +157,11 @@ app.use("/api/admin", adminRouter);
 app.use(errorHandler);
 
 // Socket.io middleware — токен необязателен, гости подключаются как анонимы
-io.use((socket, next) => {
+io.use(socketConnectionRateLimit);
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined;
   if (token) {
-    const authResult = parseAuthToken(token);
+    const authResult = await parseAuthToken(token);
     if (authResult.success) {
       socket.data.user = authResult.user;
     }

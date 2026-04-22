@@ -4,7 +4,7 @@ import crypto from 'crypto';
 // Простой CSRF-токен на основе double-submit cookie pattern
 // Генерируем случайный токен и проверяем его в заголовке/cookie
 
-const CSRF_SECRET = process.env.CSRF_SECRET;
+const {CSRF_SECRET} = process.env;
 
 function getCsrfSecret(): string {
   if (!CSRF_SECRET || CSRF_SECRET.trim() === '') {

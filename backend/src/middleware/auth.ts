@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
 import { getJwtSecret } from "../config/jwt";
+import { redis } from "../config/redis";
 
 export interface AuthContext {
   id: number;
@@ -16,15 +17,29 @@ export type AuthResult =
   | { success: true; user: AuthContext }
   | { success: false; error: string };
 
+// Проверка, находится ли токен в черном списке
+async function isTokenBlacklisted(token: string): Promise<boolean> {
+  const key = `blacklist:${token}`;
+  const exists = await redis.exists(key);
+  return exists === 1;
+}
+
 // Функциональная версия проверки токена
-export function parseAuthToken(token: string | undefined): AuthResult {
+export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
   if (!token) {
     return { success: false, error: "No token provided" };
   }
 
+  const cleanToken = token.replace("Bearer ", "");
+
+  // Проверка черного списка
+  if (await isTokenBlacklisted(cleanToken)) {
+    return { success: false, error: "Token revoked" };
+  }
+
   try {
     const decoded = jwt.verify(
-      token.replace("Bearer ", ""),
+      cleanToken,
       getJwtSecret(),
     ) as { id: number; email: string; role: string };
 
@@ -39,14 +54,14 @@ export function parseAuthToken(token: string | undefined): AuthResult {
 }
 
 // Базовая функция проверки токена
-function checkAuthToken(authHeader: string | undefined): AuthResult {
-  return parseAuthToken(authHeader);
+async function checkAuthToken(authHeader: string | undefined): Promise<AuthResult> {
+  return await parseAuthToken(authHeader);
 }
 
 // Обязательная аутентификация
 export function createAuthMiddleware() {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const authResult = checkAuthToken(req.headers.authorization);
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const authResult = await checkAuthToken(req.headers.authorization);
 
     if (!authResult.success) {
       res.status(401).json({ error: authResult.error });
@@ -62,7 +77,7 @@ export const authMiddleware = createAuthMiddleware();
 
 // Опциональная аутентификация
 export function createOptionalAuthMiddleware() {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     
     // Если токен отсутствует - просто продолжаем
@@ -70,7 +85,7 @@ export function createOptionalAuthMiddleware() {
       return next();
     }
 
-    const authResult = checkAuthToken(authHeader);
+    const authResult = await checkAuthToken(authHeader);
 
     // Если токен есть, но невалиден - возвращаем 401
     if (!authResult.success) {

@@ -33,6 +33,12 @@ router.post("/register", registerLimiter, authController.register);
 // POST /api/auth/login - Вход
 router.post("/login", loginLimiter, authController.login);
 
+// POST /api/auth/refresh - Обновление токенов
+router.post("/refresh", authController.refresh);
+
+// POST /api/auth/logout - Выход
+router.post("/logout", authMiddleware, authController.logout);
+
 // GET /api/auth/me - Текущий пользователь
 router.get("/me", authMiddleware, authController.getCurrentUser);
 
