@@ -26,16 +26,20 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
 
 // Функциональная версия проверки токена
 export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
-  if (!token) {
-    return { success: false, error: "No token provided" };
-  }
+  const start = Date.now();
+  const minDelay = 100;
+
+  const fail = async (error: string): Promise<AuthResult> => {
+    const elapsed = Date.now() - start;
+    if (elapsed < minDelay) await new Promise(r => setTimeout(r, minDelay - elapsed));
+    return { success: false, error };
+  };
+
+  if (!token) return fail("No token provided");
 
   const cleanToken = token.replace("Bearer ", "");
 
-  // Проверка черного списка
-  if (await isTokenBlacklisted(cleanToken)) {
-    return { success: false, error: "Token revoked" };
-  }
+  if (await isTokenBlacklisted(cleanToken)) return fail("Token revoked");
 
   try {
     const decoded = jwt.verify(
@@ -47,9 +51,8 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
       success: true,
       user: { id: decoded.id, email: decoded.email, role: decoded.role ?? 'USER' },
     };
-  } catch (error) {
-    console.error("Auth error:", error);
-    return { success: false, error: "Invalid token" };
+  } catch {
+    return fail("Invalid token");
   }
 }
 

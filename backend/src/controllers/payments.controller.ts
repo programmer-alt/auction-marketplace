@@ -40,8 +40,8 @@ export const paymentsController = {
       await paymentsService.handleWebhook(req.body, sig);
       res.json({ received: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      res.status(400).send(`Webhook Error: ${message}`);
+      console.error("[webhook] Error processing webhook:", error);
+      res.status(400).send("Webhook processing failed");
     }
   },
 

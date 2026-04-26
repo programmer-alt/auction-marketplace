@@ -1,0 +1,7 @@
+flowchart TD
+  F["React компонент (ставка)"] -->|"api.post('/api/auctions/:id/bids')"| AX["frontend/src/api/axios.ts (interceptor)"]
+  AX -->|"X-CSRF-Token + Authorization: Bearer <accessToken>"| BE["backend/src/index.ts (middleware цепочка)"]
+  BE -->|"generateCsrfToken + verifyCsrfToken"| CS["backend/src/middleware/csrf.ts"]
+  BE -->|"authMiddleware"| AU["backend/src/middleware/auth.ts"]
+  AU -->|"req.user"| BC["backend/src/routes/bids.routes.ts + bids.controller.ts"]
+  BC -->|"Prisma"| DB["PostgreSQL (таблица Bid)"]

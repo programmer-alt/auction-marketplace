@@ -1,0 +1,17 @@
+{
+  "root": ".",
+  "include": [
+    "backend/src",
+    "frontend/src"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.recon/**"
+  ],
+  "tsconfig": [
+    "backend/tsconfig.json",
+    "frontend/tsconfig.json"
+  ]
+}

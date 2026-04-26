@@ -1,0 +1,6 @@
+{
+  "projects": ["../frontend"],
+  "watch": true,
+  "crossLanguage": true,
+  "ignore": ["node_modules/", "dist/", "build/", "coverage/"]
+}

@@ -61,6 +61,8 @@ export { io };
 // ========================================
 
 // Helmet для security headers
+const isProd = process.env.NODE_ENV === 'production';
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -68,7 +70,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:", "http://localhost:5000"],
+        imgSrc: ["'self'", "data:", "https:", ...(isProd ? [] : ["http://localhost:5000"])],
         connectSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -118,7 +120,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Статические файлы (загруженные изображения)
-app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", (_req, res) => {
@@ -179,12 +181,15 @@ io.on("connection", (socket) => {
     console.log(`⚡ [socket] Guest connected: ${socket.id}`);
   }
 
-  socket.on('auction:join', (data: { auctionId: number }) => {
-    socket.join(`auction:${data.auctionId}`);
-    console.log(`🔔 [socket] Client ${socket.id} joined auction:${data.auctionId}`);
+  socket.on('auction:join', (data: unknown) => {
+    if (!data || typeof data !== 'object' || typeof (data as Record<string, unknown>).auctionId !== 'number') return;
+    const { auctionId } = data as { auctionId: number };
+    socket.join(`auction:${auctionId}`);
+    console.log(`🔔 [socket] Client ${socket.id} joined auction:${auctionId}`);
   });
 
-  socket.on('auction:leave', (auctionId: number) => {
+  socket.on('auction:leave', (auctionId: unknown) => {
+    if (typeof auctionId !== 'number') return;
     socket.leave(`auction:${auctionId}`);
     console.log(`👋 [socket] Client ${socket.id} left auction:${auctionId}`);
   });
