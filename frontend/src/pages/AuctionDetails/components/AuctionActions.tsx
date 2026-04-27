@@ -20,7 +20,6 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
   user,
   isOwner,
   isActive,
-  onDelete,
   onEdit,
   onPayment,
   onConfirmDelete,

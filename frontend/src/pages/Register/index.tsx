@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useAuthStore } from '../store/auth.store'
-import { authApi } from '../api/auth'
-import { registerSchema, RegisterFormData } from '../utils/validation/auth.schema'
+import { useAuthStore } from '../../store/auth.store'
+import { authApi } from '../../api/auth'
+import { registerSchema, RegisterFormData } from '../../utils/validation/auth.schema'
 import { UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
-import ScanLine from '../components/effects/ScanLine'
+import ScanLine from '../../components/effects/ScanLine'
 
 export default function Register() {
   const [isLoading, setIsLoading] = useState(false)

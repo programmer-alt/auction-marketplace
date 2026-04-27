@@ -1,18 +1,17 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/auth.store';
-import { useAuctionData } from './AuctionDetailsPage/hooks/useAuctionData';
-import { useBidForm } from './AuctionDetailsPage/hooks/useBidForm';
-import { useAuctionActions } from './AuctionDetailsPage/hooks/useAuctionActions';
-import AuctionHeader from './AuctionDetailsPage/components/AuctionHeader';
-import AuctionImage from './AuctionDetailsPage/components/AuctionImage';
-import AuctionDetailsInfo from './AuctionDetailsPage/components/AuctionDetailsInfo';
-import BidHistory from './AuctionDetailsPage/components/BidHistory';
-import BidForm from './AuctionDetailsPage/components/BidForm';
-import AuctionActions from './AuctionDetailsPage/components/AuctionActions';
-import { Auction } from '../types';
+import { useAuthStore } from '../../store/auth.store';
+import { useAuctionData } from './hooks/useAuctionData';
+import { useBidForm } from './hooks/useBidForm';
+import { useAuctionActions } from './hooks/useAuctionActions';
+import AuctionHeader from './components/AuctionHeader';
+import AuctionImage from './components/AuctionImage';
+import AuctionDetailsInfo from './components/AuctionDetailsInfo';
+import BidHistory from './components/BidHistory';
+import BidForm from './components/BidForm';
+import AuctionActions from './components/AuctionActions';
 import toast from 'react-hot-toast';
-import { useStatusBadge } from '../hooks/useStatusBadge';
+import { useStatusBadge } from '../../hooks/useStatusBadge';
 
 const LoadingSkeleton = () => (
   <div className="max-w-4xl mx-auto">

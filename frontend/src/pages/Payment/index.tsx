@@ -1,10 +1,10 @@
 import { useParams, Link } from 'react-router-dom';
-import { useAuthStore } from '../store/auth.store';
+import { useAuthStore } from '../../store/auth.store';
 import { ArrowLeft, CreditCard, CheckCircle, XCircle } from 'lucide-react';
-import { usePaymentData } from './PaymentPage/hooks/usePaymentData';
-import { useCardForm } from './PaymentPage/hooks/useCardForm';
-import AuctionSummary from './PaymentPage/components/AuctionSummary';
-import CardForm from './PaymentPage/components/CardForm';
+import { usePaymentData } from './hooks/usePaymentData';
+import { useCardForm } from './hooks/useCardForm';
+import AuctionSummary from './components/AuctionSummary';
+import CardForm from './components/CardForm';
 
 export default function Payment() {
   const { id } = useParams<{ id: string }>();

@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
-import { useAuthStore } from '../store/auth.store';
+import { useAuthStore } from '../../store/auth.store';
 import { Search, Plus, Clock, Gavel, Timer } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import ScanLine from '../components/effects/ScanLine';
-import { useAuctionList } from './HomePage/hooks/useAuctionList';
-import { useStatusBadge } from '../hooks/useStatusBadge';
+import ScanLine from '../../components/effects/ScanLine';
+import { useAuctionList } from './hooks/useAuctionList';
+import { useStatusBadge } from '../../hooks/useStatusBadge';
 
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
