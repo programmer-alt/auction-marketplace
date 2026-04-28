@@ -18,6 +18,8 @@ import {
   validateAuctionsList,
 } from "../utils/json";
 import { Prisma } from "../types";
+
+type Auction = Prisma.AuctionGetPayload<{}>;
 import {
   createValidationError,
   createForbiddenError,
@@ -54,7 +56,7 @@ async function getAuctionsListVersion(): Promise<string> {
   return initial;
 }
 
-function serializeAuctionForCache(auction: any) {
+function serializeAuctionForCache(auction: Auction) {
   return {
     id: auction.id,
     title: auction.title,
@@ -83,7 +85,7 @@ function serializeAuctionForCache(auction: any) {
 }
 
 function serializeAuctionsListForCache(result: {
-  auctions: any[];
+  auctions: Auction[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }) {
   return {

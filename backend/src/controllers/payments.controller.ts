@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as paymentsService from "../services/payments.service";
 import { AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
+import { createValidationError } from "../errors/factories";
 
 // ========================================
 // Схемы валидации
@@ -21,9 +22,13 @@ export const paymentsController = {
     const parsed = createPaymentSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+
     const result = await paymentsService.createPaymentIntent(
       parsed.data.auctionId,
-      req.user!.id,
+      req.user.id,
     );
     res.status(201).json({
       message: "Платёжный интент создан",
@@ -45,9 +50,12 @@ export const paymentsController = {
     }
   },
 
-  getPaymentHistory: asyncHandler<AuthRequest>(async (req, res) => {
+  getPaymentHistory: asyncHandler<AuthRequest>(async (req, res, next) => {
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
     const { page = "1", limit = "20" } = req.query;
-    const result = await paymentsService.getPaymentHistory(req.user!.id, {
+    const result = await paymentsService.getPaymentHistory(req.user.id, {
       page: parseInt(page as string, 10),
       limit: parseInt(limit as string, 10),
     });

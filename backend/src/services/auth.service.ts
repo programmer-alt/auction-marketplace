@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
 import { redis } from "../config/redis";
@@ -46,12 +46,12 @@ function generateTokens(userId: number, email: string, role: string) {
   const accessToken = jwt.sign(
     { id: userId, email, role, type: 'access' },
     secret,
-    { expiresIn: getJwtAccessExpiresIn() } as any
+    { expiresIn: getJwtAccessExpiresIn() } as SignOptions
   );
   const refreshToken = jwt.sign(
     { id: userId, email, role, type: 'refresh' },
     secret,
-    { expiresIn: getJwtRefreshExpiresIn() } as any
+    { expiresIn: getJwtRefreshExpiresIn() } as SignOptions
   );
   return { accessToken, refreshToken };
 }

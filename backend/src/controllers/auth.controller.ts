@@ -76,12 +76,18 @@ export const authController = {
     if (!accessToken) {
       return next(createValidationError("Access токен отсутствует"));
     }
-    await authService.logout(req.user!.id, accessToken, refreshToken);
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+    await authService.logout(req.user.id, accessToken, refreshToken);
     res.json({ message: "Выход выполнен успешно" });
   }),
 
   getCurrentUser: asyncHandler<AuthRequest>(async (req, res, next) => {
-    const user = await authService.getCurrentUser(req.user!.id);
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+    const user = await authService.getCurrentUser(req.user.id);
     if (!user) return next(createNotFoundError("Пользователь не найден"));
     res.json(user);
   }),

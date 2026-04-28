@@ -71,3 +71,6 @@ Technical.mmd
 # Recon
 .recon/
 .lingma/rules/PowerShell.md
+.recon.json
+.gitignore
+.lingma/rules/Joke.md

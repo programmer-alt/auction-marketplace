@@ -2,6 +2,10 @@ import { Socket } from "socket.io";
 import { redis } from "../config/redis";
 import { LRUCache } from "lru-cache";
 
+interface ErrorWithData extends Error {
+  data?: { code: string; event?: string };
+}
+
 // Конфигурация rate limiting для WebSocket
 const WS_CONNECTION_LIMIT = 10; // Максимум подключений с одного IP
 const WS_CONNECTION_WINDOW = 60; // 60 секунд
@@ -127,8 +131,8 @@ export async function socketConnectionRateLimit(socket: Socket, next: (err?: Err
   const result = await checkRateLimit(key, WS_CONNECTION_LIMIT, WS_CONNECTION_WINDOW);
   
   if (!result.allowed) {
-    const error = new Error(`Too many connections from this IP. Try again in ${result.resetAfter} seconds.`);
-    (error as any).data = { code: "TOO_MANY_CONNECTIONS" };
+    const error = new Error(`Too many connections from this IP. Try again in ${result.resetAfter} seconds.`) as ErrorWithData;
+    error.data = { code: "TOO_MANY_CONNECTIONS" };
     return next(error);
   }
   
@@ -142,8 +146,8 @@ export async function socketBidRateLimit(socket: Socket, next: (err?: Error) => 
   const user = socket.data.user;
   if (!user) {
     // Гости не могут делать ставки
-    const error = new Error("Authentication required for bidding");
-    (error as any).data = { code: "UNAUTHORIZED" };
+    const error = new Error("Authentication required for bidding") as ErrorWithData;
+    error.data = { code: "UNAUTHORIZED" };
     return next(error);
   }
   
@@ -151,8 +155,8 @@ export async function socketBidRateLimit(socket: Socket, next: (err?: Error) => 
   const result = await checkRateLimit(key, WS_BID_LIMIT, WS_BID_WINDOW);
   
   if (!result.allowed) {
-    const error = new Error(`Too many bids. Please wait ${result.resetAfter} seconds before placing another bid.`);
-    (error as any).data = { code: "TOO_MANY_BIDS" };
+    const error = new Error(`Too many bids. Please wait ${result.resetAfter} seconds before placing another bid.`) as ErrorWithData;
+    error.data = { code: "TOO_MANY_BIDS" };
     return next(error);
   }
   
@@ -174,8 +178,8 @@ export function createSocketEventRateLimit(eventName: string, limit: number, win
     const result = await checkRateLimit(key, limit, windowSeconds);
     
     if (!result.allowed) {
-      const error = new Error(`Rate limit exceeded for event "${eventName}". Try again in ${result.resetAfter} seconds.`);
-      (error as any).data = { code: "RATE_LIMIT_EXCEEDED", event: eventName };
+      const error = new Error(`Rate limit exceeded for event "${eventName}". Try again in ${result.resetAfter} seconds.`) as ErrorWithData;
+      error.data = { code: "RATE_LIMIT_EXCEEDED", event: eventName };
       return next(error);
     }
     

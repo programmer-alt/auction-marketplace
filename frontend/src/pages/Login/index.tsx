@@ -34,7 +34,7 @@ export default function Login() {
       toast.success('Вход выполнен успешно!')
       navigate('/')
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('Login error')
       toast.error('Ошибка входа. Проверьте email и пароль.')
     } finally {
       setIsLoading(false)
