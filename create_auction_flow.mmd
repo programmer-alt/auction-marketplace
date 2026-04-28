@@ -1,0 +1,39 @@
+sequenceDiagram
+    participant User as Пользователь
+    participant CreateAuction as Компонент CreateAuction
+    participant useCreateAuction as Хук useCreateAuction
+    participant auctionsApi as API модуль (auctions.ts)
+    participant Axios as Axios клиент
+    participant BackendRoute as Маршрут /auctions (POST)
+    participant AuctionController as Контроллер auctions.controller.ts
+    participant AuctionService as Сервис auctions.service.ts
+    participant AuctionRepository as Репозиторий auctions.repository.ts
+    participant DB as База данных (Prisma)
+    participant Redis as Кэш Redis
+    participant UploadRoute as Маршрут /upload (опционально)
+
+    User->>CreateAuction: Заполняет форму, нажимает "Создать"
+    CreateAuction->>useCreateAuction: Вызывает onSubmit
+    useCreateAuction->>auctionsApi: Вызывает uploadImage (если есть файл)
+    auctionsApi->>Axios: POST /upload (multipart/form-data)
+    Axios->>UploadRoute: Запрос загрузки изображения
+    UploadRoute-->>Axios: Возвращает imageUrl
+    Axios-->>auctionsApi: imageUrl
+    auctionsApi-->>useCreateAuction: imageUrl
+    useCreateAuction->>auctionsApi: Вызывает createAuction с данными
+    auctionsApi->>Axios: POST /auctions с данными аукциона
+    Axios->>BackendRoute: Запрос на создание аукциона
+    BackendRoute->>AuctionController: Вызывает метод create
+    AuctionController->>AuctionService: Вызывает createAuction
+    AuctionService->>AuctionRepository: Вызывает createAuction
+    AuctionRepository->>DB: Вставка записи в таблицу Auction
+    DB-->>AuctionRepository: Созданный аукцион
+    AuctionRepository-->>AuctionService: Модель аукциона
+    AuctionService->>Redis: Инвалидирует кэш списков (invalidateAuctionsLists)
+    AuctionService-->>AuctionController: DTO аукциона
+    AuctionController-->>BackendRoute: JSON ответ
+    BackendRoute-->>Axios: 201 Created
+    Axios-->>auctionsApi: Ответ
+    auctionsApi-->>useCreateAuction: Успех
+    useCreateAuction->>CreateAuction: Показывает toast, перенаправляет на /
+    CreateAuction-->>User: Отображает уведомление об успехе
