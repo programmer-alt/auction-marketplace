@@ -32,6 +32,7 @@ import adminRouter from "./routes/admin.routes";
 
 // Import error handler
 import { errorHandler } from "./errors/handler";
+import { securityHeaders } from "./middleware/securityHeaders";
 
 dotenv.config();
 validateEnv();
@@ -60,24 +61,10 @@ export { io };
 // Middleware безопасности и производительности
 // ========================================
 
-// Helmet для security headers
-const isProd = process.env.NODE_ENV === 'production';
-
+// Helmet для базовых security headers (отключаем CSP, т.к. используем кастомный middleware)
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:", ...(isProd ? [] : ["http://localhost:5000"])],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
-      },
-    },
+    contentSecurityPolicy: false, // Будет установлен нашим securityHeaders middleware
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
@@ -97,6 +84,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   }),
 );
+
+// Security headers middleware (CSP, X-Frame-Options, etc.)
+app.use(securityHeaders());
 
 // Stripe webhook
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
