@@ -17,6 +17,7 @@ import {
   validateAuction,
   validateAuctionsList,
 } from "../utils/json";
+import { sanitizeObject } from "../utils/sanitization";
 import { Prisma } from "../types";
 
 type Auction = Prisma.AuctionGetPayload<{}>;
@@ -200,8 +201,13 @@ export async function getAuctionById(id: number) {
  * Создание нового аукциона
  */
 export async function createAuction(data: CreateAuctionInput, userId: number) {
+  // Очистка входных данных от потенциально опасного контента
+  const sanitizedData = sanitizeObject(data, {
+    skipKeys: ['endsAt', 'startingPrice'],
+  });
+  
   const { title, description, imageUrl, startingPrice, currency, endsAt } =
-    data;
+    sanitizedData;
 
   const endsAtDate = new Date(endsAt);
   if (isNaN(endsAtDate.getTime())) {
@@ -246,16 +252,21 @@ export async function updateAuction(
   data: UpdateAuctionInput,
   userId: number,
 ) {
+  // Очистка входных данных от потенциально опасного контента
+  const sanitizedData = sanitizeObject(data, {
+    skipKeys: ['endsAt', 'startingPrice'],
+  });
+  
   // Формируем данные для обновления
   const updateData: Prisma.AuctionUpdateInput = {};
 
-  if (data.title !== undefined) updateData.title = data.title;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
-  if (data.startingPrice !== undefined)
-    updateData.startingPrice = data.startingPrice;
-  if (data.currency !== undefined)
-    updateData.currency = data.currency.toLowerCase();
+  if (sanitizedData.title !== undefined) updateData.title = sanitizedData.title;
+  if (sanitizedData.description !== undefined) updateData.description = sanitizedData.description;
+  if (sanitizedData.imageUrl !== undefined) updateData.imageUrl = sanitizedData.imageUrl || null;
+  if (sanitizedData.startingPrice !== undefined)
+    updateData.startingPrice = sanitizedData.startingPrice;
+  if (sanitizedData.currency !== undefined)
+    updateData.currency = sanitizedData.currency.toLowerCase();
 
   if (data.endsAt) {
     const endsAtDate = new Date(data.endsAt);

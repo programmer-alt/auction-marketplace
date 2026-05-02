@@ -5,7 +5,7 @@ flowchart TD
 
     subgraph "Инициализация (старт приложения)"
         B1[Frontend] -->|GET /api/csrf-token| C1[Backend]
-        C1 -->|generateToken| C2[CSRF Middleware]
+        C1 -->|generateToken| C2[generateToken function]
         C2 -->|nonce + HMAC-SHA256| C3[Токен: nonce.signature]
         C3 -->|Set-Cookie| B2[Cookie: csrfToken]
         C3 -->|JSON response| B3[Сохранить в памяти]

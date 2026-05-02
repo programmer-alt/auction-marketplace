@@ -1,0 +1,138 @@
+/**
+ * Утилита для очистки строк от потенциально опасного контента
+ * Защита от XSS-атак и инъекций
+ */
+
+/**
+ * Базовая очистка строки от HTML-тегов и специальных символов
+ */
+export function sanitizeString(input: string): string {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  return input
+    .replace(/[<>]/g, '') // Удаление < и >
+    .replace(/javascript:/gi, '') // Удаление javascript: протокола
+    .replace(/on\w+=/gi, '') // Удаление обработчиков событий (onclick= и т.д.)
+    .trim();
+}
+
+/**
+ * Очистка HTML-контента (сохранение разрешенных тегов)
+ */
+export function sanitizeHtml(input: string, allowedTags: string[] = []): string {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  // Создаем регулярное выражение для разрешенных тегов
+  const allowedTagsPattern = allowedTags.length > 0
+    ? `(${allowedTags.join('|')})`
+    : '';
+
+  // Удаляем все теги, кроме разрешенных
+  let sanitized = input.replace(/<script[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ''); // Удаляем script теги
+
+  if (allowedTagsPattern) {
+    // Удаляем все теги, кроме разрешенных
+    sanitized = sanitized.replace(new RegExp(`<(?!${allowedTagsPattern})\/?[\w\s="'-]+>`, 'gi'), '');
+  } else {
+    // Удаляем все теги
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+  }
+
+  return sanitized;
+}
+
+/**
+ * Очистка URL от потенциально опасных протоколов
+ */
+export function sanitizeUrl(input: string): string {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  const trimmed = input.trim();
+
+  // Проверяем на опасные протоколы
+  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+  const lowerInput = trimmed.toLowerCase();
+
+  for (const protocol of dangerousProtocols) {
+    if (lowerInput.startsWith(protocol)) {
+      return '';
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Очистка объекта, рекурсивно обрабатывая все строковые поля
+ */
+export function sanitizeObject<T extends Record<string, any>>(
+  obj: T,
+  options: {
+    skipKeys?: string[];
+    sanitizeHtml?: boolean;
+    allowedHtmlTags?: string[];
+  } = {}
+): T {
+  const { skipKeys = [], sanitizeHtml: allowHtml = false, allowedHtmlTags = [] } = options;
+
+  const sanitized = { ...obj };
+
+  for (const key in sanitized) {
+    if (skipKeys.includes(key)) {
+      continue;
+    }
+
+    const value = sanitized[key];
+
+    if (typeof value === 'string') {
+      sanitized[key] = allowHtml
+        ? sanitizeHtml(value, allowedHtmlTags)
+        : sanitizeString(value);
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeObject(value, options);
+    }
+  }
+
+  return sanitized;
+}
+
+/**
+ * Валидация и очистка email-адреса
+ */
+export function sanitizeEmail(input: string): string {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  const trimmed = input.trim().toLowerCase();
+
+  // Базовая проверка формата email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(trimmed)) {
+    return '';
+  }
+
+  return trimmed;
+}
+
+/**
+ * Очистка числового значения
+ */
+export function sanitizeNumber(input: any): number | null {
+  if (typeof input === 'number') {
+    return isNaN(input) ? null : input;
+  }
+
+  if (typeof input === 'string') {
+    const parsed = parseFloat(input);
+    return isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+}

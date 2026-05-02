@@ -1,17 +1,20 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, lazy, Suspense } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
-import Home from './pages/Home'
-import AuctionDetails from './pages/AuctionDetails'
-import CreateAuction from './pages/CreateAuction'
-import EditAuction from './pages/EditAuction'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Profile from './pages/Profile'
-import Payment from './pages/Payment'
-import About from './pages/About'
-import Contacts from './pages/Contacts'
 import { useAuthStore } from './store/auth.store'
+import LoadingSpinner from './components/shared/LoadingSpinner'
+
+// Lazy loaded components for code splitting
+const Home = lazy(() => import('./pages/Home'))
+const AuctionDetails = lazy(() => import('./pages/AuctionDetails/AuctionDetails.index'))
+const CreateAuction = lazy(() => import('./pages/CreateAuction/CreateAuction.index'))
+const EditAuction = lazy(() => import('./pages/EditAuction/EditAuction.index'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Payment = lazy(() => import('./pages/Payment'))
+const About = lazy(() => import('./pages/About/About.index'))
+const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -20,7 +23,8 @@ function App() {
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <Layout>
-        <Routes>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/auctions/:id" element={<AuctionDetails />} />
           <Route
@@ -44,7 +48,8 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </Layout>
     </Router>
   )

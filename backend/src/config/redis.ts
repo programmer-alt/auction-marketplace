@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import dotenv from "dotenv";
+import logger from "./logger";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ export const redis = new Redis(redisUrl, {
 
 redis.on("error", (err: Error & { code?: string }) => {
   if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
-  console.error("Redis client error:", err);
+  logger.error("Redis client error:", err);
 });
 
 redis.on("reconnecting", () => {
@@ -28,26 +29,26 @@ redis.on("reconnecting", () => {
 export const safeRedis = {
   async get(key: string): Promise<string | null> {
     try { return await redis.get(key); }
-    catch (err) { console.error("Redis get failed:", err); return null; }
+    catch (err) { logger.error("Redis get failed:", err); return null; }
   },
   async set(key: string, value: string): Promise<void> {
     try { await redis.set(key, value); }
-    catch (err) { console.error("Redis set failed:", err); }
+    catch (err) { logger.error("Redis set failed:", err); }
   },
   async setex(key: string, ttl: number, value: string): Promise<void> {
     try { await redis.setex(key, ttl, value); }
-    catch (err) { console.error("Redis setex failed:", err); }
+    catch (err) { logger.error("Redis setex failed:", err); }
   },
   async incr(key: string): Promise<number | null> {
     try { return await redis.incr(key); }
-    catch (err) { console.error("Redis incr failed:", err); return null; }
+    catch (err) { logger.error("Redis incr failed:", err); return null; }
     },
   async del(...keys: string[]): Promise<void> {
     try { if (keys.length > 0) await redis.del(...keys); }
-    catch (err) { console.error("Redis del failed:", err); }
+    catch (err) { logger.error("Redis del failed:", err); }
   },
   async keys(pattern: string): Promise<string[]> {
     try { return await redis.keys(pattern); }
-    catch (err) { console.error("Redis keys failed:", err); return []; }
+    catch (err) { logger.error("Redis keys failed:", err); return []; }
   },
 };

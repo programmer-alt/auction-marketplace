@@ -19,6 +19,9 @@ import {
 } from "./middleware/csrf";
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
+import logger from "./config/logger";
+import { metricsMiddleware, register } from "./middleware/metrics";
+import { setResourceLimits, checkMemoryLeak } from "./config/resources";
 
 import { upload } from './config/upload';
 import path from 'path';
@@ -36,6 +39,16 @@ import { securityHeaders } from "./middleware/securityHeaders";
 
 dotenv.config();
 validateEnv();
+
+// Настройка управления ресурсами
+setResourceLimits();
+
+// Периодическая проверка на утечку памяти
+setInterval(() => {
+  if (checkMemoryLeak()) {
+    logger.warn("Possible memory leak detected");
+  }
+}, 10 * 60 * 1000); // Каждые 10 минут
 
 const app = express();
 const httpServer = createServer(app);
@@ -100,6 +113,9 @@ app.use(cookieParser());
 // Rate limiting middleware (применяется ко всем маршрутам, кроме health)
 app.use(rateLimit);
 
+// Metrics middleware для сбора метрик HTTP запросов
+app.use(metricsMiddleware);
+
 // CSRF protection
 app.use(generateCsrfToken);
 app.use(verifyCsrfToken);
@@ -107,6 +123,16 @@ app.use(verifyCsrfToken);
 // Health check
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Metrics endpoint для Prometheus
+app.get("/metrics", async (_req, res) => {
+  try {
+    res.set("Content-Type", register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
 });
 
 // Статические файлы (загруженные изображения)
@@ -165,33 +191,33 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
   const { user } = socket.data;
   if (user) {
-    console.log(`⚡ [socket] Client connected: ${socket.id} (user ${user.id})`);
+    logger.info(`Client connected: ${socket.id} (user ${user.id})`);
     socket.join(`user:${user.id}`);
   } else {
-    console.log(`⚡ [socket] Guest connected: ${socket.id}`);
+    logger.info(`Guest connected: ${socket.id}`);
   }
 
   socket.on('auction:join', (data: unknown) => {
     if (!data || typeof data !== 'object' || typeof (data as Record<string, unknown>).auctionId !== 'number') return;
     const { auctionId } = data as { auctionId: number };
     socket.join(`auction:${auctionId}`);
-    console.log(`🔔 [socket] Client ${socket.id} joined auction:${auctionId}`);
+    logger.info(`Client ${socket.id} joined auction:${auctionId}`);
   });
 
   socket.on('auction:leave', (auctionId: unknown) => {
     if (typeof auctionId !== 'number') return;
     socket.leave(`auction:${auctionId}`);
-    console.log(`👋 [socket] Client ${socket.id} left auction:${auctionId}`);
+    logger.info(`Client ${socket.id} left auction:${auctionId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log(`🔌 [socket] Client disconnected: ${socket.id} (user ${user?.id ?? 'guest'})`);
+    logger.info(`Client disconnected: ${socket.id} (user ${user?.id ?? 'guest'})`);
   });
 });
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
-  console.log(`\n🛑 [shutdown] Received ${signal}. Shutting down gracefully...`);
+  logger.info(`Received ${signal}. Shutting down gracefully...`);
 
   httpServer.closeAllConnections();
   httpServer.close();
@@ -225,21 +251,21 @@ async function shutdown(signal: string) {
 
 // Запуск сервера
 httpServer.listen(PORT, async () => {
-  console.log(`\n🚀 [server] Running on http://localhost:${PORT}`);
-  console.log(`📝 [server] Environment: ${process.env.NODE_ENV}`);
+  logger.info(`Server running on http://localhost:${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV}`);
 
   try {
     await prisma.$connect();
-    console.log('📦 [server] Database connected');
+    logger.info('Database connected');
   } catch (error) {
-    console.error('❌ [server] Database connection failed:', error);
+    logger.error('Database connection failed:', error);
   }
 
   try {
     await pubClient.ping();
-    console.log('🔗 [server] Redis connected');
+    logger.info('Redis connected');
   } catch (error) {
-    console.error('❌ [server] Redis connection failed:', error);
+    logger.error('Redis connection failed:', error);
   }
 
   const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
@@ -252,12 +278,12 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // Необработанные отклонения промисов
 process.on('unhandledRejection', (reason: unknown) => {
-  console.error('❌ [server] Unhandled promise rejection:', reason);
+  logger.error('Unhandled promise rejection:', reason);
   shutdown('unhandledRejection').catch(() => process.exit(1));
 });
 
 // Необработанные исключения (синхронные)
 process.on('uncaughtException', (error: Error) => {
-  console.error('❌ [server] Uncaught exception:', error);
+  logger.error('Uncaught exception:', error);
   shutdown('uncaughtException').catch(() => process.exit(1));
 });

@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { createValidationError, createNotFoundError } from "../errors/factories";
+import { createCursorWhereClause, createPaginationResult, parsePaginationOptions, CursorPaginationOptions, CursorPaginationResult } from "../utils/pagination";
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (
@@ -138,4 +139,57 @@ export const deleteAuction = async (prisma: PrismaClient, id: number) => {
     }
     throw error;
   }
+};
+
+// ========================================
+// Курсорная пагинация
+// ========================================
+
+/**
+ * Получение списка аукционов с курсорной пагинацией
+ */
+export const getAuctionsWithCursor = async (
+  prisma: PrismaClient,
+  where: Prisma.AuctionWhereInput,
+  options: CursorPaginationOptions,
+): Promise<CursorPaginationResult<any>> => {
+  const { cursor, limit, direction } = parsePaginationOptions(options);
+  const cursorField = 'id';
+  
+  // Создаем условие для курсора
+  const cursorWhere = createCursorWhereClause(cursor, cursorField, direction);
+  
+  // Объединяем условия
+  const combinedWhere = {
+    ...where,
+    ...cursorWhere,
+  };
+  
+  // Определяем порядок сортировки
+  const orderBy = direction === 'next' 
+    ? { [cursorField]: 'asc' as const }
+    : { [cursorField]: 'desc' as const };
+  
+  // Получаем данные с запасом для определения hasMore
+  const data = await prisma.auction.findMany({
+    where: combinedWhere,
+    include: {
+      seller: {
+        select: { id: true, email: true, name: true },
+      },
+      winner: {
+        select: { id: true, email: true, name: true },
+      },
+      _count: {
+        select: { bids: true },
+      },
+    },
+    orderBy,
+    take: limit + 1, // Берем на один больше для определения hasMore
+  });
+  
+  // Если направление назад, переворачиваем результат
+  const sortedData = direction === 'prev' ? data.reverse() : data;
+  
+  return createPaginationResult(sortedData, limit, cursorField, direction);
 };

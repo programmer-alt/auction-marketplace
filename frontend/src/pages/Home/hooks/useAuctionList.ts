@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { auctionsApi } from '../../../api/auctions';
 import { Auction } from '../../../types';
 
@@ -42,20 +42,28 @@ export const useAuctionList = () => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
-  const handleStatusFilter = (value: string) => {
+  const handleStatusFilter = useCallback((value: string) => {
     setStatusFilter(value);
     setPage(1);
-  };
+  }, []);
+
+  const handleSearch = useCallback((value: string) => {
+    setSearch(value);
+  }, []);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+  }, []);
 
   return {
     auctions,
     loading,
     search,
-    setSearch,
+    setSearch: handleSearch,
     statusFilter,
     setStatusFilter: handleStatusFilter,
     page,
-    setPage,
+    setPage: handlePageChange,
     totalPages,
   };
 };

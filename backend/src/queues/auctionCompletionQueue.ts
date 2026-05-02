@@ -2,6 +2,7 @@ import Queue from "bull";
 import Redis from "ioredis";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
+import logger from "../config/logger";
 
 
 // Типизация данных задачи
@@ -16,18 +17,11 @@ const WS_AUCTION_WON = "auction:won";
 const WS_AUCTION_SOLD = "auction:sold";
 
 // Логгер с временными метками и уровнями
-const logger = {
-  info: (msg: string) =>
-    console.log(`[${new Date().toISOString()}] INFO:  ${msg}`),
-  warn: (msg: string) =>
-    console.warn(`[${new Date().toISOString()}] WARN:  ${msg}`),
-  error: (msg: string, err?: unknown) =>
-    console.error(`[${new Date().toISOString()}] ERROR: ${msg}`, err ?? ""),
-  debug: (msg: string) => {
-    if (process.env.NODE_ENV === "development") {
-      console.debug(`[${new Date().toISOString()}] DEBUG: ${msg}`);
-    }
-  },
+const queueLogger = {
+  info: (msg: string) => logger.info(msg),
+  warn: (msg: string) => logger.warn(msg),
+  error: (msg: string, err?: unknown) => logger.error(msg, err),
+  debug: (msg: string) => logger.debug(msg),
 };
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
@@ -53,7 +47,7 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
 
   client.on("error", (err: Error & { code?: string }) => {
     if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
-    console.error(`[bull:${type}] Redis error:`, err);
+    logger.error(`[bull:${type}] Redis error:`, err);
   });
 
   sharedBullClients[type] = client;
@@ -85,7 +79,7 @@ auctionCompletionQueue.process(async (job) => {
     return;
   }
 
-  logger.info(`🔄 Завершение аукциона ${auctionId}`);
+  queueLogger.info(`🔄 Завершение аукциона ${auctionId}`);
 
   try {
     // Проверяем статус перед обновлением — защита от двойного завершения
@@ -95,12 +89,12 @@ auctionCompletionQueue.process(async (job) => {
     });
 
     if (!existing) {
-      logger.warn(`Аукцион ${auctionId} не найден, пропускаем`);
+      queueLogger.warn(`Аукцион ${auctionId} не найден, пропускаем`);
       return;
     }
 
     if (existing.status !== "ACTIVE") {
-      logger.warn(
+      queueLogger.warn(
         `Аукцион ${auctionId} уже имеет статус ${existing.status}, пропускаем`,
       );
       return;
@@ -129,7 +123,7 @@ auctionCompletionQueue.process(async (job) => {
           include: { winner: { select: { id: true, email: true } } },
         });
         winnerId = lastBid.userId;
-        logger.info(
+        queueLogger.info(
           `🏆 Победитель аукциона ${auctionId} определён из ставок: ${winnerId}`,
         );
       }
@@ -162,11 +156,11 @@ auctionCompletionQueue.process(async (job) => {
       amount: auction.currentPrice,
     });
 
-    logger.info(
+    queueLogger.info(
       `✅ Аукцион ${auctionId} завершён, победитель: ${winnerId ?? "нет"}, цена: ${auction.currentPrice}`,
     );
   } catch (error) {
-    logger.error(`❌ Ошибка завершения аукциона ${auctionId}:`, error);
+    queueLogger.error(`❌ Ошибка завершения аукциона ${auctionId}:`, error);
     throw error instanceof Error
       ? error
       : new Error(`Unknown error completing auction ${auctionId}`);
@@ -186,7 +180,7 @@ export async function scheduleAuctionCompletion(
   // Защита от дубликатов
   const existing = await auctionCompletionQueue.getJob(jobId);
   if (existing) {
-    logger.warn(`Задача для аукциона ${auctionId} уже существует, пропускаем`);
+    queueLogger.warn(`Задача для аукциона ${auctionId} уже существует, пропускаем`);
     return;
   }
 
@@ -194,7 +188,7 @@ export async function scheduleAuctionCompletion(
     { auctionId },
     { delay: Math.max(delay, 0), jobId },
   );
-  logger.info(
+  queueLogger.info(
     delay <= 0
       ? `Аукцион ${auctionId} просрочен, добавляем немедленно`
       : `⏰ Запланировано завершение аукциона ${auctionId} через ${Math.round(delay / 1000)} сек`,
@@ -210,7 +204,7 @@ export async function removeScheduledAuctionCompletion(
   const job = await auctionCompletionQueue.getJob(`auction:${auctionId}`);
   if (job) {
     await job.remove();
-    logger.info(`🗑️ Удалена задача для аукциона ${auctionId}`);
+    queueLogger.info(`🗑️ Удалена задача для аукциона ${auctionId}`);
     return true;
   }
   return false;
@@ -220,7 +214,7 @@ export async function removeScheduledAuctionCompletion(
  * Планирует завершение для всех активных аукционов при запуске сервера
  */
 export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
-  logger.info("🔍 Поиск активных аукционов...");
+  queueLogger.info("🔍 Поиск активных аукционов...");
 
   let skip = 0;
   let total = 0;
@@ -239,7 +233,7 @@ export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
     const now = new Date();
     const overdue = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt <= now).length;
     const upcoming = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt > now).length;
-    logger.debug(
+    queueLogger.debug(
       `Пачка: ${auctions.length} аукционов (просрочено: ${overdue}, предстоит: ${upcoming})`,
     );
 
@@ -253,5 +247,5 @@ export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
     if (auctions.length < batchSize) break;
   }
 
-  logger.info(`📋 Запланировано ${total} аукционов`);
+  queueLogger.info(`📋 Запланировано ${total} аукционов`);
 }

@@ -74,3 +74,4 @@ Technical.mmd
 .recon.json
 .gitignore
 .lingma/rules/Joke.md
+backend/scripts/backup.sh
