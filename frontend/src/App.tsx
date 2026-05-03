@@ -1,18 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, lazy, Suspense } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
 import { useAuthStore } from './store/auth.store'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
 // Lazy loaded components for code splitting
-const Home = lazy(() => import('./pages/Home'))
+const Home = lazy(() => import('./pages/Home/Home.index'))
 const AuctionDetails = lazy(() => import('./pages/AuctionDetails/AuctionDetails.index'))
 const CreateAuction = lazy(() => import('./pages/CreateAuction/CreateAuction.index'))
 const EditAuction = lazy(() => import('./pages/EditAuction/EditAuction.index'))
-const Login = lazy(() => import('./pages/Login'))
-const Register = lazy(() => import('./pages/Register'))
-const Profile = lazy(() => import('./pages/Profile'))
-const Payment = lazy(() => import('./pages/Payment'))
+const Login = lazy(() => import('./pages/Login/Login.index'))
+const Register = lazy(() => import('./pages/Register/Register.index'))
+const Profile = lazy(() => import('./pages/Profile/Profile.index'))
+const Payment = lazy(() => import('./pages/Payment/Payment.index'))
 const About = lazy(() => import('./pages/About/About.index'))
 const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 

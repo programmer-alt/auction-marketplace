@@ -84,7 +84,7 @@ export const useEditAuction = (id: string | undefined) => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().slice(0, 16);
 
-  const displayImage = imagePreview || (!removeImage ? currentImageUrl : null);
+  const displayImage = imagePreview || (removeImage ? null : currentImageUrl);
 
   return { form, isLoading, displayImage, handleImageChange, handleRemoveImage, onSubmit, minDate };
 };
