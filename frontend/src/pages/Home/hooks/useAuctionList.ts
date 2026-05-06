@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auctionsApi } from '../../../api/auctions';
-import { Auction } from '../../../types';
+import type { Auction } from '../../../types';
+
 
 export const useAuctionList = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
@@ -13,23 +14,29 @@ export const useAuctionList = () => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const fetchAuctions = async () => {
-      setLoading(true);
-      try {
-        const data = await auctionsApi.getAuctions({
-          page,
-          limit: 12,
-          status: statusFilter || undefined,
-          search: debouncedSearch || undefined,
-        });
+  const fetchAuctions = async () => {
+    setLoading(true);
+    try {
+      const response = await auctionsApi.getAuctions({
+        page,
+        limit: 12,
+        status: statusFilter || undefined,
+        search: debouncedSearch || undefined,
+      });
+      
+      if ('success' in response && response.success) {
+        const {data} = response;
         setAuctions(data.auctions || []);
         setTotalPages(data.pagination?.totalPages || 1);
-      } catch {
-        setAuctions([]);
-      } finally {
-        setLoading(false);
+      } else {
+        throw new Error(response.error || 'Ошибка загрузки аукционов');
       }
-    };
+    } catch {
+      setAuctions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
     fetchAuctions();
   }, [page, statusFilter, debouncedSearch]);
 

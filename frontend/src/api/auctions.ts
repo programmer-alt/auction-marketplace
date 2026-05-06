@@ -1,5 +1,11 @@
 import api from './axios'
-import { Auction, AuctionsListResponse, CreateAuctionData } from '../types'
+import type { 
+  Auction, 
+  ApiResponse, 
+  PaginatedApiResponse,
+  AuctionDetail 
+} from '../types/advanced'
+import { AuctionsListResponse, CreateAuctionData } from '../types'
 
 interface AuctionMutationResponse {
   message: string
@@ -12,37 +18,55 @@ export const auctionsApi = {
     limit?: number
     status?: string
     search?: string
-  }) => {
+  }): Promise<ApiResponse<AuctionsListResponse>> => {
     const response = await api.get<AuctionsListResponse>('/auctions', { params })
-    return response.data
+    return {
+      success: true,
+      data: response.data
+    } as ApiResponse<AuctionsListResponse>
   },
 
-  getAuctionById: async (id: number, signal?: AbortSignal) => {
-    const response = await api.get<{ auction: Auction }>(`/auctions/${id}`, { signal })
-    return response.data.auction
+  getAuctionById: async (id: number, signal?: AbortSignal): Promise<ApiResponse<AuctionDetail>> => {
+    const response = await api.get<{ auction: Auction }>('/auctions/' + id, { signal })
+    return {
+      success: true,
+      data: response.data.auction as AuctionDetail
+    } as ApiResponse<AuctionDetail>
   },
 
-  createAuction: async (data: CreateAuctionData) => {
+  createAuction: async (data: CreateAuctionData): Promise<ApiResponse<Auction>> => {
     const response = await api.post<AuctionMutationResponse>('/auctions', data)
-    return response.data.auction
+    return {
+      success: true,
+      data: response.data.auction
+    } as ApiResponse<Auction>
   },
 
-  updateAuction: async (id: number, data: Partial<CreateAuctionData>) => {
-    const response = await api.put<AuctionMutationResponse>(`/auctions/${id}`, data)
-    return response.data.auction
+  updateAuction: async (id: number, data: Partial<CreateAuctionData>): Promise<ApiResponse<Auction>> => {
+    const response = await api.put<AuctionMutationResponse>('/auctions/' + id, data)
+    return {
+      success: true,
+      data: response.data.auction
+    } as ApiResponse<Auction>
   },
 
-  uploadImage: async (file: File): Promise<string> => {
+  uploadImage: async (file: File): Promise<ApiResponse<string>> => {
     const formData = new FormData()
     formData.append('image', file)
     const response = await api.post<{ imageUrl: string }>('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    return response.data.imageUrl
+    return {
+      success: true,
+      data: response.data.imageUrl
+    } as ApiResponse<string>
   },
 
-  deleteAuction: async (id: number) => {
-    const response = await api.delete(`/auctions/${id}`)
-    return response.data
+  deleteAuction: async (id: number): Promise<ApiResponse<{ message: string }>> => {
+    const response = await api.delete('/auctions/' + id)
+    return {
+      success: true,
+      data: response.data
+    } as ApiResponse<{ message: string }>
   },
 }
