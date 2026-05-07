@@ -22,12 +22,11 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "useDefineForClassFields": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
+    "types": ["node"],
     "paths": {
-      "@/*": ["./frontend/src/*"]
-    },
-    "types": ["node"]
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "backend/src/**/*",
