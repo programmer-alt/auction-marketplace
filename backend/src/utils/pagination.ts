@@ -19,17 +19,17 @@ export interface CursorPaginationResult<T> {
 /**
  * Кодирование курсора в base64
  */
-export function encodeCursor(value: any): string {
+export function encodeCursor<T>(value: T): string {
   return Buffer.from(JSON.stringify(value)).toString('base64');
 }
 
 /**
  * Декодирование курсора из base64
  */
-export function decodeCursor(cursor: string): any {
+export function decodeCursor<T = unknown>(cursor: string): T | null {
   try {
-    return JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
-  } catch (error) {
+    return JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8')) as T;
+  } catch {
     return null;
   }
 }
@@ -37,21 +37,30 @@ export function decodeCursor(cursor: string): any {
 /**
  * Создание курсора на основе значения и поля сортировки
  */
-export function createCursor(value: any, field: string = 'id'): string {
-  return encodeCursor({ [field]: value });
+export function createCursor<T extends Record<string, unknown>>(
+  value: T,
+): string {
+  return encodeCursor(value);
+}
+
+export function createCursorByField<T>(
+  value: T,
+  field: string = 'id',
+): string {
+  return encodeCursor({ [field]: value } as Record<string, unknown>);
 }
 
 /**
  * Парсинг опций пагинации с значениями по умолчанию
  */
 export function parsePaginationOptions(options: CursorPaginationOptions): {
-  cursor: any;
+  cursor: unknown;
   limit: number;
   direction: 'next' | 'prev';
 } {
   const limit = Math.min(Math.max(options.limit || 10, 1), 100); // Ограничиваем limit от 1 до 100
   const direction = options.direction || 'next';
-  const cursor = options.cursor ? decodeCursor(options.cursor) : null;
+  const cursor = options.cursor ? decodeCursor<unknown>(options.cursor) : null;
 
   return { cursor, limit, direction };
 }
@@ -59,7 +68,7 @@ export function parsePaginationOptions(options: CursorPaginationOptions): {
 /**
  * Создание результата пагинации
  */
-export function createPaginationResult<T>(
+export function createPaginationResult<T extends Record<string, any>>(
   data: T[],
   limit: number,
   cursorField: string = 'id',
@@ -72,15 +81,22 @@ export function createPaginationResult<T>(
   let prevCursor: string | undefined;
 
   if (paginatedData.length > 0) {
-    const firstItem = paginatedData[0] as any;
     const lastItem = paginatedData[paginatedData.length - 1] as any;
 
     if (direction === 'next') {
-      nextCursor = hasMore ? createCursor(lastItem[cursorField], cursorField) : undefined;
-      prevCursor = cursor ? createCursor(firstItem[cursorField], cursorField) : undefined;
+      nextCursor = hasMore
+        ? createCursorByField(lastItem[cursorField], cursorField)
+        : undefined;
+      // Предыдущий курсор рассчитываем только если входной курсор был задан
+      // (в этой функции он не передаётся, поэтому оставляем undefined)
+      prevCursor = undefined;
     } else {
-      nextCursor = cursor ? createCursor(firstItem[cursorField], cursorField) : undefined;
-      prevCursor = hasMore ? createCursor(lastItem[cursorField], cursorField) : undefined;
+      // Следующий курсор вычисляем только для режима prev.
+      // Входной cursor параметр здесь не доступен, поэтому оставляем undefined.
+      nextCursor = undefined;
+      prevCursor = hasMore
+        ? createCursorByField(lastItem[cursorField], cursorField)
+        : undefined;
     }
   }
 
@@ -96,27 +112,27 @@ export function createPaginationResult<T>(
  * Создание условий Prisma для курсорной пагинации
  */
 export function createCursorWhereClause(
-  cursor: any,
+  cursor: unknown,
   cursorField: string = 'id',
   direction: 'next' | 'prev' = 'next'
-): Record<string, any> {
-  if (!cursor || !cursor[cursorField]) {
+): Record<string, unknown> {
+  if (!cursor || typeof cursor !== 'object') {
     return {};
   }
 
-  const cursorValue = cursor[cursorField];
+  const cursorObj = cursor as Record<string, unknown>;
+  const cursorValue = cursorObj[cursorField];
+  if (cursorValue === undefined || cursorValue === null) {
+    return {};
+  }
 
   if (direction === 'next') {
     return {
-      [cursorField]: {
-        gt: cursorValue,
-      },
+      [cursorField]: { gt: cursorValue },
     };
   } else {
     return {
-      [cursorField]: {
-        lt: cursorValue,
-      },
+      [cursorField]: { lt: cursorValue },
     };
   }
 }

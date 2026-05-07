@@ -87,3 +87,9 @@ export interface CreateAuctionData {
 export interface CreateBidData {
   amount: number
 }
+
+// Экспортируем все типы из advanced.ts
+export * from './advanced';
+
+// Экспортируем утилиты для WebSocket
+export * from '../utils/websocket';

@@ -4,11 +4,11 @@ import { useForm, useFormState } from 'react-hook-form';
 import { auctionsApi } from '../../../api/auctions';
 import toast from 'react-hot-toast';
 import type { 
-  FormState, 
   AsyncState, 
   ApiResponse, 
   AuctionDetail
 } from '../../../types/advanced';
+
 
 type EditAuctionData = {
   title: string;
@@ -61,7 +61,8 @@ export const useEditAuction = (id: string | undefined) => {
             updatedAt: new Date() 
           });
         } else {
-          throw new Error(result.error || 'Аукцион не найден');
+          const errorMessage = 'error' in result ? result.error : 'Аукцион не найден';
+          throw new Error(errorMessage);
         }
       } catch (error: any) {
         const errorMsg = error.message || 'Аукцион не найден';
@@ -103,27 +104,33 @@ export const useEditAuction = (id: string | undefined) => {
     try {
       let imageUrl: string | null | undefined = undefined;
       if (imageFile) {
-        imageUrl = await auctionsApi.uploadImage(imageFile);
+        const imageResult = await auctionsApi.uploadImage(imageFile);
+        if ('success' in imageResult && imageResult.success) {
+          imageUrl = imageResult.data;
+        } else {
+          throw new Error(imageResult.error || 'Ошибка загрузки изображения');
+        }
       } else if (removeImage) {
         imageUrl = null;
       }
 
-      const updateData = {
+      // Используем обычный тип для обновления аукциона
+      const updateData: Partial<EditAuctionData> = {
         title: data.title,
         description: data.description || undefined,
         ...(imageUrl !== undefined && { imageUrl }),
-        startingPrice: parseFloat(data.startingPrice),
-        endsAt: new Date(data.endsAt).toISOString(),
+        startingPrice: data.startingPrice,
+        endsAt: data.endsAt,
       };
 
-      const result = await auctionsApi.updateAuction(Number(id), updateData) as ApiResponse<any>;
+      const result = await auctionsApi.updateAuction(Number(id), updateData as any) as ApiResponse<any>;
 
         if ('success' in result && result.success) {
-        toast.success('Аукцион обновлён!');
+          toast.success('Аукцион обновлён!');
         navigate(`/auctions/${id}`);
         return true;
       } else {
-        toast.error(result.error || 'Не удалось обновить аукцион');
+        toast.error('Не удалось обновить аукцион');
         return false;
       }
     } catch (error: any) {

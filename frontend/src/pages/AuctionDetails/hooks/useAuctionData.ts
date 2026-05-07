@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { auctionsApi } from '../../../api/auctions';
 import { bidsApi } from '../../../api/bids';
-import { Auction, Bid } from '../../../types';
+import { Auction, Bid, isApiSuccess } from '../../../types';
 import toast from 'react-hot-toast';
 
 const isCancelError = (error: unknown): boolean => {
@@ -26,15 +26,21 @@ export const useAuctionData = (id: string | undefined) => {
     try {
       const data = await auctionsApi.getAuctionById(Number(auctionId), signal);
       if (signal?.aborted) return;
-      setAuction(data);
-      try {
-        const bidsData = await bidsApi.getAuctionBids(Number(auctionId), signal);
-        if (signal?.aborted) return;
-        setBids(bidsData?.bids || []);
-      } catch (error) {
-        if (isCancelError(error)) return;
-        console.error('Ошибка при загрузке ставок:', error);
-        setBids([]);
+      
+      // Используем type guard для проверки успешности ответа
+      if (isApiSuccess(data)) {
+        setAuction(data.data);
+        try {
+          const bidsData = await bidsApi.getAuctionBids(Number(auctionId), signal);
+          if (signal?.aborted) return;
+          setBids(bidsData?.bids || []);
+        } catch (error) {
+          if (isCancelError(error)) return;
+          console.error('Ошибка при загрузке ставок:', error);
+          setBids([]);
+        }
+      } else {
+        throw new Error(data.error || 'Аукцион не найден');
       }
     } catch (error) {
       if (isCancelError(error)) return;

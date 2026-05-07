@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React from 'react';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import { useAuctionData } from './hooks/useAuctionData';
@@ -13,11 +14,12 @@ import AuctionActions from './components/AuctionActions';
 import toast from 'react-hot-toast';
 import { useStatusBadge } from '../../hooks/useStatusBadge';
 
+
 const LoadingSkeleton = () => (
   <div className="max-w-4xl mx-auto">
     <div className="card animate-pulse">
       <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
-      <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-2" />
       <div className="h-4 bg-gray-200 rounded w-1/2" />
     </div>
   </div>
@@ -38,7 +40,7 @@ export default function AuctionDetails() {
   const { user, isAuthenticated } = useAuthStore();
 
   const { auction, bids, loading, refresh } = useAuctionData(id);
-  const { bidAmount, setBidAmount, isSubmitting, submitBid, error } = useBidForm(
+  const { bidAmount, setBidAmount, isSubmitting, submitBid } = useBidForm(
     auction?.id,
     auction?.currentPrice
   );
@@ -49,17 +51,14 @@ export default function AuctionDetails() {
 
   const { getStatusBadge } = useStatusBadge();
 
-  const { isOwner, isActive, isEnded, statusInfo } = useMemo(() => {
-    if (!auction) {
-      return { isOwner: false, isActive: false, isEnded: false, statusInfo: { label: '', cls: '' } };
-    }
-    return {
-      isOwner: user?.id === auction.sellerId,
-      isActive: auction.status === 'ACTIVE',
-      isEnded: new Date(auction.endsAt) < new Date(),
-      statusInfo: getStatusBadge(auction.status),
-    };
-  }, [auction, user, getStatusBadge]);
+  // Определяем, является ли пользователь владельцем аукциона
+  const isOwner = user?.id === auction?.sellerId;
+  // Определяем, активен ли аукцион
+  const isActive = auction?.status === 'ACTIVE';
+  // Определяем, закончился ли аукцион
+  const isEnded = auction ? new Date(auction.endsAt) < new Date() : false;
+  // Получаем информацию о статусе для отображения
+  const statusInfo = auction ? getStatusBadge(auction.status) : { label: '', cls: '' };
 
   const handleBidSubmit = async (amount: number): Promise<boolean> => {
     const success = await submitBid(amount);
@@ -97,9 +96,8 @@ export default function AuctionDetails() {
               auction={auction}
               onSubmit={handleBidSubmit}
               isSubmitting={isSubmitting}
-              bidAmount={bidAmount}
-              setBidAmount={setBidAmount}
-              error={error}
+              bidAmount={String(bidAmount)} // Преобразуем число в строку
+              setBidAmount={(value) => setBidAmount(Number(value))} // Преобразуем строку в число
             />
           ) : !isAuthenticated && isActive && !isEnded ? (
             <div className="card text-center">

@@ -88,12 +88,12 @@ export function sanitizeObject<T extends Record<string, any>>(
       continue;
     }
 
-    const value = sanitized[key];
+    const value = sanitized[key as keyof T];
 
     if (typeof value === 'string') {
-      sanitized[key] = allowHtml
-        ? sanitizeHtml(value, allowedHtmlTags)
-        : sanitizeString(value);
+      (sanitized as T)[key as keyof T] = allowHtml
+        ? (sanitizeHtml(value, allowedHtmlTags) as any)
+        : (sanitizeString(value) as any);
     } else if (typeof value === 'object' && value !== null) {
       sanitized[key] = sanitizeObject(value, options);
     }

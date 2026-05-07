@@ -1,8 +1,7 @@
 import api from './axios'
 import type { 
   Auction, 
-  ApiResponse, 
-  PaginatedApiResponse,
+  ApiResponse,
   AuctionDetail 
 } from '../types/advanced'
 import { AuctionsListResponse, CreateAuctionData } from '../types'
@@ -69,4 +68,20 @@ export const auctionsApi = {
       data: response.data
     } as ApiResponse<{ message: string }>
   },
+}
+
+// Функция-утилита для извлечения данных из API-ответа
+export function extractAuctionData(response: ApiResponse<Auction>): Auction | null {
+  if (response.success) {
+    return response.data;
+  }
+  return null;
+}
+
+// Функция-утилита для извлечения данных из любого API-ответа с использованием ExtractApiData
+export function extractData<T>(response: ApiResponse<T>): T | null {
+  if (response.success) {
+    return response.data;
+  }
+  return null;
 }

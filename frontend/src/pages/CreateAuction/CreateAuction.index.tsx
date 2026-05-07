@@ -5,7 +5,16 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { useCreateAuction } from './hooks/useCreateAuction';
 
 export default function CreateAuction() {
-  const { form, isLoading, imagePreview, handleImageChange, removeImage, onSubmit, minDate } = useCreateAuction();
+  const { 
+    form, 
+    isLoading,
+    imagePreview, 
+    handleImageChange, 
+    removeImage, 
+    onSubmit, 
+    minDate,
+  } = useCreateAuction();
+
   const { register, handleSubmit, formState: { errors } } = form;
 
   return (

@@ -4,10 +4,10 @@ import { useForm, useFormState } from 'react-hook-form';
 import { auctionsApi } from '../../../api/auctions';
 import toast from 'react-hot-toast';
 import type { 
-  FormState, 
-  ApiResponse, 
-  AsyncState 
+  AsyncState,
+  ApiResponse
 } from '../../../types/advanced';
+
 
 type CreateAuctionData = {
   title: string;
@@ -32,6 +32,7 @@ export const useCreateAuction = () => {
   });
 
   const formState = useFormState(form);
+  const isLoading = uploadState.status === 'loading';
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,7 +93,7 @@ export const useCreateAuction = () => {
 
   return { 
     form, 
-    formState,
+    isLoading,
     imagePreview, 
     handleImageChange, 
     removeImage, 

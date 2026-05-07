@@ -115,7 +115,13 @@ export default function Home() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
-              <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Назад</button>
+              <button 
+                className="btn-secondary" 
+                disabled={page <= 1} 
+                onClick={() => setPage(page - 1)}
+              >
+                Назад
+              </button>
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button
                   key={i + 1}
@@ -125,7 +131,13 @@ export default function Home() {
                   {i + 1}
                 </button>
               ))}
-              <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Вперёд</button>
+              <button 
+                className="btn-secondary" 
+                disabled={page >= totalPages} 
+                onClick={() => setPage(page + 1)}
+              >
+                Вперёд
+              </button>
             </div>
           )}
         </>

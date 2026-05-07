@@ -15,6 +15,7 @@ export type PaymentStatus = Payment['status'];
 
 /**
  * Делает все свойства объекта опциональными (включая вложенные)
+ * Пример использования: DeepPartial<Auction> для обновления аукциона
  */
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object
@@ -214,6 +215,7 @@ export type PaginationParams = {
 
 /**
  * Извлекает тип данных из ApiResponse
+ * Пример использования: ExtractApiData<ApiResponse<AuctionDetail>> -> AuctionDetail
  */
 export type ExtractApiData<T> = T extends ApiResponse<infer U> ? U : never;
 
@@ -240,6 +242,7 @@ export type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 
 /**
  * Создает тип для формы валидации на основе схемы Zod
+ * Пример использования: FormErrors<CreateAuctionData> -> { title?: string[], startingPrice?: string[] }
  */
 export type FormErrors<T> = {
   [K in keyof T]?: string[];
@@ -285,6 +288,7 @@ export type WebSocketEvent = AuctionEvent | BidEvent | `payment:${PaymentStatusU
 
 /**
  * Создает тип для обработчиков событий
+ * Пример использования: EventHandlers для WebSocket-событий
  */
 export type EventHandlers = {
   [K in WebSocketEvent as `on${Capitalize<K>}`]?: (data: any) => void;
@@ -327,6 +331,7 @@ export type AsyncState<T> = LoadingState | SuccessState<T> | ErrorState;
 
 /**
  * Тип для состояния аукциона с discriminated union
+ * Пример использования: AuctionState в компоненте аукциона
  */
 export type AuctionState =
   | { type: 'not_found' }
@@ -366,6 +371,7 @@ export type DateFilter = {
 
 /**
  * Type guard для проверки типа ApiSuccess
+ * Пример использования: if(isApiSuccess(response)) { console.log(response.data); }
  */
 export function isApiSuccess<T>(response: ApiResponse<T>): response is ApiSuccess<T> {
   return response.success === true;

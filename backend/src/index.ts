@@ -20,7 +20,7 @@ import {
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
 import logger from "./config/logger";
-import { metricsMiddleware, register } from "./middleware/metrics";
+import { metricsMiddleware, register } from "./config/metrics";
 import { setResourceLimits, checkMemoryLeak } from "./config/resources";
 
 import { upload } from './config/upload';

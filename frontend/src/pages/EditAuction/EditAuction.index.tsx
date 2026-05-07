@@ -6,7 +6,18 @@ import { useEditAuction } from './hooks/useEditAuction';
 
 export default function EditAuction() {
   const { id } = useParams<{ id: string }>();
-  const { form, isLoading, displayImage, handleImageChange, handleRemoveImage, onSubmit, minDate } = useEditAuction(id);
+  const { 
+    form, 
+
+    uploadState,
+    displayImage, 
+    handleImageChange, 
+    handleRemoveImage, 
+    onSubmit, 
+    minDate 
+  } = useEditAuction(id);
+  
+  const isLoading = uploadState.status === 'loading';
   const { register, handleSubmit, formState: { errors } } = form;
 
   return (

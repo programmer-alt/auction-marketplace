@@ -1,41 +1,49 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { auctionsApi } from '../../../api/auctions';
-import { Auction } from '../../../types';
 import { User } from '../../../types';
 import toast from 'react-hot-toast';
 
 export const usePaymentData = (id: string | undefined, user: User | null) => {
-  const navigate = useNavigate();
-  const [auction, setAuction] = useState<Auction | null>(null);
+  const [auction, setAuction] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
-    const fetch = async () => {
-      setLoading(true);
+    if (!id || !user) return;
+    
+    const fetchAuction = async () => {
       try {
+        setLoading(true);
         const data = await auctionsApi.getAuctionById(Number(id));
-        if (data.status !== 'COMPLETED') {
-          toast.error('Оплата доступна только для завершённых аукционов');
-          navigate(`/auctions/${id}`);
-          return;
+        
+        if ('success' in data && data.success && data.data) {
+          const auctionData = data.data;
+          
+          // Проверяем, что пользователь является победителем аукциона
+          if (auctionData.winnerId !== user.id) {
+            toast.error('Только победитель аукциона может произвести оплату');
+            return;
+          }
+          
+          // Проверяем статус аукциона
+          if (auctionData.status !== 'COMPLETED') {
+            toast.error('Оплата возможна только за завершенные аукционы');
+            return;
+          }
+          
+          setAuction(data.data);
+        } else {
+          toast.error((data as any).error || 'Аукцион не найден');
         }
-        if (data.winnerId !== user?.id) {
-          toast.error('Вы не являетесь победителем этого аукциона');
-          navigate(`/auctions/${id}`);
-          return;
-        }
-        setAuction(data);
-      } catch {
-        toast.error('Не удалось загрузить аукцион');
-        navigate('/');
+      } catch (error) {
+        console.error('Ошибка при загрузке данных аукциона для оплаты:', error);
+        toast.error('Ошибка при загрузке данных аукциона');
       } finally {
         setLoading(false);
       }
     };
-    fetch();
-  }, [id, user, navigate]);
+
+    fetchAuction();
+  }, [id, user]);
 
   return { auction, loading };
 };
