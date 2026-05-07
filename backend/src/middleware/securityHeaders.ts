@@ -44,42 +44,31 @@ export interface SecurityHeadersConfig {
 function generateCspHeader(csp: CspConfig): string {
   const directives: string[] = [];
 
-  if (csp.defaultSrc) {
-    directives.push(`default-src ${csp.defaultSrc.join(' ')}`);
+  // Маппинг свойств конфигурации на имена директив CSP
+  const directiveMap: Record<string, string> = {
+    defaultSrc: 'default-src',
+    scriptSrc: 'script-src',
+    styleSrc: 'style-src',
+    imgSrc: 'img-src',
+    fontSrc: 'font-src',
+    connectSrc: 'connect-src',
+    mediaSrc: 'media-src',
+    objectSrc: 'object-src',
+    frameSrc: 'frame-src',
+    frameAncestors: 'frame-ancestors',
+    baseUri: 'base-uri',
+    formAction: 'form-action',
+  };
+
+  // Обрабатываем директивы с массивами источников
+  for (const [key, directiveName] of Object.entries(directiveMap)) {
+    const sources = csp[key as keyof CspConfig];
+    if (Array.isArray(sources) && sources.length > 0) {
+      directives.push(`${directiveName} ${sources.join(' ')}`);
+    }
   }
-  if (csp.scriptSrc) {
-    directives.push(`script-src ${csp.scriptSrc.join(' ')}`);
-  }
-  if (csp.styleSrc) {
-    directives.push(`style-src ${csp.styleSrc.join(' ')}`);
-  }
-  if (csp.imgSrc) {
-    directives.push(`img-src ${csp.imgSrc.join(' ')}`);
-  }
-  if (csp.fontSrc) {
-    directives.push(`font-src ${csp.fontSrc.join(' ')}`);
-  }
-  if (csp.connectSrc) {
-    directives.push(`connect-src ${csp.connectSrc.join(' ')}`);
-  }
-  if (csp.mediaSrc) {
-    directives.push(`media-src ${csp.mediaSrc.join(' ')}`);
-  }
-  if (csp.objectSrc) {
-    directives.push(`object-src ${csp.objectSrc.join(' ')}`);
-  }
-  if (csp.frameSrc) {
-    directives.push(`frame-src ${csp.frameSrc.join(' ')}`);
-  }
-  if (csp.frameAncestors) {
-    directives.push(`frame-ancestors ${csp.frameAncestors.join(' ')}`);
-  }
-  if (csp.baseUri) {
-    directives.push(`base-uri ${csp.baseUri.join(' ')}`);
-  }
-  if (csp.formAction) {
-    directives.push(`form-action ${csp.formAction.join(' ')}`);
-  }
+
+  // Булевые директивы
   if (csp.upgradeInsecureRequests) {
     directives.push('upgrade-insecure-requests');
   }

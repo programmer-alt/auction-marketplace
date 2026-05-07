@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { useAuctionData } from './hooks/useAuctionData';
 import { useBidForm } from './hooks/useBidForm';
 import { useAuctionActions } from './hooks/useAuctionActions';
+import { useAuctionState } from './hooks/useAuctionState';
 import AuctionHeader from './components/AuctionHeader';
 import AuctionImage from './components/AuctionImage';
 import AuctionDetailsInfo from './components/AuctionDetailsInfo';
@@ -12,7 +13,6 @@ import BidHistory from './components/BidHistory';
 import BidForm from './components/BidForm';
 import AuctionActions from './components/AuctionActions';
 import toast from 'react-hot-toast';
-import { useStatusBadge } from '../../hooks/useStatusBadge';
 
 
 const LoadingSkeleton = () => (
@@ -49,16 +49,17 @@ export default function AuctionDetails() {
     navigate
   );
 
-  const { getStatusBadge } = useStatusBadge();
-
-  // Определяем, является ли пользователь владельцем аукциона
-  const isOwner = user?.id === auction?.sellerId;
-  // Определяем, активен ли аукцион
-  const isActive = auction?.status === 'ACTIVE';
-  // Определяем, закончился ли аукцион
-  const isEnded = auction ? new Date(auction.endsAt) < new Date() : false;
-  // Получаем информацию о статусе для отображения
-  const statusInfo = auction ? getStatusBadge(auction.status) : { label: '', cls: '' };
+  // Используем хук для вычисления производных состояний
+  const {
+    isOwner,
+    isActive,
+    isEnded,
+    statusInfo,
+    showBidForm,
+    showLoginPrompt,
+    showOwnerMessage,
+    showAuctionActions,
+  } = useAuctionState(auction, user, isAuthenticated);
 
   const handleBidSubmit = async (amount: number): Promise<boolean> => {
     const success = await submitBid(amount);
@@ -91,15 +92,16 @@ export default function AuctionDetails() {
 
         {/* Боковая панель */}
         <div>
-          {isAuthenticated && isActive && !isEnded && !isOwner ? (
+          {showBidForm && (
             <BidForm
               auction={auction}
               onSubmit={handleBidSubmit}
               isSubmitting={isSubmitting}
-              bidAmount={String(bidAmount)} // Преобразуем число в строку
-              setBidAmount={(value) => setBidAmount(Number(value))} // Преобразуем строку в число
+              bidAmount={String(bidAmount)}
+              setBidAmount={(value) => setBidAmount(Number(value))}
             />
-          ) : !isAuthenticated && isActive && !isEnded ? (
+          )}
+          {showLoginPrompt && (
             <div className="card text-center">
               <p className="text-gray-600 mb-4">Войдите, чтобы делать ставки</p>
               <button
@@ -109,28 +111,31 @@ export default function AuctionDetails() {
                 Войти
               </button>
             </div>
-          ) : isOwner && isActive ? (
+          )}
+          {showOwnerMessage && (
             <div className="card text-center">
               <p className="text-gray-500">Это ваш аукцион</p>
               <p className="text-sm text-gray-400 mt-1">
                 Ожидайте ставок от участников
               </p>
             </div>
-          ) : null}
+          )}
 
           {/* Действия с аукционом */}
-          <div className="mt-6">
-            <AuctionActions
-              auction={auction}
-              user={user}
-              isOwner={isOwner}
-              isActive={isActive}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-              onPayment={handlePayment}
-              onConfirmDelete={handleConfirmDelete}
-            />
-          </div>
+          {showAuctionActions && (
+            <div className="mt-6">
+              <AuctionActions
+                auction={auction}
+                user={user}
+                isOwner={isOwner}
+                isActive={isActive}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                onPayment={handlePayment}
+                onConfirmDelete={handleConfirmDelete}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

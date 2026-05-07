@@ -245,6 +245,69 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 }
 
 /**
+ * Вспомогательная функция для построения объекта обновления аукциона
+ */
+function buildUpdateData(
+  sanitizedData: UpdateAuctionInput,
+): Prisma.AuctionUpdateInput {
+  const updateData: Prisma.AuctionUpdateInput = {};
+
+  if (sanitizedData.title !== undefined) updateData.title = sanitizedData.title;
+  if (sanitizedData.description !== undefined) updateData.description = sanitizedData.description;
+  if (sanitizedData.imageUrl !== undefined) updateData.imageUrl = sanitizedData.imageUrl || null;
+  if (sanitizedData.startingPrice !== undefined)
+    updateData.startingPrice = sanitizedData.startingPrice;
+  if (sanitizedData.currency !== undefined)
+    updateData.currency = sanitizedData.currency.toLowerCase();
+
+  return updateData;
+}
+
+/**
+ * Валидация и обработка даты окончания аукциона
+ * Возвращает объект с полем endsAt (если дата валидна) и флагом needsReschedule
+ */
+async function processEndsAt(
+  endsAt: string | undefined,
+  auctionId: number,
+): Promise<{ endsAtDate?: Date; needsReschedule: boolean }> {
+  if (!endsAt) {
+    return { needsReschedule: false };
+  }
+
+  const endsAtDate = new Date(endsAt);
+  if (isNaN(endsAtDate.getTime())) {
+    throw createValidationError("Некорректная дата окончания");
+  }
+  if (endsAtDate <= new Date()) {
+    throw createValidationError("Дата окончания должна быть в будущем");
+  }
+
+  // Обновляем запланированное завершение аукциона
+  await removeScheduledAuctionCompletion(auctionId);
+  scheduleAuctionCompletion(auctionId, endsAtDate);
+
+  return { endsAtDate, needsReschedule: true };
+}
+
+/**
+ * Проверка прав доступа и состояния аукциона
+ */
+function validateAuctionForUpdate(
+  existingAuction: Auction,
+  userId: number,
+): void {
+  if (existingAuction.sellerId !== userId) {
+    throw createForbiddenError(
+      "Недостаточно прав для редактирования этого аукциона",
+    );
+  }
+  if (existingAuction.status !== "ACTIVE") {
+    throw createValidationError("Можно редактировать только активные аукционы");
+  }
+}
+
+/**
  * Обновление аукциона
  */
 export async function updateAuction(
@@ -258,29 +321,12 @@ export async function updateAuction(
   });
   
   // Формируем данные для обновления
-  const updateData: Prisma.AuctionUpdateInput = {};
+  const updateData = buildUpdateData(sanitizedData);
 
-  if (sanitizedData.title !== undefined) updateData.title = sanitizedData.title;
-  if (sanitizedData.description !== undefined) updateData.description = sanitizedData.description;
-  if (sanitizedData.imageUrl !== undefined) updateData.imageUrl = sanitizedData.imageUrl || null;
-  if (sanitizedData.startingPrice !== undefined)
-    updateData.startingPrice = sanitizedData.startingPrice;
-  if (sanitizedData.currency !== undefined)
-    updateData.currency = sanitizedData.currency.toLowerCase();
-
-  if (data.endsAt) {
-    const endsAtDate = new Date(data.endsAt);
-    if (isNaN(endsAtDate.getTime())) {
-      throw createValidationError("Некорректная дата окончания");
-    }
-    if (endsAtDate <= new Date()) {
-      throw createValidationError("Дата окончания должна быть в будущем");
-    }
+  // Обработка даты окончания
+  const { endsAtDate } = await processEndsAt(data.endsAt, id);
+  if (endsAtDate) {
     updateData.endsAt = endsAtDate;
-
-    // Обновляем запланированное завершение аукциона
-    await removeScheduledAuctionCompletion(id);
-    scheduleAuctionCompletion(id, endsAtDate);
   }
 
   // Проверяем, существует ли аукцион и принадлежит ли он пользователю
@@ -288,14 +334,7 @@ export async function updateAuction(
   if (!existingAuction) {
     throw createNotFoundError("Аукцион не найден");
   }
-  if (existingAuction.sellerId !== userId) {
-    throw createForbiddenError(
-      "Недостаточно прав для редактирования этого аукциона",
-    );
-  }
-  if (existingAuction.status !== "ACTIVE") {
-    throw createValidationError("Можно редактировать только активные аукционы");
-  }
+  validateAuctionForUpdate(existingAuction, userId);
 
   const auction = await updateAuctionByIdRepo(prisma, id, updateData);
 
