@@ -1,6 +1,17 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { createValidationError, createNotFoundError } from "../errors/factories";
-import { createCursorWhereClause, createPaginationResult, parsePaginationOptions, CursorPaginationOptions, CursorPaginationResult } from "../utils/pagination";
+import {
+  createCursorWhereClause,
+  createPaginationResult,
+  parsePaginationOptions,
+  CursorPaginationOptions,
+  CursorPaginationResult,
+  CompositeCursorPaginationOptions,
+  createCompositeCursorWhereClause,
+  createCompositePaginationResult,
+  parseCompositePaginationOptions,
+  createOrderBy,
+} from "../utils/pagination";
 
 // Получение списка аукционов с пагинацией
 export const getAuctions = async (
@@ -147,14 +158,32 @@ export const deleteAuction = async (prisma: PrismaClient, id: number) => {
 
 /**
  * Получение списка аукционов с курсорной пагинацией
+ * Поддерживает как одиночные, так и составные курсоры
  */
 export const getAuctionsWithCursor = async (
   prisma: PrismaClient,
   where: Prisma.AuctionWhereInput,
-  options: CursorPaginationOptions,
+  options: CursorPaginationOptions & { cursorField?: string; cursorFields?: string[] },
 ): Promise<CursorPaginationResult<any>> => {
+  // Если указаны составные поля, используем составную пагинацию
+  if (options.cursorFields && options.cursorFields.length > 0) {
+    return getAuctionsWithCompositeCursor(prisma, where, {
+      ...options,
+      cursorFields: options.cursorFields,
+    });
+  }
+
   const { cursor, limit, direction } = parsePaginationOptions(options);
-  const cursorField = 'id';
+  const cursorField = options.cursorField || 'id';
+  
+  // Валидация типа значения курсора (опционально)
+  if (cursor && typeof cursor === 'object' && cursorField in cursor) {
+    const cursorValue = (cursor as Record<string, unknown>)[cursorField];
+    if (typeof cursorValue !== 'string' && typeof cursorValue !== 'number' && !(cursorValue instanceof Date)) {
+      // Если тип невалидный, игнорируем курсор
+      console.warn(`Invalid cursor value type for field ${cursorField}`);
+    }
+  }
   
   // Создаем условие для курсора
   const cursorWhere = createCursorWhereClause(cursor, cursorField, direction);
@@ -165,8 +194,8 @@ export const getAuctionsWithCursor = async (
     ...cursorWhere,
   };
   
-  // Определяем порядок сортировки
-  const orderBy = direction === 'next' 
+  // Определяем порядок сортировки с использованием createOrderBy для единообразия
+  const orderBy = direction === 'next'
     ? { [cursorField]: 'asc' as const }
     : { [cursorField]: 'desc' as const };
   
@@ -192,4 +221,50 @@ export const getAuctionsWithCursor = async (
   const sortedData = direction === 'prev' ? data.reverse() : data;
   
   return createPaginationResult(sortedData, limit, cursorField, direction);
+};
+
+/**
+ * Получение списка аукционов с составной курсорной пагинацией
+ */
+export const getAuctionsWithCompositeCursor = async (
+  prisma: PrismaClient,
+  where: Prisma.AuctionWhereInput,
+  options: CompositeCursorPaginationOptions,
+): Promise<CursorPaginationResult<any>> => {
+  const { cursor, limit, direction, cursorFields } = parseCompositePaginationOptions(options);
+  
+  // Создаем условие для составного курсора
+  const cursorWhere = createCompositeCursorWhereClause(cursor, cursorFields, direction);
+  
+  // Объединяем условия
+  const combinedWhere = {
+    ...where,
+    ...cursorWhere,
+  };
+  
+  // Определяем порядок сортировки
+  const orderBy = createOrderBy(cursorFields, direction);
+  
+  // Получаем данные с запасом для определения hasMore
+  const data = await prisma.auction.findMany({
+    where: combinedWhere,
+    include: {
+      seller: {
+        select: { id: true, email: true, name: true },
+      },
+      winner: {
+        select: { id: true, email: true, name: true },
+      },
+      _count: {
+        select: { bids: true },
+      },
+    },
+    orderBy,
+    take: limit + 1,
+  });
+  
+  // Если направление назад, переворачиваем результат
+  const sortedData = direction === 'prev' ? data.reverse() : data;
+  
+  return createCompositePaginationResult(sortedData, limit, cursorFields, direction);
 };

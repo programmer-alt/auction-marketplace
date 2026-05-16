@@ -1,8 +1,9 @@
 import api from './axios'
-import type { 
-  Auction, 
+import type {
+  Auction,
   ApiResponse,
-  AuctionDetail 
+  AuctionDetail,
+  ExtractApiData
 } from '../types/advanced'
 import { AuctionsListResponse, CreateAuctionData } from '../types'
 
@@ -85,3 +86,14 @@ export function extractData<T>(response: ApiResponse<T>): T | null {
   }
   return null;
 }
+
+// Улучшенная функция извлечения данных с использованием ExtractApiData
+export function extractApiData<T extends ApiResponse<any>>(response: T): ExtractApiData<T> | null {
+  if (response.success) {
+    return response.data;
+  }
+  return null;
+}
+
+// Утилиты для проверки типа ответа
+export { isApiSuccess, isApiError } from '../types/advanced';

@@ -7,6 +7,7 @@ import type {
   AsyncState,
   ApiResponse
 } from '../../../types/advanced';
+import { isApiSuccess } from '../../../types/advanced';
 
 
 type CreateAuctionData = {
@@ -46,11 +47,11 @@ export const useCreateAuction = () => {
     setImagePreview(null);
   }, []);
 
-  const onSubmit = useCallback(async (data: CreateAuctionData): Promise<boolean> => {
+ const onSubmit = useCallback(async (data: CreateAuctionData): Promise<boolean> => {
     if (!formState.isValid) {
       toast.error('Заполните все обязательные поля корректно');
       return false;
-    }
+    } 
 
     setUploadState({ status: 'loading' });
     
@@ -58,7 +59,7 @@ export const useCreateAuction = () => {
       let imageUrl: string | undefined;
       if (imageFile) {
         const uploadResult = await auctionsApi.uploadImage(imageFile);
-        if ('success' in uploadResult && uploadResult.success) {
+        if (isApiSuccess(uploadResult)) {
           imageUrl = uploadResult.data;
         }
       }
@@ -71,7 +72,7 @@ export const useCreateAuction = () => {
         endsAt: new Date(data.endsAt).toISOString(),
       }) as ApiResponse<any>;
 
-      if ('success' in result && result.success) {
+      if (isApiSuccess(result)) {
         toast.success('Аукцион успешно создан!');
         navigate('/');
         return true;
