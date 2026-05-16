@@ -27,27 +27,27 @@ export function registerWebSocketHandlers(
       const eventName = handlerKey.replace(/^on/, '').toLowerCase();
       // Ищем соответствующее WebSocket-событие
       const wsEvents = getAllWebSocketEvents();
-      const matchingEvent = wsEvents.find(event => 
+      const matchingEvent = wsEvents.find(event =>
         event.toLowerCase() === eventName ||
         event.toLowerCase().replace(':', '') === eventName ||
         event.toLowerCase().replace(/:/g, '') === eventName
       );
 
       if (matchingEvent) {
-        eventHandlerMap[matchingEvent as WebSocketEvent] = handlerFn;
+        // Создаем безопасную обертку с обработкой ошибок
+        const safeHandler = (data: any) => {
+          try {
+            handlerFn(data);
+          } catch (error) {
+            console.error(`Ошибка при обработке события ${matchingEvent}:`, error);
+          }
+        };
+        // Сохраняем безопасную обертку в карту для последующего удаления
+        eventHandlerMap[matchingEvent as WebSocketEvent] = safeHandler;
+        // Регистрируем безопасную обертку в WebSocket
+        socket.addEventListener(matchingEvent, safeHandler);
       }
     }
-  });
-
-  // Регистрируем обработчики в WebSocket
-  Object.entries(eventHandlerMap).forEach(([event, handler]) => {
-    socket.addEventListener(event, (data: any) => {
-      try {
-        handler(data);
-      } catch (error) {
-        console.error(`Ошибка при обработке события ${event}:`, error);
-      }
-    });
   });
 
   // Возвращаем функцию отписки
