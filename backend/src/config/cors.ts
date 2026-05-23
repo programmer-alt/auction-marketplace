@@ -1,6 +1,4 @@
 export function getAllowedOrigins(): string[] {
-  // ВНИМАНИЕ: В продакшене используйте HTTPS протокол для всех origin.
-  // Пример: "https://ваш-домен.com,https://другой-домен.com"
   return (process.env.ALLOWED_ORIGINS || "http://localhost:5173").split(",");
 }
 
