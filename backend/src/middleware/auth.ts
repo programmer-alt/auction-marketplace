@@ -26,20 +26,17 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
 
 // Функциональная версия проверки токена
 export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
-  const start = Date.now();
-  const minDelay = 100;
-
-  const fail = async (error: string): Promise<AuthResult> => {
-    const elapsed = Date.now() - start;
-    if (elapsed < minDelay) await new Promise(r => setTimeout(r, minDelay - elapsed));
-    return { success: false, error };
-  };
-
-  if (!token) return fail("No token provided");
+  if (!token || token.trim() === "") {
+    return { success: false, error: "No token provided" };
+  }
 
   const cleanToken = token.replace("Bearer ", "");
 
-  if (await isTokenBlacklisted(cleanToken)) return fail("Token revoked");
+  // Проверяем, находится ли токен в черном списке
+  const isBlacklisted = await isTokenBlacklisted(cleanToken);
+  if (isBlacklisted) {
+    return { success: false, error: "Token is blacklisted" };
+  }
 
   try {
     const decoded = jwt.verify(
@@ -49,16 +46,21 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
 
     return {
       success: true,
-      user: { id: decoded.id, email: decoded.email, role: decoded.role ?? 'USER' },
+      user: { id: decoded.id, email: decoded.email, role: decoded.role ?? "USER" },
     };
-  } catch {
-    return fail("Invalid token");
+  } catch (error) {
+    // Type guard для проверки, является ли ошибка экземпляром Error
+    if (error instanceof Error) {
+      return { success: false, error: error.message };
+    }
+    // На случай, если будет брошен не-Error объект (что маловероятно, но возможно в JS)
+    return { success: false, error: "Invalid token" };
   }
 }
 
 // Базовая функция проверки токена
 async function checkAuthToken(authHeader: string | undefined): Promise<AuthResult> {
-  return await parseAuthToken(authHeader);
+  return parseAuthToken(authHeader);
 }
 
 // Обязательная аутентификация
@@ -76,13 +78,14 @@ export function createAuthMiddleware() {
   };
 }
 
+
 export const authMiddleware = createAuthMiddleware();
 
 // Опциональная аутентификация
 export function createOptionalAuthMiddleware() {
   return async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
-    
+
     // Если токен отсутствует - просто продолжаем
     if (!authHeader) {
       return next();
@@ -100,5 +103,6 @@ export function createOptionalAuthMiddleware() {
     next();
   };
 }
+
 
 export const optionalAuthMiddleware = createOptionalAuthMiddleware();
