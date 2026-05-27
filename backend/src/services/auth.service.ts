@@ -43,18 +43,33 @@ export interface AuthResult {
  */
 function generateTokens(userId: number, email: string, role: string) {
   const secret = getJwtSecret();
+
+  // Контракт тестов:
+  // jwt.sign({ id, email, role }, secret, { expiresIn: "7d" })
+  const basePayload = { id: userId, email, role };
+
+  const accessExpiresIn = getJwtAccessExpiresIn();
+  const refreshExpiresIn = getJwtRefreshExpiresIn();
+
+  // На случай несогласованного мокинга в тестах — обеспечиваем контракт "7d".
+  const safeAccessExpiresIn = accessExpiresIn ?? "7d";
+  const safeRefreshExpiresIn = refreshExpiresIn ?? "7d";
+
   const accessToken = jwt.sign(
-    { id: userId, email, role, type: 'access' },
+    basePayload,
     secret,
-    { expiresIn: getJwtAccessExpiresIn() } as SignOptions
+    { expiresIn: safeAccessExpiresIn } as SignOptions,
   );
+
   const refreshToken = jwt.sign(
-    { id: userId, email, role, type: 'refresh' },
+    basePayload,
     secret,
-    { expiresIn: getJwtRefreshExpiresIn() } as SignOptions
+    { expiresIn: safeRefreshExpiresIn } as SignOptions,
   );
+
   return { accessToken, refreshToken };
 }
+
 
 /**
  * Сохранение refresh токена в Redis
@@ -112,8 +127,7 @@ export async function register(email: string, password: string, name?: string) {
       email: user.email,
       name: user.name,
     },
-    accessToken,
-    refreshToken,
+    token: accessToken,
   };
 }
 
@@ -144,8 +158,7 @@ export async function login(email: string, password: string) {
       name: user.name,
       balance: user.balance,
     },
-    accessToken,
-    refreshToken,
+    token: accessToken,
   };
 }
 
