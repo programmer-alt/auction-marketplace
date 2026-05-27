@@ -19,9 +19,7 @@ const loginSchema = z.object({
   password: z.string().min(1, "Пароль обязателен"),
 });
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1, "Refresh токен обязателен"),
-});
+
 
 // ========================================
 // Контроллер
@@ -40,8 +38,7 @@ export const authController = {
     res.status(201).json({
       message: "Пользователь успешно зарегистрирован",
       user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+      token: result.token,
     });
   }),
 
@@ -53,22 +50,17 @@ export const authController = {
     res.json({
       message: "Вход выполнен успешно",
       user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+      token: result.token,
     });
   }),
 
-  refresh: asyncHandler<AuthRequest>(async (req, res, next) => {
-    const parsed = refreshSchema.safeParse(req.body);
-    if (!parsed.success) return next(parsed.error);
-
-    const result = await authService.refresh(parsed.data.refreshToken);
-    res.json({
-      message: "Токены обновлены",
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+  // POST /api/auth/refresh — возвращаем 501, чтобы роут не падал
+  // (текущий фронт/контракты могут быть частично реализованы).
+  refresh: asyncHandler<AuthRequest>(async (_req, res) => {
+    res.status(501).json({
+      message: "Refresh token не реализован в текущей конфигурации",
     });
-  }),
+  }), 
 
   logout: asyncHandler<AuthRequest>(async (req, res, next) => {
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
