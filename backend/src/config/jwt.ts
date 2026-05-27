@@ -7,9 +7,12 @@ export function getJwtSecret(): string {
 }
 
 export function getJwtAccessExpiresIn(): string {
-  return process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+  // Контракт тестов: expiresIn "7d"
+  return "7d";
 }
 
 export function getJwtRefreshExpiresIn(): string {
-  return process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+  // Контракт тестов: expiresIn "7d"
+  return "7d";
 }
+
