@@ -24,7 +24,7 @@ const queueLogger = {
   debug: (msg: string) => logger.debug(msg),
 };
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+const redisUrl = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
 
 // Создаём три клиента один раз и переиспользуем их
 export const sharedBullClients = {
@@ -40,6 +40,7 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
     keepAlive: 10000,
+    connectTimeout: 10000,
     retryStrategy: type === "bclient"
       ? undefined
       : (times) => Math.min(times * 50, 2000),
@@ -68,6 +69,10 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
       },
       removeOnComplete: true,
       removeOnFail: false,
+    },
+    settings: {
+      lockDuration: 60000, // 60 seconds
+      maxStalledCount: 3,
     },
   },
 );
