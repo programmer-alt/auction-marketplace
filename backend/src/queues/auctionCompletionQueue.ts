@@ -43,6 +43,8 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
     retryStrategy: type === "bclient"
       ? undefined
       : (times) => Math.min(times * 50, 2000),
+    maxConnections: 5,
+    connectionName: `bull-${type}`,
   });
 
   client.on("error", (err: Error & { code?: string }) => {

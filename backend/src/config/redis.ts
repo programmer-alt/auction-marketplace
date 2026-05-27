@@ -14,6 +14,8 @@ export const redis = new Redis(redisUrl, {
   reconnectOnError: () => true,
   keepAlive: 10000,
   connectTimeout: 10000,
+  maxConnections: 10,
+  connectionName: 'main-client',
 });
 
 redis.on("error", (err: Error & { code?: string }) => {

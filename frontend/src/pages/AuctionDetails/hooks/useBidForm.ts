@@ -12,24 +12,25 @@ export interface BidFormData {
 
 export const useBidForm = (auctionId: number | undefined, currentPrice: number | undefined) => {
   const [bidState, setBidState] = useState<AsyncState<Bid>>({ status: 'idle' });
-  const [bidAmount, setBidAmount] = useState<number>(0);
+  const [bidAmount, setBidAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validateBid = useCallback((amount: number): string | null => {
+  const validateBid = useCallback((amount: string): string | null => {
     if (!auctionId) {
       return 'Аукцион не выбран';
     }
     if (!currentPrice) {
       return 'Неизвестна текущая цена';
     }
-    if (typeof amount !== 'number' || isNaN(amount)) {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) {
       return 'Введите корректную сумму';
     }
-    if (amount <= currentPrice) {
+    if (numAmount <= currentPrice) {
       return `Ставка должна быть больше ${currentPrice}`;
     }
-    if (amount > currentPrice * 10) {
+    if (numAmount > currentPrice * 10) {
       return 'Ставка слишком велика (превышает текущую цену более чем в 10 раз)';
     }
     return null;
@@ -41,7 +42,8 @@ export const useBidForm = (auctionId: number | undefined, currentPrice: number |
       return false;
     }
 
-    const validationError = validateBid(amount);
+    const amountStr = String(amount);
+    const validationError = validateBid(amountStr);
     if (validationError) {
       setError(validationError);
       return false;
@@ -71,7 +73,7 @@ export const useBidForm = (auctionId: number | undefined, currentPrice: number |
   }, [auctionId, validateBid]);
 
   const resetForm = useCallback(() => {
-    setBidAmount(0);
+    setBidAmount('');
     setError(null);
     setBidState({ status: 'idle' });
   }, []);

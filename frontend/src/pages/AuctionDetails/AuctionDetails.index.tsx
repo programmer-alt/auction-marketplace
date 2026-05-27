@@ -97,8 +97,8 @@ export default function AuctionDetails() {
               auction={auction}
               onSubmit={handleBidSubmit}
               isSubmitting={isSubmitting}
-              bidAmount={String(bidAmount)}
-              setBidAmount={(value) => setBidAmount(Number(value))}
+              bidAmount={bidAmount}
+              setBidAmount={setBidAmount}
             />
           )}
           {showLoginPrompt && (

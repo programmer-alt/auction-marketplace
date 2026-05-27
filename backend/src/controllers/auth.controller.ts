@@ -54,12 +54,14 @@ export const authController = {
     });
   }),
 
-  // POST /api/auth/refresh — возвращаем 501, чтобы роут не падал
-  // (текущий фронт/контракты могут быть частично реализованы).
-  refresh: asyncHandler<AuthRequest>(async (_req, res) => {
-    res.status(501).json({
-      message: "Refresh token не реализован в текущей конфигурации",
-    });
+  // POST /api/auth/refresh — обновление access токена с помощью refresh токена
+  refresh: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return next(createValidationError("Refresh токен обязателен"));
+    }
+    const result = await authService.refresh(refreshToken);
+    res.json(result);
   }), 
 
   logout: asyncHandler<AuthRequest>(async (req, res, next) => {
