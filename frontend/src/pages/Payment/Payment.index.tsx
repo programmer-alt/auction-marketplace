@@ -6,11 +6,16 @@ import { useCardForm } from './hooks/useCardForm';
 import AuctionSummary from './components/AuctionSummary';
 import CardForm from './components/CardForm';
 
-export default function Payment() {
+import { loadStripe } from '@stripe/stripe-js'
+import { Elements } from '@stripe/react-stripe-js'
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
+
+function PaymentInner() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
   const { auction, loading } = usePaymentData(id, user);
-  const { processing, cardNumber, expiry, cvv, handleCardNumber, handleExpiry, handleCvv, handlePayment } = useCardForm(auction);
+  const { processing, error, handlePayment } = useCardForm(auction);
 
   if (loading) {
     return (
@@ -47,16 +52,12 @@ export default function Payment() {
         <AuctionSummary auction={auction} />
 
         <CardForm
-          cardNumber={cardNumber}
-          expiry={expiry}
-          cvv={cvv}
           processing={processing}
           currentPrice={auction.currentPrice}
-          onCardNumber={handleCardNumber}
-          onExpiry={handleExpiry}
-          onCvv={handleCvv}
           onSubmit={handlePayment}
+          error={error}
         />
+
 
         <div className="mt-6 pt-6 border-t text-center text-sm text-gray-500">
           <div className="flex items-center justify-center gap-4">
@@ -74,3 +75,25 @@ export default function Payment() {
     </div>
   );
 }
+
+export default function Payment() {
+  const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+
+  if (!publishableKey) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="card">
+          <h1 className="text-2xl font-bold mb-2">Stripe не настроен</h1>
+          <p className="text-gray-600">Не задан VITE_STRIPE_PUBLISHABLE_KEY</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Elements stripe={stripePromise}>
+      <PaymentInner />
+    </Elements>
+  )
+}
+
