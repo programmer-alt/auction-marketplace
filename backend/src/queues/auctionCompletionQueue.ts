@@ -24,7 +24,7 @@ const queueLogger = {
   debug: (msg: string) => logger.debug(msg),
 };
 
-const redisUrl = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
+const redisUrl: string = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
 
 // Создаём три клиента один раз и переиспользуем их
 export const sharedBullClients = {
@@ -36,7 +36,8 @@ export const sharedBullClients = {
 const createBullClient = (type: "client" | "subscriber" | "bclient") => {
   if (sharedBullClients[type]) return sharedBullClients[type]!;
 
-  const client = new Redis(redisUrl, {
+  const client = new Redis({
+    path: redisUrl,
     enableReadyCheck: false,
     maxRetriesPerRequest: null,
     keepAlive: 10000,
@@ -44,7 +45,6 @@ const createBullClient = (type: "client" | "subscriber" | "bclient") => {
     retryStrategy: type === "bclient"
       ? undefined
       : (times) => Math.min(times * 50, 2000),
-    maxConnections: 5,
     connectionName: `bull-${type}`,
   });
 

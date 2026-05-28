@@ -14,6 +14,7 @@ const Login = lazy(() => import('./pages/Login/Login.index'))
 const Register = lazy(() => import('./pages/Register/Register.index'))
 const Profile = lazy(() => import('./pages/Profile/Profile.index'))
 const Payment = lazy(() => import('./pages/Payment/Payment.index'))
+const PaymentResult = lazy(() => import('./pages/Payment/PaymentResult'))
 const About = lazy(() => import('./pages/About/About.index'))
 const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
@@ -41,6 +42,10 @@ function App() {
           <Route
             path="/profile"
             element={isAuthenticated ? <Profile /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/payment/result"
+            element={isAuthenticated ? <PaymentResult /> : <Navigate to="/login" />}
           />
           <Route
             path="/payment/:id"

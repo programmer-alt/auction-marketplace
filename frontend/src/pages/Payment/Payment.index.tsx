@@ -8,6 +8,9 @@ import CardForm from './components/CardForm';
 
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
+import { useState, useEffect } from 'react'
+import { paymentsApi } from '../../api/payments'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
 
@@ -17,7 +20,34 @@ function PaymentInner() {
   const { auction, loading } = usePaymentData(id, user);
   const { processing, error, handlePayment } = useCardForm(auction);
 
-  if (loading) {
+  // Получаем clientSecret для PaymentElement
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [secretLoading, setSecretLoading] = useState(true)
+  const [secretError, setSecretError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!auction) return
+    let cancelled = false
+
+    paymentsApi
+      .createPaymentIntent(auction.id)
+      .then((res) => {
+        if (!cancelled) {
+          setClientSecret(res.data.clientSecret ?? null)
+          setSecretLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSecretError(err?.response?.data?.message ?? 'Не удалось инициализировать платёж')
+          setSecretLoading(false)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [auction])
+
+  if (loading || secretLoading) {
     return (
       <div className="max-w-lg mx-auto">
         <div className="card animate-pulse">
@@ -30,6 +60,22 @@ function PaymentInner() {
   }
 
   if (!auction) return null;
+
+  if (secretError) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="card">
+          <div className="bg-red-50 rounded-lg p-4 text-red-700">{secretError}</div>
+          <Link to={`/auctions/${id}`} className="inline-flex items-center gap-2 text-gray-600 hover:text-primary-600 mt-4">
+            <ArrowLeft className="h-4 w-4" />
+            Назад к аукциону
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!clientSecret) return null
 
   return (
     <div className="max-w-lg mx-auto">
@@ -51,13 +97,14 @@ function PaymentInner() {
 
         <AuctionSummary auction={auction} />
 
-        <CardForm
-          processing={processing}
-          currentPrice={auction.currentPrice}
-          onSubmit={handlePayment}
-          error={error}
-        />
-
+        <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <CardForm
+            processing={processing}
+            currentPrice={auction.currentPrice}
+            onSubmit={handlePayment}
+            error={error}
+          />
+        </Elements>
 
         <div className="mt-6 pt-6 border-t text-center text-sm text-gray-500">
           <div className="flex items-center justify-center gap-4">

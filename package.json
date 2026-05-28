@@ -24,6 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "@waldzellai/clear-thought": "^0.0.4",
     "concurrently": "^8.2.2"
   },
   "dependencies": {

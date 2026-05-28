@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import type { Auction } from '../../../types'
-import { paymentsApi } from '../../../api/payments'
-import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js'
+import { useStripe, useElements } from '@stripe/react-stripe-js'
 
 export const useCardForm = (auction: Auction | null) => {
   const navigate = useNavigate()
@@ -22,42 +21,29 @@ export const useCardForm = (auction: Auction | null) => {
       return
     }
 
-    const card = elements.getElement(CardElement)
-    if (!card) {
-      toast.error('Карточные данные не найдены')
-      return
-    }
-
     setProcessing(true)
     setError(null)
 
     try {
-      const result = await paymentsApi.createPaymentIntent(auction.id)
-      if (!result.data?.clientSecret) {
-        throw new Error('Не удалось получить clientSecret')
-      }
-
-      const { clientSecret } = result.data
-
-      const confirmation = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card,
+      // clientSecret уже получен в Payment.index.tsx и передан в Elements
+      // Подтверждаем платёж через PaymentElement
+      const { error: submitError } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment/result`,
         },
+        redirect: 'if_required',
       })
 
-      if (confirmation.error) {
-        setError(confirmation.error.message ?? 'Ошибка подтверждения платежа')
+      if (submitError) {
+        setError(submitError.message ?? 'Ошибка подтверждения платежа')
         toast.error('Ошибка оплаты')
         return
       }
 
-      if (confirmation.paymentIntent?.status === 'succeeded') {
-        toast.success('Платеж успешно подтвержден')
-        navigate('/profile')
-        return
-      }
-
-      toast.success('Платеж обрабатывается')
+      // Если redirect не требуется — платёж успешен
+      toast.success('Платёж успешно подтверждён')
+      navigate('/profile')
     } catch (err: any) {
       const msg = err?.message ?? 'Ошибка оплаты. Попробуйте ещё раз.'
       setError(msg)
@@ -73,4 +59,3 @@ export const useCardForm = (auction: Auction | null) => {
     handlePayment,
   }
 }
-

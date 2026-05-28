@@ -38,7 +38,8 @@ export interface Payment {
   auctionId: number
   amount: number
   stripePaymentId: string | null
-  status: 'PENDING' | 'COMPLETED' | 'FAILED'
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+  refundReason?: string
   createdAt: string
 }
 

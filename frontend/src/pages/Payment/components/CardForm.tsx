@@ -1,7 +1,7 @@
 import React from 'react'
 import { CheckCircle } from 'lucide-react'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
-import { CardElement } from '@stripe/react-stripe-js'
+import { PaymentElement } from '@stripe/react-stripe-js'
 
 
 interface CardFormProps {
@@ -19,19 +19,9 @@ const CardForm: React.FC<CardFormProps> = ({
 }) => (
   <form onSubmit={onSubmit} className="space-y-5">
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Карта</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Способ оплаты</label>
       <div className="bg-white rounded-lg border border-gray-200 p-3">
-        <CardElement options={{
-          style: {
-            base: {
-              fontSize: '14px',
-              color: '#111827',
-              '::placeholder': { color: '#6b7280' },
-            },
-            invalid: { color: '#dc2626' },
-          },
-          hidePostalCode: true,
-        }} />
+        <PaymentElement />
       </div>
     </div>
 

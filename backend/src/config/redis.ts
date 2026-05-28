@@ -5,16 +5,16 @@ import logger from "./logger";
 dotenv.config();
 
 // Используем URL для подключения к облачному Redis
-const redisUrl = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
+const redisUrl: string = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
 
-export const redis = new Redis(redisUrl, {
+export const redis = new Redis({
+  path: redisUrl,
   enableOfflineQueue: true,
   maxRetriesPerRequest: null,
   retryStrategy: (times: number) => Math.min(times * 200, 5000),
   reconnectOnError: () => true,
   keepAlive: 10000,
   connectTimeout: 10000,
-  maxConnections: 10,
   connectionName: 'main-client',
 });
 
