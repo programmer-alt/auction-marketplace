@@ -1,7 +1,8 @@
+import "dotenv/config";
+
 import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import { createServer } from "http";
 import { createAdapter } from "@socket.io/redis-adapter";
 
@@ -15,7 +16,6 @@ import { parseAuthToken, authMiddleware } from "./middleware/auth";
 import {
   generateCsrfToken,
   verifyCsrfToken,
-  generateToken,
 } from "./middleware/csrf";
 import { validateEnv } from "./config/env";
 import { corsOriginHandler } from "./config/cors";
@@ -37,18 +37,18 @@ import adminRouter from "./routes/admin.routes";
 import { errorHandler } from "./errors/handler";
 import { securityHeaders } from "./middleware/securityHeaders";
 
-dotenv.config();
 validateEnv();
 
 // Настройка управления ресурсами
 setResourceLimits();
 
 // Периодическая проверка на утечку памяти
-setInterval(() => {
+let leakCheckInterval: NodeJS.Timeout | undefined = setInterval(() => {
   if (checkMemoryLeak()) {
     logger.warn("Possible memory leak detected");
   }
 }, 10 * 60 * 1000); // Каждые 10 минут
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -59,7 +59,12 @@ export { prisma };
 
 // Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
 import { redis as pubClient } from "./config/redis";
-const subClient = pubClient.duplicate({ keepAlive: 10000 });
+
+if (!pubClient) {
+  throw new Error('Redis client is not available');
+}
+
+const subClient = pubClient.duplicate();
 
 subClient.on("error", (err: Error & { code?: string }) => {
   if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
@@ -139,15 +144,14 @@ app.get("/metrics", async (_req, res) => {
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
-app.get("/api/csrf-token", (_req, res) => {
-  const token = generateToken();
-  res.cookie("csrfToken", token, {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 24 * 60 * 60 * 1000,
-  });
-  res.json({ csrfToken: token });
+app.get("/api/csrf-token", generateCsrfToken, (_req, res) => {
+  // generateCsrfToken middleware already set the cookie
+  // Extract the token from the Set-Cookie header
+  const setCookieHeader = res.getHeader('set-cookie');
+  const csrfToken = Array.isArray(setCookieHeader)
+    ? setCookieHeader.find(c => c.startsWith('csrfToken'))?.split(';')[0].split('=')[1]
+    : '';
+  res.json({ csrfToken });
 });
 
 // Загрузка изображений
@@ -222,22 +226,39 @@ async function shutdown(signal: string) {
   httpServer.closeAllConnections();
   httpServer.close();
 
+  // Останавливаем периодическую проверку на утечки памяти
+  try {
+    if (leakCheckInterval) {
+      clearInterval(leakCheckInterval);
+    }
+  } catch {}
+
   // Закрываем Bull queue и его Redis клиенты
   try {
     const { auctionCompletionQueue, sharedBullClients } =
       await import("./queues/auctionCompletionQueue");
     await auctionCompletionQueue.close();
+    const bullClients = Object.values(sharedBullClients).filter(Boolean);
     await Promise.all(
-      Object.values(sharedBullClients)
-        .filter(Boolean)
-        .map((c) => c!.quit())
+      bullClients.map(async (client: any) => {
+        if (client && typeof client.quit === 'function') {
+          return await client.quit();
+        }
+      })
     );
   } catch {}
 
+
   // Закрываем Redis клиенты
   try {
-    await subClient.quit();
-    await pubClient.quit();
+    if (subClient && typeof subClient.quit === 'function') {
+      await subClient.quit();
+    }
+  } catch {}
+  try {
+    if (pubClient && typeof pubClient.quit === 'function') {
+      await pubClient.quit();
+    }
   } catch {}
 
   // Закрываем подключение Prisma и пул PostgreSQL
@@ -262,8 +283,12 @@ httpServer.listen(PORT, async () => {
   }
 
   try {
-    await pubClient.ping();
-    logger.info('Redis connected');
+    if (pubClient) {
+      await pubClient.ping();
+      logger.info('Redis connected');
+    } else {
+      logger.warn('Redis is not available');
+    }
   } catch (error) {
     logger.error('Redis connection failed:', error);
   }

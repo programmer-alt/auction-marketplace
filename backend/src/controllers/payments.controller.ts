@@ -82,6 +82,11 @@ export const paymentsController = {
   }),
 
   refundPayment: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const paymentId = Number(req.params.id);
+    if (!paymentId || paymentId <= 0) {
+      return next(createValidationError("Некорректный ID платежа"));
+    }
+
     const parsed = refundPaymentSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
@@ -90,7 +95,7 @@ export const paymentsController = {
     }
 
     const result = await paymentsService.refundPayment(
-      parsed.data.paymentId,
+      paymentId,
       req.user.id,
       parsed.data.reason,
     );

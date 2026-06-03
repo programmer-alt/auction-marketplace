@@ -1,9 +1,15 @@
 import Queue from "bull";
-import Redis from "ioredis";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
 import logger from "../config/logger";
+import { getBullRedisClients } from "../config/redisBull";
 
+// Глобальный объект для хранения клиентов Redis, чтобы можно было их корректно закрыть при shutdown
+export const sharedBullClients = {
+  client: null,
+  subscriber: null,
+  bclient: null,
+};
 
 // Типизация данных задачи
 interface AuctionCompletionJobData {
@@ -24,43 +30,20 @@ const queueLogger = {
   debug: (msg: string) => logger.debug(msg),
 };
 
-const redisUrl: string = process.env.REDIS_URL || "redis://default:TyKKB11prVd27kLFbuL87ZCpVxDvGUmr@redis-12271.crce198.eu-central-1-3.ec2.cloud.redislabs.com:12271";
+const { createClient } = getBullRedisClients();
 
-// Создаём три клиента один раз и переиспользуем их
-export const sharedBullClients = {
-  client: null as Redis | null,
-  subscriber: null as Redis | null,
-  bclient: null as Redis | null,
-};
-
-const createBullClient = (type: "client" | "subscriber" | "bclient") => {
-  if (sharedBullClients[type]) return sharedBullClients[type]!;
-
-  const client = new Redis({
-    path: redisUrl,
-    enableReadyCheck: false,
-    maxRetriesPerRequest: null,
-    keepAlive: 10000,
-    connectTimeout: 10000,
-    retryStrategy: type === "bclient"
-      ? undefined
-      : (times) => Math.min(times * 50, 2000),
-    connectionName: `bull-${type}`,
-  });
-
-  client.on("error", (err: Error & { code?: string }) => {
-    if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
-    logger.error(`[bull:${type}] Redis error:`, err);
-  });
-
-  sharedBullClients[type] = client;
-  return client;
-};
-
-export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
+export const auctionCompletionQueue = new Queue(
   "auctionCompletion",
   {
-    createClient: createBullClient,
+    createClient: (type: "client" | "subscriber" | "bclient") => {
+      const client = createClient(type);
+      sharedBullClients[type] = client;
+      client.on("error", (err: Error & { code?: string }) => {
+        if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") return;
+        logger.error(`[bull:${type}] Redis error:`, err);
+      });
+      return client;
+    },
     defaultJobOptions: {
       attempts: 3,
       backoff: {
@@ -77,9 +60,10 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
   },
 );
 
+
 // Обработчик задачи
-auctionCompletionQueue.process(async (job) => {
-  const { auctionId } = job.data;
+auctionCompletionQueue.process(async (job: any) => {
+  const { auctionId } = job.data as AuctionCompletionJobData;
 
   if (!auctionId || typeof auctionId !== "number") {
     logger.error(`Некорректный auctionId: ${auctionId}`);
@@ -191,7 +175,7 @@ export async function scheduleAuctionCompletion(
     return;
   }
 
-  await auctionCompletionQueue.add(
+  await (auctionCompletionQueue as any).add(
     { auctionId },
     { delay: Math.max(delay, 0), jobId },
   );

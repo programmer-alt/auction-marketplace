@@ -1,18 +1,27 @@
-import winston from 'winston';
+import * as winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import path from 'path';
 
-// Определение уровней логирования
+import * as path from 'path';
+
+const { combine, timestamp, printf, colorize } = winston.format;
+
 const levels = {
   error: 0,
   warn: 1,
   info: 2,
   http: 3,
   debug: 4,
+} as const;
+
+type LogLevel = keyof typeof levels;
+
+const level = () => {
+  const env = process.env.NODE_ENV || 'development';
+  const isDevelopment = env === 'development';
+  return (isDevelopment ? 'debug' : 'warn') as LogLevel;
 };
 
-// Определение цветов для каждого уровня
-const colors = {
+const colors: Record<LogLevel, string> = {
   error: 'red',
   warn: 'yellow',
   info: 'green',
@@ -20,95 +29,64 @@ const colors = {
   debug: 'white',
 };
 
-// Связываем цвета с winston
-winston.addColors(colors);
+// В TransformableInfo `level` типизирован как string, поэтому убираем строгую типизацию.
+const colorizedFormat = printf((info: any) => {
+  const lvl = (info?.level as string) as LogLevel;
+  const color = colors[lvl] ?? colors.info;
+  const ts = info?.timestamp ?? '';
+  const msg = info?.message ?? '';
+  return `\u001b[${color}m${lvl}: ${msg}\u001b[0m`;
+});
 
-// Определяем уровень логирования на основе окружения
-const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
-};
+const fileFormat = printf((info: any) => {
+  const lvl = (info?.level as string) ?? 'info';
+  const ts = info?.timestamp ?? '';
+  const msg = info?.message ?? '';
+  return `[${ts}] ${lvl}: ${msg}`;
+});
 
-// Формат для консольного вывода
-const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-  ),
-);
+const format = combine(timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), colorizedFormat);
 
-// Формат для файлов (JSON)
-const fileFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.errors({ stack: true }),
-  winston.format.splat(),
-  winston.format.json(),
-);
-
-// Транспорты
-const transports = [
-  // Консольный вывод
-  new winston.transports.Console({
-    format: consoleFormat,
-  }),
-
-  // Логи ошибок
+const transports: winston.transport[] = [
   new DailyRotateFile({
+    filename: path.join(process.cwd(), 'logs', 'application-%DATE%.log'),
+
+    datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d',
+    level: 'info',
+    format: fileFormat,
+  }),
+  new (DailyRotateFile as any)({
     filename: path.join(process.cwd(), 'logs', 'error-%DATE%.log'),
     datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d',
     level: 'error',
-    maxSize: '20m',
-    maxFiles: '14d',
-    format: fileFormat,
-  }),
-
-  // Все логи
-  new DailyRotateFile({
-    filename: path.join(process.cwd(), 'logs', 'combined-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    maxSize: '20m',
-    maxFiles: '14d',
-    format: fileFormat,
-  }),
-
-  // HTTP запросы
-  new DailyRotateFile({
-    filename: path.join(process.cwd(), 'logs', 'http-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    level: 'http',
-    maxSize: '20m',
-    maxFiles: '14d',
     format: fileFormat,
   }),
 ];
 
-// Создаем логгер
-export const logger = winston.createLogger({
-  level: level(),
-  levels,
+const logger = winston.createLogger({
+  level: level() as any,
+  levels: levels as any,
+  format,
   transports,
-  exitOnError: false,
 });
 
-// Если мы не в продакшене, также логируем в консоль с более простым форматом
 if (process.env.NODE_ENV !== 'production') {
   logger.add(
     new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple(),
+      format: combine(
+        colorize(),
+        timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        printf((info: any) => `${info.level}: ${info.message}`)
       ),
-    }),
+    })
   );
 }
 
-// Создаем стрим для HTTP логирования (для использования с morgan)
-export const stream = {
-  write: (message: string) => {
-    logger.http(message.trim());
-  },
-};
-
 export default logger;
+
