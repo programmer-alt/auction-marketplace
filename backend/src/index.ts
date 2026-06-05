@@ -220,8 +220,17 @@ io.on("connection", (socket) => {
   });
 });
 
+// Flag to prevent recursive shutdown calls
+let isShuttingDown = false;
+
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
+  if (isShuttingDown) {
+    logger.info(`Shutdown already in progress. Signal ${signal} ignored.`);
+    return;
+  }
+  
+  isShuttingDown = true;
   logger.info(`Received ${signal}. Shutting down gracefully...`);
 
   httpServer.closeAllConnections();
@@ -234,21 +243,13 @@ async function shutdown(signal: string) {
     }
   } catch {}
 
-  // Закрываем Bull queue и его Redis клиенты
+  // Закрываем Bull queue с использованием предусмотренной функции
   try {
-    const { auctionCompletionQueue, sharedBullClients } =
-      await import("./queues/auctionCompletionQueue");
-    await auctionCompletionQueue.close();
-    const bullClients = Object.values(sharedBullClients).filter(Boolean);
-    await Promise.all(
-      bullClients.map(async (client: any) => {
-        if (client && typeof client.quit === 'function') {
-          return await client.quit();
-        }
-      })
-    );
-  } catch {}
-
+    const { gracefulShutdown } = await import("./queues/auctionCompletionQueue");
+    await gracefulShutdown();
+  } catch (error) {
+    logger.error('Error during Bull queue shutdown:', error);
+  }
 
   // Закрываем Redis клиенты
   try {
@@ -299,17 +300,37 @@ httpServer.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => {
+  if (!isShuttingDown) {
+    shutdown("SIGINT");
+  } else {
+    logger.info("Shutdown already in progress. SIGINT ignored.");
+  }
+});
+process.on("SIGTERM", () => {
+  if (!isShuttingDown) {
+    shutdown("SIGTERM");
+  } else {
+    logger.info("Shutdown already in progress. SIGTERM ignored.");
+  }
+});
 
 // Необработанные отклонения промисов
 process.on('unhandledRejection', (reason: unknown) => {
-  logger.error('Unhandled promise rejection:', reason);
-  shutdown('unhandledRejection').catch(() => process.exit(1));
+  if (!isShuttingDown) {
+    logger.error('Unhandled promise rejection:', reason);
+    shutdown('unhandledRejection').catch(() => process.exit(1));
+  } else {
+    logger.error('Unhandled promise rejection during shutdown:', reason);
+  }
 });
 
 // Необработанные исключения (синхронные)
 process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught exception:', error);
-  shutdown('uncaughtException').catch(() => process.exit(1));
+  if (!isShuttingDown) {
+    logger.error('Uncaught exception:', error);
+    shutdown('uncaughtException').catch(() => process.exit(1));
+  } else {
+    logger.error('Uncaught exception during shutdown:', error);
+  }
 });
