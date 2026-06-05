@@ -1,4 +1,4 @@
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 import logger from './logger';
 
 // Проверяем наличие конфигурации Redis
@@ -7,21 +7,50 @@ const redisPort = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) 
 const redisPassword = process.env.REDIS_PASSWORD;
 const redisUsername = process.env.REDIS_USERNAME || 'default';
 
-// В dev/CI иногда Redis может быть недоступен. Не падаем при импорте модуля,
-// а отдаём no-op safeRedis, чтобы остальная часть приложения поднималась.
-if (!redisHost || !redisPort || !redisPassword) {
-  console.warn('[redis] Redis configuration is incomplete. Redis features will be disabled.');
+function getRedisUrl(): string | null {
+  // Сначала проверяем, задан ли REDIS_URL напрямую
+  const url = process.env.REDIS_URL;
+  if (url && url.trim() !== "") {
+    return url;
+  }
+
+  // Если REDIS_URL не задан, собираем из компонентов
+  if (!redisHost || !redisPort || !redisPassword) {
+    return null;
+  }
+
+  // Формируем URL для ioredis: redis://:password@host:port
+  // Для Redis Cloud с TLS используем rediss://
+    // Проверяем REDIS_SECURE с приоритетом (если задан, используем его значение)
+  const redisSecureEnv = process.env.REDIS_SECURE;
+  const isSecure = redisSecureEnv !== undefined && redisSecureEnv !== ""
+    ? redisSecureEnv === "true"
+    : (redisHost.includes("redislabs") || redisPort.toString() === "6380");
+  const protocol = isSecure ? "rediss" : "redis";
+  
+  return `${protocol}://${redisUsername}:${redisPassword}@${redisHost}:${redisPort}`;
 }
 
-// Создаём клиент Redis с объектной конфигурацией
-export const redis = redisHost && redisPort && redisPassword
-  ? createClient({
-      username: redisUsername,
-      password: redisPassword,
-      socket: {
-        host: redisHost,
-        port: redisPort
-      }
+// В dev/CI иногда Redis может быть недоступен. Не падаем при импорте модуля,
+// а отдаём no-op safeRedis, чтобы остальная часть приложения поднималась.
+const redisUrl = getRedisUrl();
+
+// Проверяем, является ли URL защищенным (rediss://)
+const isSecureConnection = redisUrl?.startsWith("rediss://") || false;
+
+export const redis = redisUrl
+  ? new Redis(redisUrl, {
+      lazyConnect: false, // Подключаться сразу, а не лениво
+      // Убираем параметры, несовместимые с Bull
+      maxRetriesPerRequest: null, // Отключаем встроенную систему повторных попыток Bull (null означает отсутствие лимита)
+      enableReadyCheck: false, // Отключаем проверку готовности, чтобы избежать конфликта с Bull
+      connectionName: 'main-app',
+      // Добавляем SSL параметры, если используется защищенное соединение
+      ...(isSecureConnection && { 
+        tls: { 
+          rejectUnauthorized: false // Отключаем проверку сертификатов для облачных провайдеров Redis
+        } 
+      }),
     })
   : null;
 
@@ -34,12 +63,20 @@ if (redis) {
     }
     logger.error('Redis client error:', err);
   });
+
+  redis.on('connect', () => {
+    logger.info('Redis client connected');
+  });
+
+  redis.on('close', () => {
+    logger.warn('Redis client closed');
+  });
 }
 
 // Функция для безопасного подключения
 async function ensureConnected() {
   if (!redis) return;
-  if (redis.isOpen) return;
+  if (redis.status === 'ready' || redis.status === 'connecting') return;
   try {
     await redis.connect();
   } catch (err) {
@@ -75,7 +112,7 @@ export const safeRedis = {
     if (!redis) return;
     try {
       await ensureConnected();
-      await redis.set(key, value, { EX: ttl });
+      await redis.setex(key, ttl, value);
     } catch (err) {
       logger.error('Redis setex failed:', err);
     }
@@ -110,7 +147,7 @@ export const safeRedis = {
     if (!redis || keys.length === 0) return;
     try {
       await ensureConnected();
-      await redis.del(keys);
+      await redis.del(...keys);
     } catch (err) {
       logger.error('Redis del failed:', err);
     }
@@ -124,7 +161,7 @@ export const safeRedis = {
       const found: string[] = [];
 
       // Используем scanIterator для SCAN (не блокирует Redis)
-      for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 200 })) {
+      for await (const key of redis.scanStream({ match: pattern, count: 200 })) {
         found.push(key);
         if (found.length >= limit) break;
       }

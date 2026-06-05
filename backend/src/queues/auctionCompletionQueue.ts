@@ -1,11 +1,33 @@
+// Функция получения статистики очереди
 import Queue from "bull";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
 import logger from "../config/logger";
 import { getBullRedisClients } from "../config/redisBull";
+export async function getQueueStats() {
+  return await auctionCompletionQueue.getJobCounts();
+}
+
+// Graceful shutdown
+export async function gracefulShutdown() {
+  queueLogger.info("🛑 Остановка очереди завершения аукционов...");
+  
+  // Закрываем соединения с Redis
+  Object.entries(sharedBullClients).forEach(([type, client]) => {
+    if (client && typeof client.quit === 'function') {
+      client.quit();
+      queueLogger.info(`🔒 Закрыто соединение Redis (${type})`);
+    }
+  });
+
+  // Останавливаем очередь
+  await auctionCompletionQueue.close();
+  queueLogger.info("✅ Очередь завершения аукционов остановлена");
+}
+
 
 // Глобальный объект для хранения клиентов Redis, чтобы можно было их корректно закрыть при shutdown
-export const sharedBullClients = {
+export const sharedBullClients: Record<string, any> = {
   client: null,
   subscriber: null,
   bclient: null,
@@ -32,17 +54,19 @@ const queueLogger = {
 
 const { createClient } = getBullRedisClients();
 
-export const auctionCompletionQueue = new Queue(
+export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
   "auctionCompletion",
   {
     createClient: (type: "client" | "subscriber" | "bclient") => {
       const client = createClient(type);
       sharedBullClients[type] = client;
-      client.on("error", (err: Error & { code?: string }) => {
-        if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") return;
-        logger.error(`[bull:${type}] Redis error:`, err);
-      });
-      return client;
+      if (client) {
+        client.on("error", (err: Error & { code?: string }) => {
+          if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") return;
+          logger.error(`[bull:${type}] Redis error:`, err);
+        });
+      }
+      return client!;
     },
     defaultJobOptions: {
       attempts: 3,
@@ -50,12 +74,16 @@ export const auctionCompletionQueue = new Queue(
         type: "exponential",
         delay: 5000,
       },
-      removeOnComplete: true,
-      removeOnFail: false,
+      removeOnComplete: 100,
+      removeOnFail: 50,
     },
     settings: {
-      lockDuration: 60000, // 60 seconds
-      maxStalledCount: 3,
+      lockDuration: 30000, // 30 seconds
+      stalledInterval: 30000, // How often to check for stalled jobs
+      maxStalledCount: 1, // Max times a job can be stalled
+      guardInterval: 5000, // Delay between [check for guard] events
+      retryProcessDelay: 5000, // Delay before retrying a process
+      drainDelay: 5, // Delay before emitted drain event
     },
   },
 );
@@ -158,85 +186,76 @@ auctionCompletionQueue.process(async (job: any) => {
   }
 });
 
-/**
- * Добавляет задачу на завершение аукциона
- */
-export async function scheduleAuctionCompletion(
-  auctionId: number,
-  endsAt: Date,
-): Promise<void> {
+// Функция добавления задачи на завершение аукциона
+export function scheduleAuctionCompletion(auctionId: number, endsAt: Date) {
   const delay = endsAt.getTime() - Date.now();
-  const jobId = `auction:${auctionId}`;
-
-  // Защита от дубликатов
-  const existing = await auctionCompletionQueue.getJob(jobId);
-  if (existing) {
-    queueLogger.warn(`Задача для аукциона ${auctionId} уже существует, пропускаем`);
-    return;
+  if (delay <= 0) {
+    queueLogger.warn(`⏰ Аукцион ${auctionId} уже должен был завершиться`);
+    return auctionCompletionQueue.add(
+      { auctionId },
+      { delay: 1000 } // Запускаем через 1 секунду, если уже просрочен
+    );
   }
 
-  await (auctionCompletionQueue as any).add(
+  return auctionCompletionQueue.add(
     { auctionId },
-    { delay: Math.max(delay, 0), jobId },
-  );
-  queueLogger.info(
-    delay <= 0
-      ? `Аукцион ${auctionId} просрочен, добавляем немедленно`
-      : `⏰ Запланировано завершение аукциона ${auctionId} через ${Math.round(delay / 1000)} сек`,
+    { delay }
   );
 }
 
-/**
- * Удаляет запланированную задачу завершения аукциона
- */
-export async function removeScheduledAuctionCompletion(
-  auctionId: number,
-): Promise<boolean> {
-  const job = await auctionCompletionQueue.getJob(`auction:${auctionId}`);
-  if (job) {
-    await job.remove();
-    queueLogger.info(`🗑️ Удалена задача для аукциона ${auctionId}`);
+// Функция отмены запланированной задачи
+export async function cancelAuctionCompletion(auctionId: number) {
+  // Находим задачи, связанные с этим аукционом
+  const jobs = await auctionCompletionQueue.getDelayed();
+  const jobToCancel = jobs.find(job => job.data.auctionId === auctionId);
+
+  if (jobToCancel) {
+    await jobToCancel.remove();
+    queueLogger.info(`❌ Задача завершения аукциона ${auctionId} отменена`);
     return true;
   }
+
   return false;
 }
 
-/**
- * Планирует завершение для всех активных аукционов при запуске сервера
- */
-export async function scheduleExistingAuctions(batchSize = 100): Promise<void> {
-  queueLogger.info("🔍 Поиск активных аукционов...");
+// Альтернативное название функции для обратной совместимости
+export const removeScheduledAuctionCompletion = cancelAuctionCompletion;
 
-  let skip = 0;
-  let total = 0;
+// Функция планирования завершения существующих аукционов при запуске приложения
+export async function scheduleExistingAuctions() {
+  // Находим все активные аукционы, которые должны завершиться в будущем
+  const now = new Date();
+  const auctions = await prisma.auction.findMany({
+    where: {
+      status: 'ACTIVE',
+      endsAt: {
+        gt: now,
+      },
+    },
+    select: {
+      id: true,
+      endsAt: true,
+    },
+  });
 
-  while (true) {
-    const auctions = await prisma.auction.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, endsAt: true },
-      take: batchSize,
-      skip,
-      orderBy: { endsAt: "asc" },
-    });
+  queueLogger.info(`⏳ Найдено ${auctions.length} активных аукционов для планирования`);
 
-    if (auctions.length === 0) break;
+  for (const auction of auctions) {
+    const delay = auction.endsAt.getTime() - now.getTime();
+    if (delay > 0) {
+      // Проверяем, есть ли уже запланированная задача для этого аукциона
+      const existingJobs = await auctionCompletionQueue.getDelayed();
+      const existingJob = existingJobs.find(job => job.data.auctionId === auction.id);
 
-    const now = new Date();
-    const overdue = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt <= now).length;
-    const upcoming = auctions.filter((a: { id: number; endsAt: Date }) => a.endsAt > now).length;
-    queueLogger.debug(
-      `Пачка: ${auctions.length} аукционов (просрочено: ${overdue}, предстоит: ${upcoming})`,
-    );
-
-    for (const auction of auctions) {
-      await scheduleAuctionCompletion(auction.id, auction.endsAt);
+      if (!existingJob) {
+        await auctionCompletionQueue.add(
+          { auctionId: auction.id },
+          { delay }
+        );
+        queueLogger.info(`⏰ Планирование завершения аукциона ${auction.id} через ${Math.round(delay / 1000)} сек.`);
+      } else {
+        queueLogger.info(`📋 Аукцион ${auction.id} уже запланирован для завершения`);
+      }
     }
-
-    total += auctions.length;
-    skip += batchSize;
-
-    if (auctions.length < batchSize) break;
   }
-
-  queueLogger.info(`📋 Запланировано ${total} аукционов`);
 }

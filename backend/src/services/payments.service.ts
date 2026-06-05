@@ -22,7 +22,7 @@ import {
 // ========================================
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2023-10-16",
 });
 
 // ========================================
@@ -85,7 +85,7 @@ export async function createPaymentIntent(
   }
 
   // Проверяем, не оплачен ли уже этот аукцион
-  const existingCompletedPayment = await prisma.payment.findFirst({
+  const existingPayment = await prisma.payment.findFirst({
     where: {
       auctionId,
       userId,
@@ -93,7 +93,7 @@ export async function createPaymentIntent(
     },
   });
 
-  if (existingCompletedPayment) {
+  if (existingPayment) {
     throw createValidationError("Этот аукцион уже оплачен");
   }
 
@@ -105,41 +105,31 @@ export async function createPaymentIntent(
   );
 
   if (existingPendingPayment && existingPendingPayment.stripePaymentId) {
-    // Восстанавливаем clientSecret из Stripe
-    const existingPI = await stripe.paymentIntents.retrieve(
+    // Возвращаем существующий clientSecret
+    const existingIntent = await stripe.paymentIntents.retrieve(
       existingPendingPayment.stripePaymentId,
     );
-    if (existingPI.status === "requires_payment_method" || existingPI.status === "requires_confirmation") {
-      return {
-        clientSecret: existingPI.client_secret,
-        payment: existingPendingPayment as PaymentWithRelations,
-      };
-    }
-    // Если PI уже неактивен — создаём новый
+
+    return {
+      clientSecret: existingIntent.client_secret,
+      payment: existingPendingPayment,
+    };
   }
 
   // Сумма к оплате (текущая цена аукциона)
   const amount = Math.round(auction.currentPrice.toNumber() * 100); // в копейках/центах
   const currency = auction.currency.toLowerCase(); // гарантируем нижний регистр
 
-  // Idempotency key для предотвращения дублирования
-  const idempotencyKey = `pi-${userId}-${auctionId}-${Date.now()}`;
-
   // Создаём Payment Intent в Stripe
-  const paymentIntent = await stripe.paymentIntents.create(
-    {
-      amount,
-      currency,
-      metadata: {
-        auctionId: auction.id.toString(),
-        userId: userId.toString(),
-      },
-      description: `Оплата аукциона: ${auction.title}`,
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency,
+    metadata: {
+      auctionId: auction.id.toString(),
+      userId: userId.toString(),
     },
-    {
-      idempotencyKey,
-    },
-  );
+    description: `Оплата аукциона: ${auction.title}`,
+  });
 
   // Создаём запись о платеже в БД
   const payment = await createPayment(prisma, {
@@ -259,6 +249,41 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
 }
 
 // ========================================
+// Получение истории платежей пользователя
+// ========================================
+
+export async function getPaymentHistory(
+  userId: number,
+  options: GetPaymentHistoryOptions,
+): Promise<GetPaymentHistoryResult> {
+  const { page, limit } = options;
+  
+  // Валидация параметров пагинации
+  if (limit <= 0 || !Number.isInteger(limit)) {
+    throw createValidationError("Limit must be a positive integer");
+  }
+  if (page < 1 || !Number.isInteger(page)) {
+    throw createValidationError("Page must be a positive integer");
+  }
+  
+  const skip = (page - 1) * limit;
+
+  const payments = await getPaymentsByUserId(prisma, userId, skip, limit);
+
+  const total = await getPaymentsCountByUserId(prisma, userId);
+
+  return {
+    payments,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+// ========================================
 // Возврат платежа (Refund)
 // ========================================
 
@@ -308,40 +333,5 @@ export async function refundPayment(
   return {
     refundId: refund.id,
     payment: updatedPayment as PaymentWithRelations,
-  };
-}
-
-// ========================================
-// Получение истории платежей пользователя
-// ========================================
-
-export async function getPaymentHistory(
-  userId: number,
-  options: GetPaymentHistoryOptions,
-): Promise<GetPaymentHistoryResult> {
-  const { page, limit } = options;
-
-  // Валидация параметров пагинации
-  if (limit <= 0 || !Number.isInteger(limit)) {
-    throw createValidationError("Limit must be a positive integer");
-  }
-  if (page < 1 || !Number.isInteger(page)) {
-    throw createValidationError("Page must be a positive integer");
-  }
-
-  const skip = (page - 1) * limit;
-
-  const payments = await getPaymentsByUserId(prisma, userId, skip, limit);
-
-  const total = await getPaymentsCountByUserId(prisma, userId);
-
-  return {
-    payments,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
   };
 }

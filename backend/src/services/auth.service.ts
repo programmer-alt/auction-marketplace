@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
-import { redis } from "../config/redis";
+import { safeRedis } from "../config/redis";
 import {
   getUserByEmail,
   createUser,
@@ -77,7 +77,7 @@ function generateTokens(userId: number, email: string, role: string) {
 async function saveRefreshToken(userId: number, refreshToken: string) {
   const key = `refresh:${userId}`;
   const ttl = 7 * 24 * 60 * 60; // 7 дней в секундах
-  await redis.setex(key, ttl, refreshToken);
+  await safeRedis.setex(key, ttl, refreshToken);
 }
 
 /**
@@ -85,8 +85,8 @@ async function saveRefreshToken(userId: number, refreshToken: string) {
  */
 async function isTokenBlacklisted(token: string): Promise<boolean> {
   const key = `blacklist:${token}`;
-  const exists = await redis.exists(key);
-  return exists === 1;
+  const exists = await safeRedis.get(key);
+  return exists === "1";
 }
 
 /**
@@ -94,7 +94,7 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
  */
 async function blacklistToken(token: string, expiresInSeconds: number) {
   const key = `blacklist:${token}`;
-  await redis.setex(key, expiresInSeconds, '1');
+  await safeRedis.setex(key, expiresInSeconds, '1');
 }
 
 /**
@@ -188,7 +188,7 @@ export async function refresh(refreshToken: string) {
   const role = payload.role;
 
   // Проверка, что refresh токен сохранен в Redis
-  const storedToken = await redis.get(`refresh:${userId}`);
+  const storedToken = await safeRedis.get(`refresh:${userId}`);
   if (!storedToken || storedToken !== refreshToken) {
     throw createForbiddenError("Refresh токен не найден или устарел");
   }
@@ -234,7 +234,7 @@ export async function logout(userId: number, accessToken: string, refreshToken?:
       }
     }
     // Удаление refresh токена из Redis
-    await redis.del(`refresh:${userId}`);
+    await safeRedis.del(`refresh:${userId}`);
   }
 }
 

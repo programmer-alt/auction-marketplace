@@ -57,13 +57,14 @@ const PORT = process.env.PORT || 5000;
 import { prisma, pool } from "./config/db";
 export { prisma };
 
-// Redis клиенты для Socket.io адаптера (переиспользуем подключение из redis.ts)
+// Redis клиенты для Socket.io адаптера (теперь используем ioredis)
 import { redis as pubClient } from "./config/redis";
 
 if (!pubClient) {
   throw new Error('Redis client is not available');
 }
 
+// Для Socket.IO адаптера используем ioredis.duplicate()
 const subClient = pubClient.duplicate();
 
 subClient.on("error", (err: Error & { code?: string }) => {

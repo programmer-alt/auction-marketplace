@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { redis } from "../config/redis";
+import { safeRedis } from "../config/redis";
 import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 
@@ -101,17 +101,17 @@ export async function rateLimit(
     const memoryEntry = memoryLimitStore.get(ip);
     if (memoryEntry && memoryEntry.resetAt > now) {
       const remainingSeconds = Math.ceil((memoryEntry.resetAt - now) / 1000);
-      const existing = await redis.get(key);
+      const existing = await safeRedis.get(key);
       if (existing === null) {
-        await redis.setex(key, remainingSeconds, String(memoryEntry.count));
+        await safeRedis.setex(key, remainingSeconds, String(memoryEntry.count));
       }
       memoryLimitStore.delete(ip);
     }
 
-    const current = await redis.get(key);
+    const current = await safeRedis.get(key);
     if (current === null) {
       // Первый запрос в окне
-      await redis.setex(key, WINDOW_SIZE_IN_SECONDS, "1");
+      await safeRedis.setex(key, WINDOW_SIZE_IN_SECONDS, "1");
       return next();
     }
 
@@ -124,7 +124,7 @@ export async function rateLimit(
     }
 
     // Увеличиваем счётчик (TTL не сбрасывается)
-    await redis.incr(key);
+    await safeRedis.incr(key);
     next();
   } catch (error) {
     console.error("Rate limit error (Redis unavailable):", error);

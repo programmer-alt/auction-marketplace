@@ -1,5 +1,5 @@
 import { Socket } from "socket.io";
-import { redis } from "../config/redis";
+import { safeRedis } from "../config/redis";
 import { LRUCache } from "lru-cache";
 
 interface ErrorWithData extends Error {
@@ -43,15 +43,14 @@ async function checkRateLimit(
   limit: number,
   windowSeconds: number,
 ): Promise<{ allowed: boolean; remaining: number; resetAfter: number }> {
-  const now = Date.now();
   const redisKey = `ws:rate_limit:${key}`;
 
   try {
     // Пытаемся использовать Redis
-    const current = await redis.get(redisKey);
+    const current = await safeRedis.get(redisKey);
     if (current === null) {
       // Первый запрос в окне
-      await redis.setex(redisKey, windowSeconds, "1");
+      await safeRedis.setex(redisKey, windowSeconds, "1");
       return {
         allowed: true,
         remaining: limit - 1,
@@ -61,63 +60,55 @@ async function checkRateLimit(
 
     const requestCount = parseInt(current, 10);
     if (requestCount >= limit) {
-      const ttl = await redis.ttl(redisKey);
+      const ttl = await safeRedis.ttl(redisKey);
       return {
         allowed: false,
         remaining: 0,
-        resetAfter: ttl > 0 ? ttl : windowSeconds,
+        resetAfter: ttl !== null && ttl > 0 ? ttl : windowSeconds,
       };
     }
 
     // Увеличиваем счётчик
-    await redis.incr(redisKey);
+    await safeRedis.incr(redisKey);
     return {
       allowed: true,
       remaining: limit - requestCount - 1,
       resetAfter: windowSeconds,
     };
   } catch (error) {
-    console.error("WebSocket Redis rate limit error, falling back to memory:", error);
+    console.error("[WS Rate Limit] Redis error:", error);
+    // Fallback на memory store при ошибке Redis
+    const memoryKey = `mem:${key}`;
+    const now = Date.now();
+    const windowMs = windowSeconds * 1000;
     
-    // Memory fallback
-    const memoryKey = `memory:${key}`;
-    const currentEntry = wsMemoryStore.get(memoryKey);
-    
-    if (currentEntry) {
-      if (currentEntry.resetAt < now) {
-        // Окно истекло, сбрасываем
-        wsMemoryStore.set(memoryKey, { count: 1, resetAt: now + windowSeconds * 1000 });
-        return {
-          allowed: true,
-          remaining: limit - 1,
-          resetAfter: windowSeconds,
-        };
-      }
-      
-      currentEntry.count++;
-      if (currentEntry.count > limit) {
-        const resetAfter = Math.ceil((currentEntry.resetAt - now) / 1000);
-        return {
-          allowed: false,
-          remaining: 0,
-          resetAfter,
-        };
-      }
-      
-      wsMemoryStore.set(memoryKey, currentEntry);
+    let record = wsMemoryStore.get(memoryKey);
+    if (!record) {
+      record = { count: 0, resetAt: now + windowMs };
+      wsMemoryStore.set(memoryKey, record);
+    }
+
+    if (now > record.resetAt) {
+      record.count = 0;
+      record.resetAt = now + windowMs;
+    }
+
+    if (record.count >= limit) {
       return {
-        allowed: true,
-        remaining: limit - currentEntry.count,
-        resetAfter: Math.ceil((currentEntry.resetAt - now) / 1000),
-      };
-    } else {
-      wsMemoryStore.set(memoryKey, { count: 1, resetAt: now + windowSeconds * 1000 });
-      return {
-        allowed: true,
-        remaining: limit - 1,
-        resetAfter: windowSeconds,
+        allowed: false,
+        remaining: 0,
+        resetAfter: Math.ceil((record.resetAt - now) / 1000),
       };
     }
+
+    record.count++;
+    wsMemoryStore.set(memoryKey, record);
+    
+    return {
+      allowed: true,
+      remaining: limit - record.count,
+      resetAfter: Math.ceil((record.resetAt - now) / 1000),
+    };
   }
 }
 

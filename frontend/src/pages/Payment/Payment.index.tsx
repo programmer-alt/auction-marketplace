@@ -32,7 +32,7 @@ function PaymentInner() {
       .createPaymentIntent(auction.id)
       .then((res) => {
         if (!cancelled) {
-          setClientSecret(res.data.clientSecret ?? null)
+          setClientSecret(res.data?.clientSecret ?? null)
           setSecretLoading(false)
         }
       })
@@ -142,4 +142,3 @@ export default function Payment() {
     </Elements>
   )
 }
-

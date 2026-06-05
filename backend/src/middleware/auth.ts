@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
 import { getJwtSecret } from "../config/jwt";
-import { redis } from "../config/redis";
+import { safeRedis } from "../config/redis";
 
 export interface AuthContext {
   id: number;
@@ -20,8 +20,8 @@ export type AuthResult =
 // Проверка, находится ли токен в черном списке
 async function isTokenBlacklisted(token: string): Promise<boolean> {
   const key = `blacklist:${token}`;
-  const exists = await redis.exists(key);
-  return exists === 1;
+  const exists = await safeRedis.get(key);
+  return exists === "1";
 }
 
 // Функциональная версия проверки токена

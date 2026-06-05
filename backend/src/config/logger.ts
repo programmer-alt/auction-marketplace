@@ -33,7 +33,6 @@ const colors: Record<LogLevel, string> = {
 const colorizedFormat = printf((info: any) => {
   const lvl = (info?.level as string) as LogLevel;
   const color = colors[lvl] ?? colors.info;
-  const ts = info?.timestamp ?? '';
   const msg = info?.message ?? '';
   return `\u001b[${color}m${lvl}: ${msg}\u001b[0m`;
 });

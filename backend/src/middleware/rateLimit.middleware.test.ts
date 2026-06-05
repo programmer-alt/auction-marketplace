@@ -2,20 +2,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Request, Response, NextFunction } from "express";
 import { rateLimit } from "./rateLimit";
 
-// Мокаем redis
-vi.mock("../config/redis", () => ({
-  redis: {
+// Мокаем ioredis для тестов
+vi.mock("ioredis", () => {
+  const mockRedis = {
     get: vi.fn(),
     setex: vi.fn(),
     incr: vi.fn(),
-  },
-}));
+    connect: vi.fn(),
+    on: vi.fn(),
+    status: 'ready',
+    quit: vi.fn(),
+  };
+  return {
+    default: vi.fn(() => mockRedis),
+  };
+});
 
-import { redis } from "../config/redis";
+// Импортируем после мока
+import { redis, safeRedis } from "../config/redis";
 
-const mockRedisGet = vi.mocked(redis.get);
-const mockRedisSetex = vi.mocked(redis.setex);
-const mockRedisIncr = vi.mocked(redis.incr);
+const mockRedisGet = vi.mocked(redis?.get || vi.fn());
+const mockRedisSetex = vi.mocked(redis?.setex || vi.fn());
+const mockRedisIncr = vi.mocked(redis?.incr || vi.fn());
 
 describe("Rate Limit Middleware", () => {
   let mockReq: Partial<Request>;

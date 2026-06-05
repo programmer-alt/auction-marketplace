@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useStripe } from '@stripe/react-stripe-js'
 import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const stripe = useStripe()
 
   const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading')
