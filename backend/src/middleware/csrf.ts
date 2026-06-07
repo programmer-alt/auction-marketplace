@@ -53,6 +53,11 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
     return next();
   }
 
+  // Пропускаем генерацию токена для аутентификационных маршрутов, так как они защищены JWT
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/auth')) {
+    return next();
+  }
+
   // Проверяем, есть ли уже токен в cookie
   const existingToken = req.cookies?.csrfToken;
   
@@ -60,10 +65,10 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
     // Генерируем новый токен
     const token = generateToken();
     res.cookie('csrfToken', token, {
-      httpOnly: false, // Доступен для JavaScript (для отправки в заголовке)
+      httpOnly: true, // Не доступен для JavaScript (защита от XSS)
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000, // 24 часа
+      maxAge: 2 * 60 * 60 * 1000, // 2 часа
     });
   }
   
@@ -83,7 +88,12 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
   }
 
   // Пропускаем auth маршруты — они защищены JWT
-  if (req.path.startsWith('/auth')) {
+  if (req.path === '/api/auth/login' || req.path === '/api/auth/register' || req.path === '/api/auth/refresh' || req.path === '/api/auth/logout' || req.path === '/api/auth/me') {
+    return next();
+  }
+  
+  // Альтернативно: проверяем, если путь содержит '/api/auth' как отдельный сегмент
+  if (req.path.startsWith('/api/auth') && ['/login', '/register', '/refresh', '/logout', '/me'].some(endpoint => req.path.endsWith(endpoint))) {
     return next();
   }
 

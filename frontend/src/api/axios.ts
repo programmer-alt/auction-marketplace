@@ -11,20 +11,23 @@ const api = axios.create({
 })
 
 // Получаем CSRF токен при старте и сохраняем промис
-const csrfReady = api.get('/csrf-token').catch((err) => {
+let csrfReady: Promise<any> | null = api.get('/csrf-token').catch((err) => {
   console.error('CSRF token fetch failed:', err)
 })
 
 // Request interceptor для добавления токена и CSRF
 api.interceptors.request.use(
   async (config) => {
-  const {token} = useAuthStore.getState()
+    const { token } = useAuthStore.getState()
     
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
     }
     
-    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
+    // Не добавляем CSRF токен для auth endpoints (они защищены JWT)
+    const isAuthEndpoint = config.url?.startsWith('/auth') || config.url?.startsWith('/api/auth');
+    
+    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '') && !isAuthEndpoint) {
       if (!getCsrfToken()) {
         await csrfReady
       }
