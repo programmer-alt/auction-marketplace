@@ -12,7 +12,7 @@ export interface Auction {
   description: string | null
   imageUrl: string | null
   startingPrice: number
-  currentPrice: number
+  currentPrice: number | null
   sellerId: number
   seller: Pick<User, 'id' | 'name' | 'email'>
   winnerId: number | null

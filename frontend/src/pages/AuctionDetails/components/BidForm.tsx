@@ -30,8 +30,9 @@ const BidForm: React.FC<BidFormProps> = ({
       return;
     }
 
-    if (amount <= auction.currentPrice) {
-      setLocalError(`Ставка должна быть больше ${auction.currentPrice}`);
+    const currentPrice = auction.currentPrice ?? 0;
+    if (amount <= currentPrice) {
+      setLocalError(`Ставка должна быть больше ${currentPrice}`);
       return;
     }
 
@@ -41,20 +42,23 @@ const BidForm: React.FC<BidFormProps> = ({
     }
   };
 
+  const currentPrice = auction.currentPrice ?? 0;
+  const minBid = currentPrice + 0.01;
+
   return (
     <form onSubmit={handleSubmit} className="card">
       <h3 className="font-semibold mb-3">Сделать ставку</h3>
       <div className="space-y-3">
         <div>
-          <label className="block text-sm text-gray-600 mb-1">Текущая ставка: ${auction.currentPrice}</label>
+          <label className="block text-sm text-gray-600 mb-1">Текущая ставка: ${currentPrice}</label>
           <input
             type="number"
             step="0.01"
-            min={auction.currentPrice + 0.01}
+            min={minBid}
             value={bidAmount}
             onChange={(e) => setBidAmount(e.target.value)}
             className="input-field w-full"
-            placeholder={`Минимум ${(auction.currentPrice + 0.01).toFixed(2)}`}
+            placeholder={`Минимум ${minBid.toFixed(2)}`}
             disabled={isSubmitting}
           />
         </div>

@@ -1,4 +1,4 @@
-по# Node.js
+# Node.js
 node_modules/
 npm-debug.log
 yarn-error.log
@@ -199,3 +199,7 @@ skills-lock.json
 .lingma/rules/Answer.md
 .gitignore
 desktop.ini
+.lingma/rules/fairyTale.md
+.gigacode/rules/Rules .md
+.gitignore
+.codegeex/agent/configs/user_mcp_config.json

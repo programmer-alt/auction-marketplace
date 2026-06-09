@@ -101,11 +101,16 @@ async function blacklistToken(token: string, expiresInSeconds: number) {
  * Регистрация пользователя
  */
 export async function register(email: string, password: string, name?: string) {
+  console.log(`[REGISTER] Попытка регистрации для email: ${email}`);
+
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
+    console.log(`[REGISTER] Пользователь уже существует: ${email}`);
     throw createValidationError("Пользователь уже существует");
   }
+
+  console.log(`[REGISTER] Пользователь не найден, создаем новый аккаунт`);
 
   // Хеширование пароля
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -116,6 +121,8 @@ export async function register(email: string, password: string, name?: string) {
     password: hashedPassword,
     name,
   });
+
+  console.log(`[REGISTER] Пользователь создан: ${user.id}, ${user.email}`);
 
   // Генерация пары токенов
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
@@ -135,17 +142,25 @@ export async function register(email: string, password: string, name?: string) {
  * Вход пользователя
  */
 export async function login(email: string, password: string) {
+  console.log(`[LOGIN] Попытка входа для email: ${email}`);
+
   // Поиск пользователя
   const user = await getUserByEmail(prisma, email);
   if (!user) {
+    console.log(`[LOGIN] Пользователь не найден: ${email}`);
     throw createForbiddenError("Неверные учетные данные");
   }
+
+  console.log(`[LOGIN] Пользователь найден: ${user.id}, ${user.email}`);
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
+    console.log(`[LOGIN] Неверный пароль для пользователя: ${user.email}`);
     throw createForbiddenError("Неверные учетные данные");
   }
+
+  console.log(`[LOGIN] Успешный вход для пользователя: ${user.email}`);
 
   // Генерация пары токенов
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
