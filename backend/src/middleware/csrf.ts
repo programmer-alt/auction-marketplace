@@ -8,7 +8,7 @@ const { CSRF_SECRET } = process.env;
 
 function getCsrfSecret(): string {
   if (!CSRF_SECRET || CSRF_SECRET.trim() === '') {
-    // Тестовый дефолт чтобы csrf.middleware.test.ts не падал
+    
     if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
       return 'test-csrf-secret';
     }
