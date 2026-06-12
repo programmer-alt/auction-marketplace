@@ -1,11 +1,11 @@
 import "dotenv/config";
-
+import { prisma, pool } from "./config/db";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { createAdapter } from "@socket.io/redis-adapter";
-
+import { redis as pubClient } from "./config/redis";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
@@ -45,7 +45,7 @@ setResourceLimits();
 // Периодическая проверка на утечку памяти
 let leakCheckInterval: NodeJS.Timeout | undefined = setInterval(() => {
   if (checkMemoryLeak()) {
-    logger.warn("Possible memory leak detected");
+    logger.warn("Возможна утечка памяти");
   }
 }, 10 * 60 * 1000); // Каждые 10 минут
 
@@ -54,11 +54,11 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-import { prisma, pool } from "./config/db";
+
 export { prisma };
 
 // Redis клиенты для Socket.io адаптера (теперь используем ioredis)
-import { redis as pubClient } from "./config/redis";
+
 
 if (!pubClient) {
   throw new Error('Redis client is not available');
@@ -196,27 +196,27 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
   const { user } = socket.data;
   if (user) {
-    logger.info(`Client connected: ${socket.id} (user ${user.id})`);
+    logger.info(`Клиент подключен: ${socket.id} (пользователь ${user.id})`);
     socket.join(`user:${user.id}`);
   } else {
-    logger.info(`Guest connected: ${socket.id}`);
+    logger.info(`Гость подключен: ${socket.id}`);
   }
 
   socket.on('auction:join', (data: unknown) => {
     if (!data || typeof data !== 'object' || typeof (data as Record<string, unknown>).auctionId !== 'number') return;
     const { auctionId } = data as { auctionId: number };
     socket.join(`auction:${auctionId}`);
-    logger.info(`Client ${socket.id} joined auction:${auctionId}`);
+    logger.info(`Клиент ${socket.id} присоединился к аукциону:${auctionId}`);
   });
 
   socket.on('auction:leave', (auctionId: unknown) => {
     if (typeof auctionId !== 'number') return;
     socket.leave(`auction:${auctionId}`);
-    logger.info(`Client ${socket.id} left auction:${auctionId}`);
+    logger.info(`Клиент ${socket.id} покинул аукцион:${auctionId}`);
   });
 
   socket.on('disconnect', () => {
-    logger.info(`Client disconnected: ${socket.id} (user ${user?.id ?? 'guest'})`);
+    logger.info(`Клиент отключен: ${socket.id} (пользователь ${user?.id ?? 'гость'})`);
   });
 });
 
@@ -226,13 +226,14 @@ let isShuttingDown = false;
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
   if (isShuttingDown) {
-    logger.info(`Shutdown already in progress. Signal ${signal} ignored.`);
+    logger.info(`Завершение уже в процессе. Сигнал ${signal} игнорируется.`);
     return;
   }
   
   isShuttingDown = true;
-  logger.info(`Received ${signal}. Shutting down gracefully...`);
+  logger.info(`Получен сигнал ${signal}. Корректное завершение...`);
 
+  // Закрываем соединения HTTP сервера
   httpServer.closeAllConnections();
   httpServer.close();
 
@@ -241,14 +242,16 @@ async function shutdown(signal: string) {
     if (leakCheckInterval) {
       clearInterval(leakCheckInterval);
     }
-  } catch {}
+  } catch (error) {
+    logger.error('Ошибка очистки интервала проверки утечки памяти:', error);
+  }
 
   // Закрываем Bull queue с использованием предусмотренной функции
   try {
     const { gracefulShutdown } = await import("./queues/auctionCompletionQueue");
     await gracefulShutdown();
   } catch (error) {
-    logger.error('Error during Bull queue shutdown:', error);
+    logger.error('Ошибка во время завершения Bull queue:', error);
   }
 
   // Закрываем Redis клиенты
@@ -256,81 +259,195 @@ async function shutdown(signal: string) {
     if (subClient && typeof subClient.quit === 'function') {
       await subClient.quit();
     }
-  } catch {}
+  } catch (error) {
+    logger.error('Ошибка закрытия Redis subClient:', error);
+  }
   try {
     if (pubClient && typeof pubClient.quit === 'function') {
       await pubClient.quit();
     }
-  } catch {}
+  } catch (error) {
+    logger.error('Ошибка закрытия Redis pubClient:', error);
+  }
 
   // Закрываем подключение Prisma и пул PostgreSQL
   try {
     await prisma.$disconnect();
     await pool.end();
-  } catch {}
+  } catch (error) {
+    logger.error('Ошибка отключения от базы данных:', error);
+  }
 
+  logger.info('Приложение успешно завершено');
   process.exit(0);
 }
 
 // Запуск сервера
 httpServer.listen(PORT, async () => {
-  logger.info(`Server running on http://localhost:${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV}`);
+  logger.info(`Сервер запущен на http://localhost:${PORT}`);
+  logger.info(`Среда: ${process.env.NODE_ENV}`);
 
   try {
     await prisma.$connect();
-    logger.info('Database connected');
+    logger.info('База данных подключена');
   } catch (error) {
-    logger.error('Database connection failed:', error);
+    logger.error('Ошибка подключения к базе данных:', error);
   }
 
   try {
     if (pubClient) {
       await pubClient.ping();
-      logger.info('Redis connected');
+      logger.info('Redis подключен');
     } else {
-      logger.warn('Redis is not available');
+      logger.warn('Redis недоступен');
     }
   } catch (error) {
-    logger.error('Redis connection failed:', error);
+    logger.error('Ошибка подключения к Redis:', error);
   }
 
   const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
   await scheduleExistingAuctions();
 });
 
+// Обработка ошибки EADDRINUSE
+httpServer.on('error', async (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    logger.error(`Порт ${PORT} уже занят. Пожалуйста, остановите процесс, который использует этот порт, прежде чем продолжить.`);
+    logger.info(`Попытка найти и завершить процесс на порту ${PORT}...`);
+    
+    const os = await import('os'); // Используем динамический импорт
+    
+    if (os.default.platform() === 'win32') {
+      const { exec } = await import('child_process');
+      exec(`netstat -ano | findstr :${PORT}`, (err: Error, stdout: string) => {
+        if (err) {
+          logger.error('Не удалось выполнить команду netstat:', err);
+          logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+          process.exit(1);
+        }
+        
+        const lines = stdout.split('\n');
+        let foundPid = false;
+        for (const line of lines) {
+          if (line.trim() === '') continue;
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 5) {
+            const pid = parts[parts.length - 1];
+            if (pid && pid !== '0' && !isNaN(parseInt(pid))) {
+              foundPid = true;
+              logger.info(`Найден процесс с PID: ${pid}`);
+              logger.info(`Попытка завершить процесс ${pid}...`);
+              
+              exec(`taskkill /PID ${pid} /F`, (killErr: Error) => {
+                if (killErr) {
+                  logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
+                  logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав администратора.`);
+                  logger.info(`Пожалуйста, вручную завершите процесс, использующий порт ${PORT}, и перезапустите приложение.`);
+                  logger.info(`Вы можете попробовать выполнить: netstat -ano | findstr :${PORT} для определения процесса`);
+                  logger.info(`Затем попробуйте: taskkill /PID ${pid} /F (от имени администратора)`);
+                  process.exit(1);
+                } else {
+                  logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+                  process.exit(1);
+                }
+              });
+            }
+          }
+        }
+        
+        if (!foundPid) {
+          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+          logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: netstat -ano | findstr :${PORT}`);
+          process.exit(1);
+        }
+      });
+    } else {
+      // For Unix-like systems
+      const { exec } = await import('child_process');
+      exec(`lsof -i :${PORT} | grep LISTEN | awk '{print $2}'`, (err: Error, stdout: string) => {
+        if (err) {
+          logger.error('Не удалось найти процесс, использующий порт:', err);
+          logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+          process.exit(1);
+        }
+        
+        const pid = stdout.trim();
+        if (pid) {
+          logger.info(`Найден процесс с PID: ${pid}`);
+          logger.info(`Попытка завершить процесс ${pid}...`);
+          
+          exec(`kill -9 ${pid}`, (killErr: Error) => {
+            if (killErr) {
+              logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
+              logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав sudo.`);
+              logger.info('Пожалуйста, вручную завершите процесс, использующий порт 5000, и перезапустите приложение.');
+              logger.info(`Вы можете попробовать выполнить: lsof -i :${PORT} для определения процесса`);
+              logger.info(`Затем попробуйте: kill -9 ${pid} (с sudo при необходимости)`);
+              process.exit(1);
+            } else {
+              logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+              process.exit(1);
+            }
+          });
+        } else {
+          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+          logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: lsof -i :${PORT}`);
+          process.exit(1);
+        }
+      });
+    }
+  } else {
+    logger.error('Ошибка сервера:', error);
+    process.exit(1);
+  }
+});
+
 // Graceful shutdown
 process.on("SIGINT", () => {
   if (!isShuttingDown) {
+    logger.info("Получен сигнал SIGINT. Инициируется корректное завершение...");
     shutdown("SIGINT");
   } else {
-    logger.info("Shutdown already in progress. SIGINT ignored.");
+    logger.info("Завершение уже в процессе. SIGINT игнорируется.");
   }
 });
 process.on("SIGTERM", () => {
   if (!isShuttingDown) {
+    logger.info("Получен сигнал SIGTERM. Инициируется корректное завершение...");
     shutdown("SIGTERM");
   } else {
-    logger.info("Shutdown already in progress. SIGTERM ignored.");
+    logger.info("Завершение уже в процессе. SIGTERM игнорируется.");
+  }
+});
+
+// Обработка нажатия Ctrl+C в Windows
+process.on('SIGBREAK', () => {
+  if (!isShuttingDown) {
+    logger.info("Получен сигнал SIGBREAK (Ctrl+C в Windows). Инициируется корректное завершение...");
+    shutdown("SIGBREAK");
+  } else {
+    logger.info("Завершение уже в процессе. SIGBREAK игнорируется.");
   }
 });
 
 // Необработанные отклонения промисов
 process.on('unhandledRejection', (reason: unknown) => {
   if (!isShuttingDown) {
-    logger.error('Unhandled promise rejection:', reason);
+    logger.error('Необработанное отклонение промиса:', reason);
     shutdown('unhandledRejection').catch(() => process.exit(1));
   } else {
-    logger.error('Unhandled promise rejection during shutdown:', reason);
+    logger.error('Необработанное отклонение промиса во время завершения:', reason);
   }
 });
 
 // Необработанные исключения (синхронные)
 process.on('uncaughtException', (error: Error) => {
   if (!isShuttingDown) {
-    logger.error('Uncaught exception:', error);
+    logger.error('Необработанное исключение:', error);
     shutdown('uncaughtException').catch(() => process.exit(1));
   } else {
-    logger.error('Uncaught exception during shutdown:', error);
+    logger.error('Необработанное исключение во время завершения:', error);
   }
 });

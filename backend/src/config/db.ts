@@ -13,7 +13,21 @@ const adapter = new PrismaPg(pool);
 // Инициализация PrismaClient с адаптером
 export const prisma = new PrismaClient({ 
   adapter,
-  log: ['query', 'info', 'warn', 'error'], // Добавляем логирование для отладки
+  log: [
+    { level: 'info', emit: 'event' },
+    { level: 'warn', emit: 'event' },
+    { level: 'error', emit: 'event' },
+    ...(process.env.NODE_ENV === 'development' 
+      ? [{ level: 'query', emit: 'event' }] 
+      : [])
+  ]
 });
+
+// В development среде продолжаем логировать запросы для отладки
+if (process.env.NODE_ENV === 'development') {
+  prisma.$on('query', (e) => {
+    console.log(`prisma:query ${e.query}`);
+  });
+}
 
 export { pool };
