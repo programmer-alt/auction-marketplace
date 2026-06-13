@@ -98,7 +98,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Начальная: <span className="font-medium text-gray-700">${auction.startingPrice}</span></span>
-                    {auction.currentPrice > auction.startingPrice && (
+                    {auction.currentPrice && auction.currentPrice > auction.startingPrice && (
                       <span className="text-primary-600 font-semibold">${auction.currentPrice}</span>
                     )}
                   </div>

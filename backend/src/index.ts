@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { exec, type ExecException } from "child_process";
 import { prisma, pool } from "./config/db";
 import express, { Request, Response } from "express";
 import cors from "cors";
@@ -315,18 +316,16 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
     logger.error(`Порт ${PORT} уже занят. Пожалуйста, остановите процесс, который использует этот порт, прежде чем продолжить.`);
     logger.info(`Попытка найти и завершить процесс на порту ${PORT}...`);
     
-    const os = await import('os'); // Используем динамический импорт
-    
-    if (os.default.platform() === 'win32') {
-      const { exec } = await import('child_process');
-      exec(`netstat -ano | findstr :${PORT}`, (err: Error, stdout: string) => {
+    if (process.platform === 'win32') {
+      // exec уже импортирован статически в начале файла
+      exec(`netstat -ano | findstr :${PORT}`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
         if (err) {
           logger.error('Не удалось выполнить команду netstat:', err);
           logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
           process.exit(1);
         }
         
-        const lines = stdout.split('\n');
+        const lines = (stdout as string).split('\n');
         let foundPid = false;
         for (const line of lines) {
           if (line.trim() === '') continue;
@@ -338,7 +337,7 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
               logger.info(`Найден процесс с PID: ${pid}`);
               logger.info(`Попытка завершить процесс ${pid}...`);
               
-              exec(`taskkill /PID ${pid} /F`, (killErr: Error) => {
+              exec(`taskkill /PID ${pid} /F`, undefined, (killErr: ExecException | null) => {
                 if (killErr) {
                   logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
                   logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав администратора.`);
@@ -364,20 +363,20 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
       });
     } else {
       // For Unix-like systems
-      const { exec } = await import('child_process');
-      exec(`lsof -i :${PORT} | grep LISTEN | awk '{print $2}'`, (err: Error, stdout: string) => {
+      // exec уже импортирован статически в начале файла
+      exec(`lsof -i :${PORT} | grep LISTEN | awk '{print $2}'`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
         if (err) {
           logger.error('Не удалось найти процесс, использующий порт:', err);
           logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
           process.exit(1);
         }
         
-        const pid = stdout.trim();
+        const pid = (stdout as string).trim();
         if (pid) {
           logger.info(`Найден процесс с PID: ${pid}`);
           logger.info(`Попытка завершить процесс ${pid}...`);
           
-          exec(`kill -9 ${pid}`, (killErr: Error) => {
+          exec(`kill -9 ${pid}`, undefined, (killErr: ExecException | null) => {
             if (killErr) {
               logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
               logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав sudo.`);

@@ -42,7 +42,7 @@ export default function AuctionDetails() {
   const { auction, bids, loading, refresh } = useAuctionData(id);
   const { bidAmount, setBidAmount, isSubmitting, submitBid } = useBidForm(
     auction?.id,
-    auction?.currentPrice
+    auction?.currentPrice ?? undefined
   );
   const { handleDelete, handleEdit, handlePayment, handleConfirmDelete } = useAuctionActions(
     auction?.id,
