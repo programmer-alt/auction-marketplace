@@ -48,8 +48,21 @@ function verifyToken(token: string): boolean {
 
 // Middleware для генерации CSRF-токена
 export function generateCsrfToken(req: Request, res: Response, next: NextFunction) {
-  // Не генерируем токен для GET-запросов (они только читают данные)
+  // Для GET-запросов генерируем токен только для /api/csrf-token эндпоинта
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    // Если это /api/csrf-token эндпоинт, генерируем токен
+    if ((req as any).path === '/api/csrf-token') {
+      const existingToken = (req as any).cookies?.csrfToken;
+      if (!existingToken || !verifyToken(existingToken)) {
+        const token = generateToken();
+        res.cookie('csrfToken', token, {
+          httpOnly: true, // Не доступен для JavaScript (защита от XSS)
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 2 * 60 * 60 * 1000, // 2 часа
+        });
+      }
+    }
     return next();
   }
 
