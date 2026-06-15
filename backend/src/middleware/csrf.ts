@@ -54,12 +54,12 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
   }
 
   // Пропускаем генерацию токена для аутентификационных маршрутов, так как они защищены JWT
-  if (req.path.startsWith('/api/auth') || req.path.startsWith('/auth')) {
+  if ((req as any).path?.startsWith('/api/auth') || (req as any).path?.startsWith('/auth')) {
     return next();
   }
 
   // Проверяем, есть ли уже токен в cookie
-  const existingToken = req.cookies?.csrfToken;
+  const existingToken = (req as any).cookies?.csrfToken;
   
   if (!existingToken || !verifyToken(existingToken)) {
     // Генерируем новый токен
@@ -82,23 +82,23 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
     return next();
   }
 
-  // Пропускаем webhook-маршруты (Stripe и другие)
-  if (req.path.includes('/webhook') || req.path.includes('/uploads')) {
+  // Пропускаем webhook-маршруты и загрузки файлов (Stripe и другие)
+  if ((req as any).path?.includes('/webhook') || (req as any).path?.includes('/uploads')) {
     return next();
   }
 
   // Пропускаем auth маршруты — они защищены JWT
-  if (req.path === '/api/auth/login' || req.path === '/api/auth/register' || req.path === '/api/auth/refresh' || req.path === '/api/auth/logout' || req.path === '/api/auth/me') {
+  if ((req as any).path === '/api/auth/login' || (req as any).path === '/api/auth/register' || (req as any).path === '/api/auth/refresh' || (req as any).path === '/api/auth/logout' || (req as any).path === '/api/auth/me') {
     return next();
   }
   
   // Альтернативно: проверяем, если путь содержит '/api/auth' как отдельный сегмент
-  if (req.path.startsWith('/api/auth') && ['/login', '/register', '/refresh', '/logout', '/me'].some(endpoint => req.path.endsWith(endpoint))) {
+  if ((req as any).path?.startsWith('/api/auth') && ['/login', '/register', '/refresh', '/logout', '/me'].some(endpoint => (req as any).path?.endsWith(endpoint))) {
     return next();
   }
 
-  const tokenFromCookie = req.cookies?.csrfToken;
-  const tokenFromHeader = req.headers['x-csrf-token'] as string;
+  const tokenFromCookie = (req as any).cookies?.csrfToken;
+  const tokenFromHeader = (req.headers as any)['x-csrf-token'] as string;
 
   if (!tokenFromCookie || !tokenFromHeader) {
     return res.status(403).json({ error: 'CSRF токен не найден' });

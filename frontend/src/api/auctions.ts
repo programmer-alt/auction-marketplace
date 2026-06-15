@@ -53,9 +53,7 @@ export const auctionsApi = {
   uploadImage: async (file: File): Promise<ApiResponse<string>> => {
     const formData = new FormData()
     formData.append('image', file)
-    const response = await api.post<{ imageUrl: string }>('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const response = await api.post<{ imageUrl: string }>('/upload', formData)
     return {
       success: true,
       data: response.data.imageUrl
