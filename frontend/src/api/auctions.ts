@@ -50,10 +50,15 @@ export const auctionsApi = {
     } as ApiResponse<Auction>
   },
 
+  // ponytail: сбрасываем Content-Type в undefined, чтобы FormData мог установить multipart/form-data с boundary
   uploadImage: async (file: File): Promise<ApiResponse<string>> => {
     const formData = new FormData()
     formData.append('image', file)
-    const response = await api.post<{ imageUrl: string }>('/upload', formData)
+    const response = await api.post<{ imageUrl: string }>('/upload', formData, {
+      headers: {
+        'Content-Type': undefined
+      }
+    })
     return {
       success: true,
       data: response.data.imageUrl
