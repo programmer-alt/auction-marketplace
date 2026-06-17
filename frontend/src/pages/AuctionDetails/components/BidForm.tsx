@@ -30,7 +30,7 @@ const BidForm: React.FC<BidFormProps> = ({
       return;
     }
 
-    const currentPrice = auction.currentPrice ?? 0;
+    const currentPrice = Number(auction.currentPrice) || 0;
     if (amount <= currentPrice) {
       setLocalError(`Ставка должна быть больше ${currentPrice}`);
       return;
@@ -42,7 +42,7 @@ const BidForm: React.FC<BidFormProps> = ({
     }
   };
 
-  const currentPrice = auction.currentPrice ?? 0;
+  const currentPrice = Number(auction.currentPrice) || 0;
   const minBid = currentPrice + 0.01;
 
   return (
