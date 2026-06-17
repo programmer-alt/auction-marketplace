@@ -10,10 +10,24 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Получаем CSRF токен при старте и сохраняем промис
-let csrfReady: Promise<any> | null = api.get('/csrf-token').catch((err) => {
-  console.error('CSRF token fetch failed:', err)
-})
+// Глобальный промис для получения CSRF токена
+let csrfToken: string | null = null
+let csrfReady: Promise<void> | null = null
+
+// Получаем CSRF токен при старте
+function fetchCsrfToken(): Promise<void> {
+  if (csrfReady) return csrfReady
+  
+  csrfReady = api.get<{ csrfToken: string }>('/csrf-token')
+    .then(response => {
+      csrfToken = response.data.csrfToken
+    })
+    .catch((err) => {
+      console.error('CSRF token fetch failed:', err)
+    })
+  
+  return csrfReady
+}
 
 // Request interceptor для добавления токена и CSRF
 api.interceptors.request.use(
@@ -28,10 +42,9 @@ api.interceptors.request.use(
     const isAuthEndpoint = config.url?.startsWith('/auth') || config.url?.startsWith('/api/auth');
     
     if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '') && !isAuthEndpoint) {
-      if (!getCsrfToken()) {
-        await csrfReady
+      if (!csrfToken) {
+        await fetchCsrfToken()
       }
-      const csrfToken = getCsrfToken()
       if (csrfToken) {
         config.headers.set('X-CSRF-Token', csrfToken)
       }
@@ -67,13 +80,5 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-function getCsrfToken(): string | null {
-  const match = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('csrfToken='))
-  if (!match) return null
-  return decodeURIComponent(match.substring('csrfToken='.length))
-}
 
 export default api

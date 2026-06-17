@@ -83,7 +83,7 @@ function getCsrfTokenFromCookies(req: Request): string | undefined {
 
 // Middleware для генерации CSRF-токена
 export function generateCsrfToken(req: Request, res: Response, next: NextFunction) {
-  // Для GET-запросов генерируем токен только для /api/csrf-token эндпоинта
+  // Для GET/HEAD/OPTIONS запросов генерируем токен только для /api/csrf-token эндпоинта
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
     // Если это /api/csrf-token эндпоинт, генерируем токен
     const path = getRequestPath(req);
@@ -94,10 +94,16 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
         res.cookie('csrfToken', token, {
           httpOnly: true, // Не доступен для JavaScript (защита от XSS)
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
           maxAge: 2 * 60 * 60 * 1000, // 2 часа
         });
+        // Возвращаем токен в теле ответа для frontend
+        res.json({ csrfToken: token });
+        return;
       }
+      // Если токен уже есть, возвращаем его
+      res.json({ csrfToken: existingToken });
+      return;
     }
     return next();
   }
@@ -117,7 +123,7 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
     res.cookie('csrfToken', token, {
       httpOnly: true, // Не доступен для JavaScript (защита от XSS)
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
       maxAge: 2 * 60 * 60 * 1000, // 2 часа
     });
   }
