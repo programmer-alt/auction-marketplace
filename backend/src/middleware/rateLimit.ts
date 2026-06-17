@@ -4,7 +4,9 @@ import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 
 const WINDOW_SIZE_IN_SECONDS = 60;
-const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'development' ? 500 : 100;
+const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'development' 
+  ? parseInt(process.env.DEV_RATE_LIMIT || '1000', 10)
+  : parseInt(process.env.PROD_RATE_LIMIT || '100', 10);
 
 // Fallback: если Redis недоступен, используем LRU-кэш с ограничением размера и TTL
 const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }>({
@@ -91,6 +93,9 @@ export async function rateLimit(
   res: Response,
   next: NextFunction,
 ) {
+  // ponytail: Исключаем /api/csrf-token из rate limiting - это простой GET-запрос для генерации токена
+  if (req.path === '/api/csrf-token') return next();
+
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
   const key = `rate_limit:${ip}`;
