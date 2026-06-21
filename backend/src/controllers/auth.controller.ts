@@ -35,10 +35,17 @@ export const authController = {
       parsed.data.password,
       parsed.data.name,
     );
+    // Устанавливаем refresh токен в HTTP-only cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      sameSite: 'strict',
+    });
     res.status(201).json({
       message: "Пользователь успешно зарегистрирован",
       user: result.user,
-      token: result.token,
+      token: result.accessToken,
     });
   }),
 
@@ -47,26 +54,46 @@ export const authController = {
     if (!parsed.success) return next(parsed.error);
 
     const result = await authService.login(parsed.data.email, parsed.data.password);
+    // Устанавливаем refresh токен в HTTP-only cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      sameSite: 'strict',
+    });
     res.json({
       message: "Вход выполнен успешно",
       user: result.user,
-      token: result.token,
+      token: result.accessToken,
     });
   }),
 
-  // POST /api/auth/refresh — обновление access токена с помощью refresh токена
+  // POST /api/auth/refresh — обновление access токена с помощью refresh токена из cookie
   refresh: asyncHandler<AuthRequest>(async (req, res, next) => {
-    const { refreshToken } = req.body;
+    // Извлекаем refresh токен из cookie, а не из body, как указано в архитектуре
+    const refreshToken = req.cookies.refreshToken;
+    
     if (!refreshToken) {
       return next(createValidationError("Refresh токен обязателен"));
     }
+    
     const result = await authService.refresh(refreshToken);
-    res.json(result);
+    // Обновляем refresh токен в cookie
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      sameSite: "strict",
+    });
+
+    // Возвращаем только accessToken
+    res.json({ accessToken: result.accessToken });
   }), 
 
   logout: asyncHandler<AuthRequest>(async (req, res, next) => {
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    const { refreshToken } = req.body;
+    // Извлекаем refresh токен из cookie
+    const refreshToken = req.cookies.refreshToken;
     if (!accessToken) {
       return next(createValidationError("Access токен отсутствует"));
     }
@@ -74,6 +101,8 @@ export const authController = {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
     await authService.logout(req.user.id, accessToken, refreshToken);
+    // Удаляем refresh токен из cookie
+    res.clearCookie('refreshToken');
     res.json({ message: "Выход выполнен успешно" });
   }),
 

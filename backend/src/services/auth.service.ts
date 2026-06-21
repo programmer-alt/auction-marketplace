@@ -134,7 +134,8 @@ export async function register(email: string, password: string, name?: string) {
       email: user.email,
       name: user.name,
     },
-    token: accessToken,
+    accessToken,
+    refreshToken,
   };
 }
 
@@ -173,7 +174,8 @@ export async function login(email: string, password: string) {
       name: user.name,
       balance: user.balance,
     },
-    token: accessToken,
+    accessToken,
+    refreshToken,
   };
 }
 

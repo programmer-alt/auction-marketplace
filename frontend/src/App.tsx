@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
@@ -18,12 +18,84 @@ const PaymentResult = lazy(() => import('./pages/Payment/PaymentResult'))
 const About = lazy(() => import('./pages/About/About.index'))
 const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
+// Компонент для инициализации аутентификации
+function AuthInitializer() {
+  const { isAuthenticated, login, setLoading } = useAuthStore();
+
+  useEffect(() => {
+    // Проверяем аутентификацию при запуске приложения
+    const initializeAuth = async () => {
+      setLoading(true);
+      
+      try {
+        // Пытаемся получить данные текущего пользователя
+        // Если пользователь был залогинен ранее, и refresh токен все еще валиден,
+        // сервер вернет данные пользователя
+        const { authApi } = await import('./api/auth');
+        
+        // Пробуем получить данные пользователя
+        const userData = await authApi.getMe();
+        
+        if (userData) {
+          // Пользователь аутентифицирован, пробуем обновить токен через refresh
+          const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            credentials: 'include', // важно для отправки HTTP-only cookies
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const { accessToken } = await response.json();
+            // Обновляем состояние с новым токеном и данными пользователя
+            login(accessToken, userData);
+          } else {
+            // Если refresh не удался, но мы получили данные пользователя,
+            // возможно, access токен еще не истек, просто обновляем данные
+            // без обновления токена
+            login(useAuthStore.getState().token || '', userData);
+          }
+        }
+      } catch (error) {
+        // Если бэкенд еще не запущен, повторяем попытку через 2 секунды
+        if (error instanceof Error && (error.message.includes('ECONNREFUSED') || error.message.includes('Network Error'))) {
+          console.log('⏳ Бэкенд еще не запущен, повторная попытка через 2 секунды...');
+          setTimeout(initializeAuth, 2000);
+          return; // Прерываем текущее выполнение, чтобы не сбросить isLoading раньше времени
+        }
+        // Если другая ошибка (например, 401) - пользователь просто не авторизован
+        console.log('Пользователь не аутентифицирован или сессия истекла');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Запускаем инициализацию только один раз при монтировании компонента
+    if (!isAuthenticated) {
+      initializeAuth();
+    } else {
+      // Если пользователь уже аутентифицирован, просто сбрасываем состояние загрузки
+      setLoading(false);
+    }
+  }, [isAuthenticated, login]);
+
+  return null; // Этот компонент не рендерит ничего
+}
+
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, isLoading } = useAuthStore()
+
+  // Показываем загрузку, пока проверяем аутентификацию
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
+      {/* Инициализация аутентификации */}
+      <AuthInitializer />
       <Layout>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
