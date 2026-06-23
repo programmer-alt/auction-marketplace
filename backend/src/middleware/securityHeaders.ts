@@ -133,12 +133,12 @@ const devCspConfig: CspConfig = {
   scriptSrc: [...(defaultCspConfig.scriptSrc || []), "chrome-extension:*", "'unsafe-eval'", "'wasm-unsafe-eval'"],
   styleSrc: [...(defaultCspConfig.styleSrc || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
   // Явно добавляем специфичные директивы для inline элементов
-  scriptSrcElem: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
-  styleSrcElem: [...(defaultCspConfig.styleSrcElem || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
+  scriptSrcElem: ["'self'", "'unsafe-inline'", "chrome-extension:*", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+  styleSrcElem: [...(defaultCspConfig.styleSrcElem || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
   scriptSrcAttr: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
-  styleSrcAttr: [...(defaultCspConfig.styleSrcAttr || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
+  styleSrcAttr: [...(defaultCspConfig.styleSrcAttr || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
   imgSrc: [...(defaultCspConfig.imgSrc || []), "chrome-extension:*", "https://*", "data:", "blob:", "filesystem:"],
-  fontSrc: [...(defaultCspConfig.fontSrc || []), "https://fonts.gstatic.com"],
+  fontSrc: [...(defaultCspConfig.fontSrc || []), "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
   // Разрешаем доступ к well-known ресурсам для Chrome и других инструментов разработки
   defaultSrc: [...(defaultCspConfig.defaultSrc || []), "https://*", "chrome-extension:*"],
 };

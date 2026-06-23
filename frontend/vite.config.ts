@@ -6,6 +6,41 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: 'security-headers',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          // Content-Security-Policy
+          const isProduction = process.env.NODE_ENV === 'production';
+          
+          // Конфигурация CSP для development режима
+          const cspPolicy = isProduction
+            ? "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' http://localhost:* ws://localhost:*; object-src 'none'; frame-src 'none'; frame-ancestors 'none'"
+            : "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http://localhost:*; font-src 'self' data: https: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' http://localhost:* ws://localhost:* https://* wss://*; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com https://fonts.googleapis.com";
+
+          res.setHeader('Content-Security-Policy', cspPolicy);
+          
+          // X-Frame-Options
+          res.setHeader('X-Frame-Options', 'DENY');
+          
+          // X-Content-Type-Options
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          
+          // Referrer-Policy
+          res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+          
+          // Permissions-Policy
+          res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), autoplay=(), fullscreen=(self)');
+          
+          // Strict-Transport-Security (только в production)
+          if (isProduction) {
+            res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+          }
+          
+          next();
+        });
+      }
+    }
   ],
   resolve: {
     alias: {
