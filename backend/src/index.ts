@@ -317,53 +317,71 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
     logger.info(`Попытка найти и завершить процесс на порту ${PORT}...`);
     
     if (process.platform === 'win32') {
-      // exec уже импортирован статически в начале файла
-      exec(`netstat -ano | findstr :${PORT}`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
+      // Используем PowerShell для более надежного определения процесса
+      exec(`powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess"`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
         if (err) {
-          logger.error('Не удалось выполнить команду netstat:', err);
+          logger.error('Не удалось выполнить команду PowerShell для поиска процесса:', err);
           logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+          logger.info(`Вы можете попробовать выполнить: Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue`);
           process.exit(1);
         }
         
-        const lines = (stdout as string).split('\n');
-        let foundPid = false;
-        for (const line of lines) {
-          if (line.trim() === '') continue;
-          const parts = line.trim().split(/\s+/);
-          if (parts.length >= 5) {
-            const pid = parts[parts.length - 1];
-            if (pid && pid !== '0' && !isNaN(parseInt(pid))) {
+        const pids = (stdout as string).trim().split(/\r?\n/).map(pid => pid.trim()).filter(pid => pid !== '' && pid !== '0');
+        
+        if (pids.length === 0) {
+          // Проверяем, нет ли TIME_WAIT состояния (сокет еще не освободился после завершения процесса)
+          exec(`powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Format-Table -AutoSize"`, undefined, (checkErr: ExecException | null, checkStdout: string | NonSharedBuffer) => {
+            if (!checkErr) {
+              const hasTimeWait = (checkStdout as string).includes('TimeWait');
+              if (hasTimeWait) {
+                logger.warn(`Порт ${PORT} находится в состоянии TIME_WAIT (ожидание освобождения после закрытия соединения).`);
+                logger.info('Это нормально, процесс уже завершился, но сокет еще не освободился системой.');
+                logger.info('Пожалуйста, подождите 30-60 секунд и попробуйте снова.');
+                process.exit(1);
+              }
+            }
+            logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+            logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+            logger.info('Пожалуйста, подождите немного и попробуйте перезапустить приложение.');
+            process.exit(1);
+          });
+        } else {
+          // Найдены активные процессы
+          let foundPid = false;
+          for (const pid of pids) {
+            if (pid && !isNaN(parseInt(pid))) {
               foundPid = true;
               logger.info(`Найден процесс с PID: ${pid}`);
               logger.info(`Попытка завершить процесс ${pid}...`);
               
-              exec(`taskkill /PID ${pid} /F`, undefined, (killErr: ExecException | null) => {
+              exec(`powershell -Command "Stop-Process -Id ${pid} -Force"`, undefined, (killErr: ExecException | null) => {
                 if (killErr) {
                   logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
                   logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав администратора.`);
                   logger.info(`Пожалуйста, вручную завершите процесс, использующий порт ${PORT}, и перезапустите приложение.`);
-                  logger.info(`Вы можете попробовать выполнить: netstat -ano | findstr :${PORT} для определения процесса`);
-                  logger.info(`Затем попробуйте: taskkill /PID ${pid} /F (от имени администратора)`);
+                  logger.info(`Вы можете попробовать выполнить: Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue`);
+                  logger.info(`Затем попробуйте: Stop-Process -Id ${pid} -Force (от имени администратора)`);
                   process.exit(1);
                 } else {
                   logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
                   process.exit(1);
                 }
               });
+              // Прерываем цикл после первого PID, чтобы не завершать несколько процессов
+              break;
             }
           }
-        }
-        
-        if (!foundPid) {
-          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
-          logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: netstat -ano | findstr :${PORT}`);
-          process.exit(1);
+          
+          if (!foundPid) {
+            logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+            logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+            logger.info('Пожалуйста, подождите немного и попробуйте перезапустить приложение.');
+            process.exit(1);
+          }
         }
       });
     } else {
       // For Unix-like systems
-      // exec уже импортирован статически в начале файла
       exec(`lsof -i :${PORT} | grep LISTEN | awk '{print $2}'`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
         if (err) {
           logger.error('Не удалось найти процесс, использующий порт:', err);
@@ -391,7 +409,7 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
           });
         } else {
           logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+          logger.info('Это может быть связ��но с устаревшим сокетом или другой сетевой проблемой.');
           logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: lsof -i :${PORT}`);
           process.exit(1);
         }
