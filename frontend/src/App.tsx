@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
 import { useAuthStore } from './store/auth.store'
 import LoadingSpinner from './components/shared/LoadingSpinner'
+import { useState } from 'react'
 
 // Lazy loaded components for code splitting
 const Home = lazy(() => import('./pages/Home/Home.index'))
@@ -20,9 +21,13 @@ const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
 // Компонент для инициализации аутентификации
 function AuthInitializer() {
-  const { isAuthenticated, login, setLoading } = useAuthStore();
+  const {  login, setLoading } = useAuthStore();
+  const [ hasInitialized, setHasInitialized ] = useState(false)
 
   useEffect(() => {
+    if (hasInitialized ) {
+      return
+    }
     // Проверяем аутентификацию при запуске приложения
     const initializeAuth = async () => {
       setLoading(true);
@@ -68,19 +73,15 @@ function AuthInitializer() {
         console.log('Пользователь не аутентифицирован или сессия истекла');
       } finally {
         setLoading(false);
+        setHasInitialized(true);
       }
     };
-
-    // Запускаем инициализацию только один раз при монтировании компонента
-    if (!isAuthenticated) {
+    
       initializeAuth();
-    } else {
-      // Если пользователь уже аутентифицирован, просто сбрасываем состояние загрузки
-      setLoading(false);
-    }
-  }, [isAuthenticated, login]);
+   
+  }, []);
 
-  return null; // Этот компонент не рендерит ничего
+  return null; 
 }
 
 function App() {
