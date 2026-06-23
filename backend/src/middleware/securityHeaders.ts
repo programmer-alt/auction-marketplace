@@ -107,9 +107,9 @@ function generatePermissionsPolicyHeader(policy: Record<string, string[]>): stri
 const defaultCspConfig: CspConfig = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Разрешаем inline скрипты и eval для совместимости
-  styleSrc: ["'self'", "'unsafe-inline'"], // Разрешаем inline стили
+  styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Разрешаем inline стили и Google Fonts
   imgSrc: ["'self'", "data:", "https:", "http://localhost:*"], // Изображения с любых HTTPS источников и локального сервера
-  fontSrc: ["'self'", "data:", "https:"],
+  fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
   connectSrc: ["'self'", "http://localhost:*", "ws://localhost:*"], // WebSocket и API вызовы
   mediaSrc: ["'self'"],
   objectSrc: ["'none'"], // Запрещаем <object>, <embed>, <applet>
@@ -119,6 +119,9 @@ const defaultCspConfig: CspConfig = {
   formAction: ["'self'"],
   upgradeInsecureRequests: false, // Включать только в production
   blockAllMixedContent: false,
+  // Явно добавляем специфичные директивы для разрешения элементов стилей из Google Fonts
+  styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+  styleSrcAttr: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
 };
 
 // Конфигурация CSP для development режима - улучшенная версия для поддержки инструментов разработки
@@ -131,9 +134,9 @@ const devCspConfig: CspConfig = {
   styleSrc: [...(defaultCspConfig.styleSrc || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
   // Явно добавляем специфичные директивы для inline элементов
   scriptSrcElem: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
-  styleSrcElem: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
+  styleSrcElem: [...(defaultCspConfig.styleSrcElem || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
   scriptSrcAttr: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
-  styleSrcAttr: ["'self'", "'unsafe-inline'", "chrome-extension:*"],
+  styleSrcAttr: [...(defaultCspConfig.styleSrcAttr || []), "chrome-extension:*", "'unsafe-inline'", "https://fonts.googleapis.com"],
   imgSrc: [...(defaultCspConfig.imgSrc || []), "chrome-extension:*", "https://*", "data:", "blob:", "filesystem:"],
   fontSrc: [...(defaultCspConfig.fontSrc || []), "https://fonts.gstatic.com"],
   // Разрешаем доступ к well-known ресурсам для Chrome и других инструментов разработки
@@ -179,20 +182,22 @@ export function securityHeaders(config: SecurityHeadersConfig = defaultSecurityH
       // В development используем расширенную конфигурацию для поддержки инструментов разработки
       if (!isProduction) {
         // Объединяем конфигурацию, при этом сохраняя любые переопределения из config
+        // Но для специфических директив, таких как элементы и атрибуты стилей, 
+        // расширяем разрешения из devCspConfig, а не заменяем их
         cspConfig = {
           ...devCspConfig,
           ...config.csp,
-          // Если в конфигурации были указаны конкретные значения, используем их
-          connectSrc: config.csp.connectSrc || devCspConfig.connectSrc,
-          scriptSrc: config.csp.scriptSrc || devCspConfig.scriptSrc,
-          styleSrc: config.csp.styleSrc || devCspConfig.styleSrc,
-          scriptSrcElem: config.csp.scriptSrcElem || devCspConfig.scriptSrcElem,
-          styleSrcElem: config.csp.styleSrcElem || devCspConfig.styleSrcElem,
-          scriptSrcAttr: config.csp.scriptSrcAttr || devCspConfig.scriptSrcAttr,
-          styleSrcAttr: config.csp.styleSrcAttr || devCspConfig.styleSrcAttr,
-          imgSrc: config.csp.imgSrc || devCspConfig.imgSrc,
-          fontSrc: config.csp.fontSrc || devCspConfig.fontSrc,
-          defaultSrc: config.csp.defaultSrc || devCspConfig.defaultSrc,
+          // Объединяем значения для специфических директив, а не заменяем их
+          connectSrc: [...new Set([...(config.csp.connectSrc || []), ...(devCspConfig.connectSrc || [])])],
+          scriptSrc: [...new Set([...(config.csp.scriptSrc || []), ...(devCspConfig.scriptSrc || [])])],
+          styleSrc: [...new Set([...(config.csp.styleSrc || []), ...(devCspConfig.styleSrc || [])])],
+          scriptSrcElem: [...new Set([...(config.csp.scriptSrcElem || []), ...(devCspConfig.scriptSrcElem || [])])],
+          styleSrcElem: [...new Set([...(config.csp.styleSrcElem || []), ...(devCspConfig.styleSrcElem || [])])],
+          scriptSrcAttr: [...new Set([...(config.csp.scriptSrcAttr || []), ...(devCspConfig.scriptSrcAttr || [])])],
+          styleSrcAttr: [...new Set([...(config.csp.styleSrcAttr || []), ...(devCspConfig.styleSrcAttr || [])])],
+          imgSrc: [...new Set([...(config.csp.imgSrc || []), ...(devCspConfig.imgSrc || [])])],
+          fontSrc: [...new Set([...(config.csp.fontSrc || []), ...(devCspConfig.fontSrc || [])])],
+          defaultSrc: [...new Set([...(config.csp.defaultSrc || []), ...(devCspConfig.defaultSrc || [])])],
         };
       }
       
