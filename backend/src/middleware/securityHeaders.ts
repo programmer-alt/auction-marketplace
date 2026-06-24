@@ -106,8 +106,8 @@ function generatePermissionsPolicyHeader(policy: Record<string, string[]>): stri
  */
 const defaultCspConfig: CspConfig = {
   defaultSrc: ["'self'"],
-  scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Разрешаем inline скрипты и eval для совместимости
-  styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Разрешаем inline стили и Google Fonts
+  scriptSrc: ["'self'"],
+  styleSrc: ["'self'", "https://fonts.googleapis.com"],
   imgSrc: ["'self'", "data:", "https:", "http://localhost:*"], // Изображения с любых HTTPS источников и локального сервера
   fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
   connectSrc: ["'self'", "http://localhost:*", "ws://localhost:*"], // WebSocket и API вызовы

@@ -1,10 +1,9 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
 import { useAuthStore } from './store/auth.store'
 import LoadingSpinner from './components/shared/LoadingSpinner'
-import { useState } from 'react'
 
 // Lazy loaded components for code splitting
 const Home = lazy(() => import('./pages/Home/Home.index'))
@@ -21,13 +20,12 @@ const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
 // Компонент для инициализации аутентификации
 function AuthInitializer() {
-  const {  login, setLoading } = useAuthStore();
-  const [ hasInitialized, setHasInitialized ] = useState(false)
+  const { login, setLoading } = useAuthStore();
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
-    if (hasInitialized ) {
-      return
-    }
+   
+
     // Проверяем аутентификацию при запуске приложения
     const initializeAuth = async () => {
       setLoading(true);
@@ -63,23 +61,18 @@ function AuthInitializer() {
           }
         }
       } catch (error) {
-        // Если бэкенд еще не запущен, повторяем попытку через 2 секунды
-        if (error instanceof Error && (error.message.includes('ECONNREFUSED') || error.message.includes('Network Error'))) {
-          console.log('⏳ Бэкенд еще не запущен, повторная попытка через 2 секунды...');
-          setTimeout(initializeAuth, 2000);
-          return; // Прерываем текущее выполнение, чтобы не сбросить isLoading раньше времени
-        }
-        // Если другая ошибка (например, 401) - пользователь просто не авторизован
-        console.log('Пользователь не аутентифицирован или сессия истекла');
+        // Если бэкенд еще не запущен или другая ошибка - просто отмечаем инициализацию как завершенную
+        // и пользователь останется неавторизованным, что нормально
+        console.debug('Проверка аутентификации завершена, пользователь не авторизован');
       } finally {
         setLoading(false);
         setHasInitialized(true);
       }
     };
     
-      initializeAuth();
+    initializeAuth();
    
-  }, []);
+  }, [hasInitialized]); // Добавляем hasInitialized в зависимости, чтобы предотвратить лишние вызовы
 
   return null; 
 }

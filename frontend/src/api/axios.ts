@@ -55,28 +55,50 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+// Состояние для отслеживания последнего времени показа уведомления о превышении лимита
+let lastRateLimitNotification = 0
+
 let isRedirecting = false
+
+function safeRedirectToLogin() {
+  // Не редиректим повторно, если пользователь уже на странице логина
+  if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+    return
+  }
+
+  if (!isRedirecting) {
+    isRedirecting = true
+
+    // Логин-страница может сама инициировать очистку/перерендер,
+    // но нам важно не уйти в бесконечный цикл редиректов.
+    useAuthStore.getState().logout()
+    window.location.href = '/login'
+  }
+}
 
 // Response interceptor для обработки ошибок
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.error || error.response?.data?.message || 'Произошла ошибка'
-    
-    if (error.response?.status === 401 && !isRedirecting) {
-      isRedirecting = true
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+
+    if (error.response?.status === 401) {
+      safeRedirectToLogin()
     } else if (error.response?.status === 403) {
       toast.error('Доступ запрещен')
     } else if (error.response?.status === 429) {
-      toast.error('Слишком много запросов. Попробуйте позже.')
+      // Показываем уведомление не чаще одного раза в 5 секунд, чтобы не спамить пользователя
+      const currentTime = Date.now()
+      if (currentTime - lastRateLimitNotification > 5000) {
+        lastRateLimitNotification = currentTime
+        toast.error('Слишком много запросов. Пожалуйста, немного замедлитесь.')
+      }
     } else if (error.response?.status >= 500) {
       toast.error('Ошибка сервера. Пожалуйста, попробуйте позже.')
     } else {
       toast.error(message)
     }
-    
+
     return Promise.reject(error)
   }
 )

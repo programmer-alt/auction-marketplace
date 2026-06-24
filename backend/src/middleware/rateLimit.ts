@@ -93,8 +93,9 @@ export async function rateLimit(
   res: Response,
   next: NextFunction,
 ) {
-  // ponytail: Исключаем /api/csrf-token из rate limiting - это простой GET-запрос для генерации токена
-  if (req.path === '/api/csrf-token') return next();
+  // ponytail: Исключаем /api/csrf-token и /api/auth/me из rate limiting 
+  // - это GET-запросы для генерации токена и проверки аутентификации
+  if (req.path === '/api/csrf-token' || req.path === '/api/auth/me') return next();
 
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
