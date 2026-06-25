@@ -247,7 +247,7 @@ async function shutdown(signal: string) {
     logger.error('Ошибка очистки интервала проверки утечки памяти:', error);
   }
 
-  // Закрываем Bull queue с использованием предусмотренной функции
+  // Сначала останавливаем Bull queue + закрываем bull redis клиенты.
   try {
     const { gracefulShutdown } = await import("./queues/auctionCompletionQueue");
     await gracefulShutdown();
@@ -255,21 +255,23 @@ async function shutdown(signal: string) {
     logger.error('Ошибка во время завершения Bull queue:', error);
   }
 
-  // Закрываем Redis клиенты
+  // Затем закрываем Redis клиенты для Socket.io адаптера.
+  // Важно: ошибки Connection is closed при shutdown — не критичны.
   try {
     if (subClient && typeof subClient.quit === 'function') {
       await subClient.quit();
     }
   } catch (error) {
-    logger.error('Ошибка закрытия Redis subClient:', error);
+    logger.warn('Ошибка закрытия Redis subClient (игнорируем при shutdown):', error);
   }
   try {
     if (pubClient && typeof pubClient.quit === 'function') {
       await pubClient.quit();
     }
   } catch (error) {
-    logger.error('Ошибка закрытия Redis pubClient:', error);
+    logger.warn('Ошибка закрытия Redis pubClient (игнорируем при shutdown):', error);
   }
+
 
   // Закрываем подключение Prisma и пул PostgreSQL
   try {
@@ -451,12 +453,15 @@ process.on('SIGBREAK', () => {
 
 // Необработанные отклонения промисов
 process.on('unhandledRejection', (reason: unknown) => {
-  if (!isShuttingDown) {
-    logger.error('Необработанное отклонение промиса:', reason);
-    shutdown('unhandledRejection').catch(() => process.exit(1));
-  } else {
+  // Если unhandledRejection произошёл на фоне shutdown — не запускаем shutdown заново,
+  // просто логируем, чтобы не получить каскад ошибок от закрытых соединений.
+  if (isShuttingDown) {
     logger.error('Необработанное отклонение промиса во время завершения:', reason);
+    return;
   }
+
+  logger.error('Необработанное отклонение промиса:', reason);
+  shutdown('unhandledRejection').catch(() => process.exit(1));
 });
 
 // Необработанные исключения (синхронные)

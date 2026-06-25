@@ -11,19 +11,43 @@ export async function getQueueStats() {
 // Graceful shutdown
 export async function gracefulShutdown() {
   queueLogger.info("🛑 Остановка очереди завершения аукционов...");
-  
-  // Закрываем соединения с Redis
-  Object.entries(sharedBullClients).forEach(([type, client]) => {
-    if (client && typeof client.quit === 'function') {
-      client.quit();
-      queueLogger.info(`🔒 Закрыто соединение Redis (${type})`);
-    }
-  });
 
-  // Останавливаем очередь
-  await auctionCompletionQueue.close();
+  // Важно: сначала останавливаем очередь.
+  // Клиенты redis для Bull лучше НЕ закрывать здесь,
+  // т.к. параллельно socket.io адаптер (pub/sub) может ещё использовать redis.
+  // Тогда при close/quit легко получить `Connection is closed`.
+  try {
+    await auctionCompletionQueue.close();
+  } catch (error) {
+    logger.error("Ошибка остановки bull очереди auctionCompletion:", error);
+  }
+
+  // Корректное закрытие Redis-клиентов Bull, чтобы event loop не держал процесс
+  try {
+    const clients = sharedBullClients;
+
+    type Quitable = { quit?: () => Promise<unknown> };
+
+    const closeOne = async (c: Quitable | null, name: string) => {
+      if (!c?.quit) return;
+      try {
+        await c.quit();
+      } catch (e) {
+        logger.warn(`Ошибка quit() для bull redis ${name} (игнорируем):`, e);
+      }
+    };
+
+    await closeOne(clients.client as Quitable | null, 'client');
+    await closeOne(clients.subscriber as Quitable | null, 'subscriber');
+    await closeOne(clients.bclient as Quitable | null, 'bclient');
+  } catch (error) {
+    logger.error('Ошибка закрытия bull redis клиентов:', error);
+  }
+
+
   queueLogger.info("✅ Очередь завершения аукционов остановлена");
 }
+
 
 
 // Глобальный объект для хранения клиентов Redis, чтобы можно было их корректно закрыть при shutdown
