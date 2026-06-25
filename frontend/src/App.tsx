@@ -73,7 +73,7 @@ function AuthInitializer() {
     };
     
     initializeAuth();
-  
+
   }, []); // Убираем зависимость от hasInitialized, так как теперь она в глобальном store
 
   return null; 
