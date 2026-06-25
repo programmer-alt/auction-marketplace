@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
@@ -20,11 +20,13 @@ const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
 // Компонент для инициализации аутентификации
 function AuthInitializer() {
-  const { login, setLoading } = useAuthStore();
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const { login, setLoading, isInitialized, setIsInitialized } = useAuthStore();
 
   useEffect(() => {
-   
+    // Если уже инициализировано, ничего не делаем
+    if (isInitialized) {
+      return;
+    }
 
     // Проверяем аутентификацию при запуске приложения
     const initializeAuth = async () => {
@@ -66,13 +68,13 @@ function AuthInitializer() {
         console.debug('Проверка аутентификации завершена, пользователь не авторизован');
       } finally {
         setLoading(false);
-        setHasInitialized(true);
+        setIsInitialized(true);
       }
     };
     
     initializeAuth();
-   
-  }, [hasInitialized]); // Добавляем hasInitialized в зависимости, чтобы предотвратить лишние вызовы
+  
+  }, []); // Убираем зависимость от hasInitialized, так как теперь она в глобальном store
 
   return null; 
 }

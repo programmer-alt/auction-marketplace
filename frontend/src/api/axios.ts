@@ -66,11 +66,14 @@ function safeRedirectToLogin() {
     return
   }
 
+  // Не редиректим, если уже выполняется инициализация (чтобы не прерывать процесс проверки токена)
+  const { isInitialized } = useAuthStore.getState()
+  if (!isInitialized) {
+    return
+  }
+
   if (!isRedirecting) {
     isRedirecting = true
-
-    // Логин-страница может сама инициировать очистку/перерендер,
-    // но нам важно не уйти в бесконечный цикл редиректов.
     useAuthStore.getState().logout()
     window.location.href = '/login'
   }

@@ -6,18 +6,21 @@ interface AuthState {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  isInitialized: boolean
   login: (token: string, user: User) => void
   register: (token: string, user: User) => void
   logout: () => void
   setUser: (user: User) => void
   setLoading: (loading: boolean) => void
+  setIsInitialized: (initialized: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  isLoading: false, // Возвращаем оригинальное значение false
+  isLoading: false,
+  isInitialized: false,
   login: (token: string, user: User) => {
     set({ token, user, isAuthenticated: true })
   },
@@ -29,4 +32,5 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   setUser: (user) => set({ user }),
   setLoading: (loading) => set({ isLoading: loading }),
+  setIsInitialized: (initialized) => set({ isInitialized: initialized }),
 }))
