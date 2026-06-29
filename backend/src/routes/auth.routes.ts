@@ -2,6 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { authController } from "../controllers/auth.controller";
 import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
+import type { Request, Response } from 'express';
 
 const router = Router();
 
@@ -27,11 +28,17 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Условное применение рейт-лимитов в зависимости от среды
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Middleware для пропуска лимитов в разработке
+const skipRateLimit = (_req: Request, _res: Response, next: (err?: any) => void) => next();
+
 // POST /api/auth/register - Регистрация
-router.post("/register", registerLimiter, authController.register);
+router.post("/register", isProduction ? registerLimiter : skipRateLimit, authController.register);
 
 // POST /api/auth/login - Вход
-router.post("/login", loginLimiter, authController.login);
+router.post("/login", isProduction ? loginLimiter : skipRateLimit, authController.login);
 
 // POST /api/auth/refresh - Обновление токенов
 router.post("/refresh", authController.refresh);
