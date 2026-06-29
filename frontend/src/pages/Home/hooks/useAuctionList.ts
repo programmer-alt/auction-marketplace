@@ -12,7 +12,6 @@ export const useAuctionList = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fetchedRef = useRef(false);
  
   useEffect(() => {
     const controller = new AbortController();
@@ -30,8 +29,7 @@ export const useAuctionList = () => {
         if ('success' in response && response.success) {
           const { data } = response;
           setAuctions(data.auctions || []);
-          setTotalPages(data.pagination?.totalPages || 1);
-          fetchedRef.current = true;
+          setTotalPages(data.pagination?.totalPages || 1)
         } else {
           throw new Error(response.error || 'Ошибка загрузки аукционов');
         }
