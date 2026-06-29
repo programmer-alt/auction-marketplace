@@ -124,9 +124,14 @@ export async function rateLimit(
   res: Response,
   next: NextFunction,
 ) {
-  // ponytail: Исключаем /api/csrf-token и /api/auth/me из rate limiting 
-  // - это GET-запросы для генерации токена и проверки аутентификации
-  if (req.path === '/api/csrf-token' || req.path === '/api/auth/me') return next();
+  // ponytail: Исключаем /api/csrf-token, /api/auth/me, /api/auth/login и /api/auth/refresh из rate limiting 
+  // - это GET-запросы для генерации токена и проверки аутентификации, а также POST-запросы для входа и обновления токенов
+  if (
+    req.path === '/api/csrf-token' || 
+    req.path === '/api/auth/me' ||
+    req.path === '/api/auth/login' ||
+    req.path === '/api/auth/refresh'
+  ) return next();
 
   // ponytail: исключаем /api/auctions из rate limiting при первом открытии (200 запросов за 5 секунд)
   if (req.path === '/api/auctions' && initialRequestCount < INITIAL_REQUEST_LIMIT) {
