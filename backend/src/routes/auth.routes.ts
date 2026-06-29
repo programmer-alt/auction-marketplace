@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { authController } from "../controllers/auth.controller";
-import { authMiddleware } from "../middleware/auth";
+import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
 
 const router = Router();
 
@@ -33,7 +33,13 @@ router.post("/register", registerLimiter, authController.register);
 // POST /api/auth/login - Вход
 router.post("/login", loginLimiter, authController.login);
 
-// GET /api/auth/me - Текущий пользователь
-router.get("/me", authMiddleware, authController.getCurrentUser);
+// POST /api/auth/refresh - Обновление токенов
+router.post("/refresh", authController.refresh);
+
+// POST /api/auth/logout - Выход
+router.post("/logout", authMiddleware, authController.logout);
+
+// GET /api/auth/me - Текущий пользователь (опциональная аутентификация)
+router.get("/me", optionalAuthMiddleware, authController.getCurrentUser);
 
 export default router;

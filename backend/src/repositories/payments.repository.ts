@@ -86,6 +86,58 @@ export const getPaymentById = async (prisma: PrismaClient, id: number) => {
   });
 };
 
+// Поиск PENDING-платежа по аукциону и пользователю (для лимита повторных PI)
+export const getPendingPaymentByAuctionAndUser = async (
+  prisma: PrismaClient,
+  auctionId: number,
+  userId: number,
+) => {
+  return await prisma.payment.findFirst({
+    where: {
+      auctionId,
+      userId,
+      status: "PENDING",
+    },
+    include: {
+      user: {
+        select: { id: true, email: true, name: true },
+      },
+      auction: {
+        select: { id: true, title: true, currentPrice: true, currency: true },
+      },
+    },
+  });
+};
+
+// Получение платежа по ID с данными аукциона (для refund)
+export const getPaymentByIdWithAuction = async (
+  prisma: PrismaClient,
+  id: number,
+) => {
+  return await prisma.payment.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: { id: true, email: true, name: true },
+      },
+      auction: {
+        select: { id: true, title: true, currentPrice: true, currency: true },
+      },
+    },
+  });
+};
+
+// Обновление paidAt у аукциона при успешной оплате
+export const updateAuctionPaidAt = async (
+  prisma: PrismaClient,
+  auctionId: number,
+) => {
+  return await prisma.auction.update({
+    where: { id: auctionId },
+    data: { paidAt: new Date() },
+  });
+};
+
 // Удаление платежа
 export const deletePayment = async (prisma: PrismaClient, id: number) => {
   return await prisma.payment.delete({

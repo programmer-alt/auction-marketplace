@@ -4,18 +4,27 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+  ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
     port: 3000,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (_err, _req, _res) => {
+            // Интенсивные ECONNREFUSED во время старта бэкенда создают «шум».
+            // Спокойно игнорируем — браузер/axios сделают повторные попытки.
+          });
+        },
       },
       '/uploads': {
         target: 'http://localhost:5000',
@@ -28,3 +37,4 @@ export default defineConfig({
     },
   },
 })
+

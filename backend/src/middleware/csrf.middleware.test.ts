@@ -61,8 +61,9 @@ describe("CSRF Middleware", () => {
         "csrfToken",
         expect.any(String),
         expect.objectContaining({
-          httpOnly: false,
+          httpOnly: true,
           sameSite: "strict",
+          maxAge: 7200000,
         }),
       );
       expect(mockNext).toHaveBeenCalled();
@@ -76,7 +77,7 @@ describe("CSRF Middleware", () => {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
       };
-      const tempReq = { method: "POST", cookies: {}, headers: {} } as any;
+      const tempReq = { method: "POST", cookies: {}, headers: {}, path: "/api/test" } as any;
       generateCsrfToken(tempReq, tempRes as any, () => {});
       const generatedToken = tempRes.cookie.mock.calls[0][1];
 
@@ -102,7 +103,7 @@ describe("CSRF Middleware", () => {
 
     it("должен пропустить webhook маршруты", () => {
       mockReq.method = "POST";
-      mockReq.path = "/api/payments/webhook";
+      Object.defineProperty(mockReq, 'path', { value: '/api/payments/webhook', writable: true });
 
       verifyCsrfToken(mockReq as Request, mockRes as Response, mockNext);
 

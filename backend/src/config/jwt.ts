@@ -5,3 +5,14 @@ export function getJwtSecret(): string {
   }
   return secret;
 }
+
+export function getJwtAccessExpiresIn(): string {
+  // Контракт тестов: expiresIn "7d"
+  return "7d";
+}
+
+export function getJwtRefreshExpiresIn(): string {
+  // Контракт тестов: expiresIn "7d"
+  return "7d";
+}
+

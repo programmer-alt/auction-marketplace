@@ -13,8 +13,8 @@ export const authApi = {
   },
 
   getMe: async () => {
-    const response = await api.get<User>('/auth/me')
-    return response.data
+    const response = await api.get<{ user: User }>('/auth/me')
+    return response.data.user
   },
 
   logout: async () => {

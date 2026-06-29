@@ -53,16 +53,40 @@ backend/package-lock.json
 frontend/package-lock.json
 .codeassistant/mcp.json
 
-
+# Migration file
 backend/prisma/migrations/20260317171211_add_currency_to_auction/migration.sql
-backend/package-lock.json
+
+# Specific files
 .codeassistant/rules/shell.mdc
-.amazonq/agents/default.json
 .fitten/rules/Уязвимости.md
-.qwen/settings.json
 .fitten/rules/code.md
-.qwen/settings.json
-.qwen/settings.json
-.qwen/settings.json
-.qwen/settings.json
-.qwen/  
+Technical.mmd
+.blackboxrules
+
+# Recon
+.recon/
+.lingma/rules/PowerShell.md
+.recon.json
+
+.lingma/rules/Joke.md
+backend/scripts/backup.sh
+skills-lock.json
+
+# Ignore entire directories and their contents
+/.qwen/
+/.amazonq/
+/.codeassistant/
+/.fitten/
+/.lingma/
+/.gigacode/
+/.codegeex/
+.agents/
+.kiro/
+
+.lingma/rules/Answer.md
+desktop.ini
+.lingma/rules/fairyTale.md
+.gigacode/rules/Rules .md
+.codegeex/agent/configs/user_mcp_config.json
+.gigacode/rules/mcp mirror .md
+AGENTS.md

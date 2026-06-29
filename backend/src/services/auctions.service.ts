@@ -17,7 +17,10 @@ import {
   validateAuction,
   validateAuctionsList,
 } from "../utils/json";
+import { sanitizeObject } from "../utils/sanitization";
 import { Prisma } from "../types";
+
+type Auction = Prisma.AuctionGetPayload<{}>;
 import {
   createValidationError,
   createForbiddenError,
@@ -40,10 +43,62 @@ function getAuctionCacheKey(id: number): string {
   return `auction:${id}`;
 }
 
-// Удаление всех кэшированных списков аукционов
+function getAuctionsListVersionKey(): string {
+  return "auctions:list:version";
+}
+
+async function getAuctionsListVersion(): Promise<string> {
+  const key = getAuctionsListVersionKey();
+  const current = await safeRedis.get(key);
+  if (current) return current;
+
+  const initial = "1";
+  await safeRedis.set(key, initial);
+  return initial;
+}
+
+function serializeAuctionForCache(auction: Auction) {
+  return {
+    id: auction.id,
+    title: auction.title,
+    description: auction.description ?? null,
+    imageUrl: auction.imageUrl ?? null,
+    startingPrice: typeof auction.startingPrice === 'object' && 'toNumber' in auction.startingPrice 
+      ? auction.startingPrice.toNumber() 
+      : Number(auction.startingPrice),
+    currentPrice: typeof auction.currentPrice === 'object' && 'toNumber' in auction.currentPrice 
+      ? auction.currentPrice.toNumber() 
+      : Number(auction.currentPrice),
+    sellerId: auction.sellerId,
+    currency: auction.currency,
+    status: auction.status,
+    createdAt: auction.createdAt instanceof Date 
+      ? auction.createdAt.toISOString() 
+      : typeof auction.createdAt === 'string' 
+        ? auction.createdAt 
+        : new Date(auction.createdAt).toISOString(),
+    endsAt: auction.endsAt instanceof Date 
+      ? auction.endsAt.toISOString() 
+      : typeof auction.endsAt === 'string' 
+        ? auction.endsAt 
+        : new Date(auction.endsAt).toISOString(),
+  };
+}
+
+function serializeAuctionsListForCache(result: {
+  auctions: Auction[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}) {
+  return {
+    auctions: result.auctions.map((auction: any) => serializeAuctionForCache(auction)),
+    pagination: result.pagination,
+  };
+}
+
+// Инвалидация кэша списков аукционов через версионирование ключей
 async function invalidateAuctionsLists() {
-  const keys = await safeRedis.keys("auctions:list:*");
-  await safeRedis.del(...keys);
+  const versionKey = getAuctionsListVersionKey();
+  await safeRedis.incr(versionKey);
 }
 
 // ========================================
@@ -79,7 +134,8 @@ export interface UpdateAuctionInput {
  * Получение списка аукционов
  */
 export async function getAuctions(options: GetAuctionsOptions) {
-  const cacheKey = getAuctionsCacheKey(options);
+  const version = await getAuctionsListVersion();
+  const cacheKey = `${getAuctionsCacheKey(options)}:v${version}`;
 
   const cached = await safeRedis.get(cacheKey);
   if (cached) {
@@ -110,20 +166,8 @@ export async function getAuctions(options: GetAuctionsOptions) {
     },
   };
 
-  // Преобразуем аукционы к упрощенной форме для кэширования
-  const simplifiedResult = {
-    auctions: auctions.map((auction: any) => ({
-      id: auction.id,
-      title: auction.title,
-      startingPrice: Number(auction.startingPrice),
-      sellerId: auction.sellerId,
-      createdAt: auction.createdAt.toISOString(),
-      endsAt: auction.endsAt.toISOString(),
-    })),
-    pagination: result.pagination,
-  };
-
-  await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(simplifiedResult));
+  const serialized = serializeAuctionsListForCache(result);
+  await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(serialized));
 
   return result;
 }
@@ -146,7 +190,8 @@ export async function getAuctionById(id: number) {
   const auction = await getAuctionByIdRepo(prisma, id);
 
   if (auction) {
-    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(auction));
+    const serialized = serializeAuctionForCache(auction);
+    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(serialized));
   }
 
   return auction;
@@ -156,8 +201,13 @@ export async function getAuctionById(id: number) {
  * Создание нового аукциона
  */
 export async function createAuction(data: CreateAuctionInput, userId: number) {
+  // Очистка входных данных от потенциально опасного контента
+  const sanitizedData = sanitizeObject(data, {
+    skipKeys: ['endsAt', 'startingPrice'],
+  });
+  
   const { title, description, imageUrl, startingPrice, currency, endsAt } =
-    data;
+    sanitizedData;
 
   const endsAtDate = new Date(endsAt);
   if (isNaN(endsAtDate.getTime())) {
@@ -195,44 +245,58 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 }
 
 /**
- * Обновление аукциона
+ * Вспомогательная функция для построения объекта обновления аукциона
  */
-export async function updateAuction(
-  id: number,
-  data: UpdateAuctionInput,
-  userId: number,
-) {
-  // Формируем данные для обновления
+function buildUpdateData(
+  sanitizedData: UpdateAuctionInput,
+): Prisma.AuctionUpdateInput {
   const updateData: Prisma.AuctionUpdateInput = {};
 
-  if (data.title !== undefined) updateData.title = data.title;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
-  if (data.startingPrice !== undefined)
-    updateData.startingPrice = data.startingPrice;
-  if (data.currency !== undefined)
-    updateData.currency = data.currency.toLowerCase();
+  if (sanitizedData.title !== undefined) updateData.title = sanitizedData.title;
+  if (sanitizedData.description !== undefined) updateData.description = sanitizedData.description;
+  if (sanitizedData.imageUrl !== undefined) updateData.imageUrl = sanitizedData.imageUrl || null;
+  if (sanitizedData.startingPrice !== undefined)
+    updateData.startingPrice = sanitizedData.startingPrice;
+  if (sanitizedData.currency !== undefined)
+    updateData.currency = sanitizedData.currency.toLowerCase();
 
-  if (data.endsAt) {
-    const endsAtDate = new Date(data.endsAt);
-    if (isNaN(endsAtDate.getTime())) {
-      throw createValidationError("Некорректная дата окончания");
-    }
-    if (endsAtDate <= new Date()) {
-      throw createValidationError("Дата окончания должна быть в будущем");
-    }
-    updateData.endsAt = endsAtDate;
+  return updateData;
+}
 
-    // Обновляем запланированное завершение аукциона
-    await removeScheduledAuctionCompletion(id);
-    scheduleAuctionCompletion(id, endsAtDate);
+/**
+ * Валидация и обработка даты окончания аукциона
+ * Возвращает объект с полем endsAt (если дата валидна) и флагом needsReschedule
+ */
+async function processEndsAt(
+  endsAt: string | undefined,
+  auctionId: number,
+): Promise<{ endsAtDate?: Date; needsReschedule: boolean }> {
+  if (!endsAt) {
+    return { needsReschedule: false };
   }
 
-  // Проверяем, существует ли аукцион и принадлежит ли он пользователю
-  const existingAuction = await getAuctionByIdRepo(prisma, id);
-  if (!existingAuction) {
-    throw createNotFoundError("Аукцион не найден");
+  const endsAtDate = new Date(endsAt);
+  if (isNaN(endsAtDate.getTime())) {
+    throw createValidationError("Некорректная дата окончания");
   }
+  if (endsAtDate <= new Date()) {
+    throw createValidationError("Дата окончания должна быть в будущем");
+  }
+
+  // Обновляем запланированное завершение аукциона
+  await removeScheduledAuctionCompletion(auctionId);
+  scheduleAuctionCompletion(auctionId, endsAtDate);
+
+  return { endsAtDate, needsReschedule: true };
+}
+
+/**
+ * Проверка прав доступа и состояния аукциона
+ */
+function validateAuctionForUpdate(
+  existingAuction: Auction,
+  userId: number,
+): void {
   if (existingAuction.sellerId !== userId) {
     throw createForbiddenError(
       "Недостаточно прав для редактирования этого аукциона",
@@ -241,6 +305,36 @@ export async function updateAuction(
   if (existingAuction.status !== "ACTIVE") {
     throw createValidationError("Можно редактировать только активные аукционы");
   }
+}
+
+/**
+ * Обновление аукциона
+ */
+export async function updateAuction(
+  id: number,
+  data: UpdateAuctionInput,
+  userId: number,
+) {
+  // Очистка входных данных от потенциально опасного контента
+  const sanitizedData = sanitizeObject(data, {
+    skipKeys: ['endsAt', 'startingPrice'],
+  });
+  
+  // Формируем данные для обновления
+  const updateData = buildUpdateData(sanitizedData);
+
+  // Обработка даты окончания
+  const { endsAtDate } = await processEndsAt(data.endsAt, id);
+  if (endsAtDate) {
+    updateData.endsAt = endsAtDate;
+  }
+
+  // Проверяем, существует ли аукцион и принадлежит ли он пользователю
+  const existingAuction = await getAuctionByIdRepo(prisma, id);
+  if (!existingAuction) {
+    throw createNotFoundError("Аукцион не найден");
+  }
+  validateAuctionForUpdate(existingAuction, userId);
 
   const auction = await updateAuctionByIdRepo(prisma, id, updateData);
 

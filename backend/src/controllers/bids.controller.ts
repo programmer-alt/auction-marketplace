@@ -24,7 +24,11 @@ export const bidsController = {
     const parsed = createBidSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
-    const result = await bidsService.createBid(auctionId, req.user!.id, parsed.data.amount);
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+
+    const result = await bidsService.createBid(auctionId, req.user.id, parsed.data.amount);
     res.status(201).json({
       message: "Ставка успешно размещена",
       bid: result.bid,

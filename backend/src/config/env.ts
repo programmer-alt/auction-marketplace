@@ -1,7 +1,10 @@
 const REQUIRED_ENV = [
   "JWT_SECRET",
+  "CSRF_SECRET",
   "DATABASE_URL",
-  "REDIS_URL",
+  "REDIS_HOST",
+  "REDIS_PORT",
+  "REDIS_PASSWORD",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
 ];
@@ -16,6 +19,16 @@ export function validateEnv(): void {
       missing.push(key);
     } else if (value.trim() === "") {
       empty.push(key);
+    }
+  }
+
+  // Проверяем, что если переменные для рейт-лимита заданы, то они являются числовыми значениями
+  const rateLimitVars = ['DEV_RATE_LIMIT', 'PROD_RATE_LIMIT'];
+  for (const key of rateLimitVars) {
+    const value = process.env[key];
+    if (value !== undefined && value.trim() !== '' && isNaN(Number(value))) {
+      console.error(`❌ Переменная окружения ${key} должна быть числом, получено: ${value}`);
+      process.exit(1);
     }
   }
 

@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom'
 
 export default function Footer() {
@@ -13,13 +14,13 @@ export default function Footer() {
               Аукционы
             </Link>
             <span className="text-gray-400">|</span>
-            <a href="#" className="hover:text-primary-600 transition-colors">
+            <Link to="/about" className="hover:text-primary-600 transition-colors">
               О нас
-            </a>
+            </Link>
             <span className="text-gray-400">|</span>
-            <a href="#" className="hover:text-primary-600 transition-colors">
+            <Link to="/contacts" className="hover:text-primary-600 transition-colors">
               Контакты
-            </a>
+            </Link>
           </div>
         </div>
       </div>

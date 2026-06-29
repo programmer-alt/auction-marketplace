@@ -4,7 +4,7 @@ import { Request } from 'express';
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, path.join(process.cwd(), 'src', 'uploads'));
+    cb(null, path.join(process.cwd(), 'uploads'));
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname);

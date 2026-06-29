@@ -37,6 +37,18 @@ export default {
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'scan': 'scan 3s linear infinite',
+        'scan-horizontal': 'scan-horizontal 3s linear infinite',
+      },
+      keyframes: {
+        scan: {
+          '0%': { top: '-100%' },
+          '100%': { top: '100%' },
+        },
+        'scan-horizontal': {
+          '0%': { left: '-100%' },
+          '100%': { left: '100%' },
+        },
       },
     },
   },

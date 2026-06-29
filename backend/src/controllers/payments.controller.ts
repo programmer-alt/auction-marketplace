@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as paymentsService from "../services/payments.service";
 import { AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
+import { createValidationError } from "../errors/factories";
 
 // ========================================
 // Схемы валидации
@@ -10,6 +11,16 @@ import { asyncHandler } from "../utils/asyncHandler";
 
 const createPaymentSchema = z.object({
   auctionId: z.number().int().positive("ID аукциона должен быть положительным"),
+});
+
+const refundPaymentSchema = z.object({
+  paymentId: z.number().int().positive("ID платежа должен быть положительным"),
+  reason: z.string().max(500, "Причина возврата слишком длинная").optional(),
+});
+
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1, "Page >= 1").default(1),
+  limit: z.coerce.number().int().min(1, "Limit >= 1").max(100, "Limit <= 100").default(20),
 });
 
 // ========================================
@@ -21,9 +32,13 @@ export const paymentsController = {
     const parsed = createPaymentSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+
     const result = await paymentsService.createPaymentIntent(
       parsed.data.auctionId,
-      req.user!.id,
+      req.user.id,
     );
     res.status(201).json({
       message: "Платёжный интент создан",
@@ -37,20 +52,57 @@ export const paymentsController = {
   async handleWebhook(req: Request, res: Response) {
     try {
       const sig = req.headers["stripe-signature"] as string;
+
+      if (!sig) {
+        res.status(400).send("Missing stripe-signature header");
+        return;
+      }
+
       await paymentsService.handleWebhook(req.body, sig);
       res.json({ received: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      res.status(400).send(`Webhook Error: ${message}`);
+      console.error("[webhook] Error processing webhook:", error);
+      res.status(400).send("Webhook processing failed");
     }
   },
 
-  getPaymentHistory: asyncHandler<AuthRequest>(async (req, res) => {
-    const { page = "1", limit = "20" } = req.query;
-    const result = await paymentsService.getPaymentHistory(req.user!.id, {
-      page: parseInt(page as string, 10),
-      limit: parseInt(limit as string, 10),
+  getPaymentHistory: asyncHandler<AuthRequest>(async (req, res, next) => {
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) return next(parsed.error);
+
+    const result = await paymentsService.getPaymentHistory(req.user.id, {
+      page: parsed.data.page,
+      limit: parsed.data.limit,
     });
     res.json(result);
+  }),
+
+  refundPayment: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const paymentId = Number(req.params.id);
+    if (!paymentId || paymentId <= 0) {
+      return next(createValidationError("Некорректный ID платежа"));
+    }
+
+    const parsed = refundPaymentSchema.safeParse(req.body);
+    if (!parsed.success) return next(parsed.error);
+
+    if (!req.user) {
+      return next(createValidationError("Пользователь не аутентифицирован"));
+    }
+
+    const result = await paymentsService.refundPayment(
+      paymentId,
+      req.user.id,
+      parsed.data.reason,
+    );
+    res.json({
+      message: "Возврат успешно создан",
+      refundId: result.refundId,
+      payment: result.payment,
+    });
   }),
 };

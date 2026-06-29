@@ -12,7 +12,7 @@ export interface Auction {
   description: string | null
   imageUrl: string | null
   startingPrice: number
-  currentPrice: number
+  currentPrice: number | null
   sellerId: number
   seller: Pick<User, 'id' | 'name' | 'email'>
   winnerId: number | null
@@ -38,7 +38,8 @@ export interface Payment {
   auctionId: number
   amount: number
   stripePaymentId: string | null
-  status: 'PENDING' | 'COMPLETED' | 'FAILED'
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+  refundReason?: string
   createdAt: string
 }
 
@@ -87,3 +88,9 @@ export interface CreateAuctionData {
 export interface CreateBidData {
   amount: number
 }
+
+// Экспортируем все типы из advanced.ts
+export * from './advanced';
+
+// Экспортируем утилиты для WebSocket
+export * from '../utils/websocket';

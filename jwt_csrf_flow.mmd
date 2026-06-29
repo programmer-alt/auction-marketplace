@@ -1,0 +1,48 @@
+flowchart TD
+    A[Пользователь] --> B[Frontend React]
+    B --> C[Backend Express]
+    C --> D[Database]
+
+    subgraph "Инициализация (старт приложения)"
+        B1[Frontend] -->|GET /api/csrf-token| C1[Backend]
+        C1 -->|generateToken| C2[generateToken function]
+        C2 -->|nonce + HMAC-SHA256| C3[Токен: nonce.signature]
+        C3 -->|Set-Cookie| B2[Cookie: csrfToken]
+        C3 -->|JSON response| B3[Сохранить в памяти]
+    end
+
+    subgraph "Аутентификация (Логин/Регистрация)"
+        B4[Форма входа] -->|POST /api/auth/login| C4[Auth Controller]
+        C4 -->|verify credentials| D1[Database]
+        D1 -->|user data| C5[Auth Service]
+        C5 -->|jwt.sign| C6[JWT Token]
+        C6 -->|user + token| B5[Frontend Store]
+        B5 -->|useAuthStore.login| B6[Persist in localStorage]
+    end
+
+    subgraph "Защищенный запрос (POST/PUT/DELETE)"
+        B7[Компонент] -->|API call| B8[Axios Interceptor]
+        B8 -->|getCsrfToken| B9[Read cookie]
+        B9 -->|X-CSRF-Token header| B10[Add Authorization header]
+        B10 -->|Send request| C7[Backend]
+        C7 -->|generateCsrfToken middleware| C8[Check/Set cookie]
+        C7 -->|verifyCsrfToken middleware| C9[Validate token]
+        C7 -->|authMiddleware| C10[Verify JWT]
+        C10 -->|req.user| C11[Process request]
+        C11 -->|Database operation| D2[Database]
+        D2 -->|Response| B11[Frontend]
+    end
+
+    subgraph "Ключевые файлы"
+        F1[backend/src/config/jwt.ts] -->|JWT_SECRET| G1
+        F2[backend/src/middleware/auth.ts] -->|jwt.verify| G2
+        F3[backend/src/middleware/csrf.ts] -->|generate/verify| G3
+        F4[backend/src/services/auth.service.ts] -->|jwt.sign| G4
+        F5[frontend/src/api/axios.ts] -->|interceptors| G5
+        F6[frontend/src/store/auth.store.ts] -->|zustand store| G6
+    end
+
+    B3 --> B9
+    B6 --> B10
+    C3 --> C9
+    C6 --> C10
