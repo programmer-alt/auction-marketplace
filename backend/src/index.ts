@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 import { exec, type ExecException } from "child_process";
 import { prisma, pool } from "./config/db";
@@ -26,6 +27,10 @@ import { setResourceLimits, checkMemoryLeak } from "./config/resources";
 
 import { upload } from './config/upload';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+
+
 
 // Routes
 import authRouter from "./routes/auth.routes";
@@ -141,9 +146,10 @@ app.get("/metrics", async (_req, res) => {
     res.status(500).end(err);
   }
 });
-
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Статические файлы (загруженные изображения)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", generateCsrfToken, (_req, res) => {
@@ -411,7 +417,7 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
           });
         } else {
           logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-          logger.info('Это может быть связ��но с устаревшим сокетом или другой сетевой проблемой.');
+          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
           logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: lsof -i :${PORT}`);
           process.exit(1);
         }

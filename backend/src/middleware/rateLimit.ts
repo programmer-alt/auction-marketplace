@@ -119,18 +119,18 @@ export async function rateLimit(
   if (
     req.path === '/api/csrf-token' || 
     req.path === '/api/auth/me' ||
-    req.path.startsWith('/uploads/') ||
-    (req.path === '/api/auth/login' && process.env.NODE_ENV !== 'production') ||
-    (req.path.startsWith('/api/auctions') && process.env.NODE_ENV !== 'production')
+    req.path === '/uploads' ||
+    req.path.startsWith('/uploads/')
   ) return next();
 
-  // ponytail: исключаем /api/auctions из rate limiting при первом открытии (ОТКЛЮЧЕНО)
-  // if (req.path === '/api/auctions' && initialRequestCount < INITIAL_REQUEST_LIMIT) {
-  //   initialRequestCount++;
-  //   console.log(`[RateLimit] Initial request ${initialRequestCount}/${INITIAL_REQUEST_LIMIT} to ${req.path}`);
-  //   return next();
-  // }
-
+  // Добавляем условные исключения для разработки
+  if (process.env.NODE_ENV !== 'production') {
+    if (
+      req.path === '/api/auth/login' ||
+      req.path === '/api/auth/refresh' ||
+      req.path.startsWith('/api/auctions')
+    ) return next();
+  }
 
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);

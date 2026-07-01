@@ -51,7 +51,7 @@ router.post("/register", isProduction ? registerLimiter : skipRateLimit, authCon
 // POST /api/auth/login - Вход
 router.post("/login", isProduction ? loginLimiter : skipRateLimit, authController.login);
 
-// POST /api/auth/refresh - Обновление токенов
+// POST /api/auth/refresh - Обновление токенов (с отдельным ограничителем)
 router.post("/refresh", isProduction ? refreshLimiter : skipRateLimit, authController.refresh);
 
 // POST /api/auth/logout - Выход
