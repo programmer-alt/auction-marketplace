@@ -357,25 +357,29 @@ export async function deleteAuction(id: number, userId: number) {
     throw createNotFoundError("Аукцион не найден");
   }
   
+  // Проверяем, что пользователь является владельцем аукциона
   if (existingAuction.sellerId !== userId) {
     throw createForbiddenError(
       "Недостаточно прав для удаления этого аукциона",
     );
   }
   
-  // Проверяем статус аукциона - можно удалять только активные аукционы
+  // Проверяем, что аукцион находится в активном состоянии
   if (existingAuction.status !== "ACTIVE") {
-    throw createValidationError("Можно удалять только активные аукционы");
+    throw createValidationError(
+      "Можно удалять только активные аукционы",
+    );
   }
 
   // Удаляем запланированное завершение аукциона
   await removeScheduledAuctionCompletion(id);
 
-  // Атомарное удаление с проверкой владельца
+  // Атомарное удаление с проверкой владельца и статуса
   const deleted = await prisma.auction.deleteMany({
     where: {
       id,
       sellerId: userId,
+      status: "ACTIVE", // Дополнительно проверяем статус на уровне базы данных
     },
   });
 
@@ -384,9 +388,13 @@ export async function deleteAuction(id: number, userId: number) {
     const exists = await getAuctionByIdRepo(prisma, id);
     if (!exists) {
       throw createNotFoundError("Аукцион не найден");
-    } else {
+    } else if (exists.sellerId !== userId) {
       throw createForbiddenError(
         "Недостаточно прав для удаления этого аукциона",
+      );
+    } else if (exists.status !== "ACTIVE") {
+      throw createValidationError(
+        "Можно удалять только активные аукционы",
       );
     }
   }
