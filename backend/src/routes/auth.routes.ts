@@ -34,6 +34,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Middleware для пропуска лимитов в разработке
 const skipRateLimit = (_req: Request, _res: Response, next: (err?: any) => void) => next();
 
+// Добавляем новый рейт-лимитер для refresh
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 20, // 20 попыток обновления токенов с одного IP
+  message: {
+    error: "Слишком много попыток обновления токенов. Попробуйте через 15 минут.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // POST /api/auth/register - Регистрация
 router.post("/register", isProduction ? registerLimiter : skipRateLimit, authController.register);
 
@@ -41,7 +52,7 @@ router.post("/register", isProduction ? registerLimiter : skipRateLimit, authCon
 router.post("/login", isProduction ? loginLimiter : skipRateLimit, authController.login);
 
 // POST /api/auth/refresh - Обновление токенов
-router.post("/refresh", authController.refresh);
+router.post("/refresh", isProduction ? refreshLimiter : skipRateLimit, authController.refresh);
 
 // POST /api/auth/logout - Выход
 router.post("/logout", authMiddleware, authController.logout);

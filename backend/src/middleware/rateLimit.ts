@@ -20,16 +20,6 @@ const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }
 // если Redis еще не готов, rate limiting отключен
 let isRedisReady = false;
 
-// ponytail: счётчик запросов к /api/auctions без ограничений (сбрасывается каждые 5 секунд)
-let initialRequestCount = 0;
-const INITIAL_REQUEST_LIMIT = 200; // разрешаем первые 200 запросов без ограничений
-const INITIAL_REQUEST_WINDOW_MS = 5000; // 5 секунд
-
-// ponytail: сбрасываем счётчик каждые 5 секунд
-setInterval(() => {
-  initialRequestCount = 0;
-  console.log('Rate limit: счётчик начальных запросов сброшен');
-}, INITIAL_REQUEST_WINDOW_MS);
 
 // ponytail: слушаем событие 'connect' Redis для отслеживания готовности
 if (redis) {
@@ -124,21 +114,23 @@ export async function rateLimit(
   res: Response,
   next: NextFunction,
 ) {
-  // ponytail: Исключаем /api/csrf-token, /api/auth/me, /api/auth/login и /api/auth/refresh из rate limiting 
-  // - это GET-запросы для генерации токена и проверки аутентификации, а также POST-запросы для входа и обновления токенов
+  // ponytail: Исключаем /api/csrf-token, /api/auth/me и /uploads/* из rate limiting 
+  // - это GET-запросы для генерации токена, проверки аутентификации и статических ресурсов
   if (
     req.path === '/api/csrf-token' || 
     req.path === '/api/auth/me' ||
-    req.path === '/api/auth/login' ||
-    req.path === '/api/auth/refresh'
+    req.path.startsWith('/uploads/') ||
+    (req.path === '/api/auth/login' && process.env.NODE_ENV !== 'production') ||
+    (req.path.startsWith('/api/auctions') && process.env.NODE_ENV !== 'production')
   ) return next();
 
-  // ponytail: исключаем /api/auctions из rate limiting при первом открытии (200 запросов за 5 секунд)
-  if (req.path === '/api/auctions' && initialRequestCount < INITIAL_REQUEST_LIMIT) {
-    initialRequestCount++;
-    console.log(`[RateLimit] Initial request ${initialRequestCount}/${INITIAL_REQUEST_LIMIT} to ${req.path}`);
-    return next();
-  }
+  // ponytail: исключаем /api/auctions из rate limiting при первом открытии (ОТКЛЮЧЕНО)
+  // if (req.path === '/api/auctions' && initialRequestCount < INITIAL_REQUEST_LIMIT) {
+  //   initialRequestCount++;
+  //   console.log(`[RateLimit] Initial request ${initialRequestCount}/${INITIAL_REQUEST_LIMIT} to ${req.path}`);
+  //   return next();
+  // }
+
 
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
@@ -146,7 +138,7 @@ export async function rateLimit(
   const now = Date.now();
 
   // ponytail: логирование для диагностики - какие запросы приходят к /api
-  // логируем только для /api/auctions, /api/auth/me, /api/csrf-token, чтобы не заспамить консоль
+  // логируем только для /api/auctions, /api/auth.me, /api/csrf-token, чтобы не заспамить консоль
   if (req.path === '/api/auctions' || req.path === '/api/auth/me' || req.path === '/api/csrf-token') {
     console.log(`[RateLimit] Request: ${req.method} ${req.originalUrl} - IP: ${ip}`);
   }

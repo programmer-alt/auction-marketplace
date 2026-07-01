@@ -351,6 +351,23 @@ export async function updateAuction(
  * Удаление аукциона
  */
 export async function deleteAuction(id: number, userId: number) {
+  // Проверяем, существует ли аукцион и принадлежит ли он пользователю
+  const existingAuction = await getAuctionByIdRepo(prisma, id);
+  if (!existingAuction) {
+    throw createNotFoundError("Аукцион не найден");
+  }
+  
+  if (existingAuction.sellerId !== userId) {
+    throw createForbiddenError(
+      "Недостаточно прав для удаления этого аукциона",
+    );
+  }
+  
+  // Проверяем статус аукциона - можно удалять только активные аукционы
+  if (existingAuction.status !== "ACTIVE") {
+    throw createValidationError("Можно удалять только активные аукционы");
+  }
+
   // Удаляем запланированное завершение аукциона
   await removeScheduledAuctionCompletion(id);
 
