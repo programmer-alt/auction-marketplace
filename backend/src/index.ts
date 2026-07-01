@@ -143,7 +143,7 @@ app.get("/metrics", async (_req, res) => {
 });
 
 // Статические файлы (загруженные изображения)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", generateCsrfToken, (_req, res) => {
