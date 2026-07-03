@@ -44,31 +44,32 @@ export interface AuthResult {
 function generateTokens(userId: number, email: string, role: string) {
   const secret = getJwtSecret();
 
-  // Контракт тестов:
-  // jwt.sign({ id, email, role }, secret, { expiresIn: "7d" })
+  // Общие поля полезной нагрузки
   const basePayload = { id: userId, email, role };
 
   const accessExpiresIn = getJwtAccessExpiresIn();
   const refreshExpiresIn = getJwtRefreshExpiresIn();
 
-  // На случай несогласованного мокинга в тестах — обеспечиваем контракт "7d".
+  
   const safeAccessExpiresIn = accessExpiresIn ?? "7d";
   const safeRefreshExpiresIn = refreshExpiresIn ?? "7d";
 
+  // ВАЖНО: refresh() на сервере ожидает payload.type === 'refresh'
   const accessToken = jwt.sign(
-    basePayload,
+    { ...basePayload, type: 'access' },
     secret,
     { expiresIn: safeAccessExpiresIn } as SignOptions,
   );
 
   const refreshToken = jwt.sign(
-    basePayload,
+    { ...basePayload, type: 'refresh' },
     secret,
     { expiresIn: safeRefreshExpiresIn } as SignOptions,
   );
 
   return { accessToken, refreshToken };
 }
+
 
 
 /**

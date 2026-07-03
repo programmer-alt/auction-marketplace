@@ -30,51 +30,55 @@ function AuthInitializer() {
 
     // Проверяем аутентификацию при запуске приложения
     const initializeAuth = async () => {
-      setLoading(true);
-      
-      try {
-        // Пытаемся получить данные текущего пользователя
-        // Если пользователь был залогинен ранее, и refresh токен все еще валиден,
-        // сервер вернет данные пользователя
-        const { authApi } = await import('./api/auth');
-        
-        // Пробуем получить данные пользователя
-        const userData = await authApi.getMe();
-        
-        if (userData) {
-          // Пользователь аутентифицирован, пробуем обновить токен через refresh
-          const response = await fetch('/api/auth/refresh', {
-            method: 'POST',
-            credentials: 'include', // важно для отправки HTTP-only cookies
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (response.ok) {
-            const { accessToken } = await response.json();
-            // Обновляем состояние с новым токеном и данными пользователя
-            login(accessToken, userData);
-          } else {
-            // Если refresh не удался, но мы получили данные пользователя,
-            // возможно, access токен еще не истек, просто обновляем данные
-            // без обновления токена
-            login(useAuthStore.getState().token || '', userData);
-          }
+  setLoading(true);
+
+  try {
+    const { authApi } = await import('./api/auth');
+
+    // 1) Сначала обновляем accessToken через refresh cookie
+    const refreshResponse = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!refreshResponse.ok) {
+      return;
+    }
+
+        const { accessToken } = await refreshResponse.json();
+
+        // 2) Сохраняем access token в store ДО запроса /me,
+        // чтобы axios interceptor добавил Authorization для authApi.getMe().
+        const { user: currentUser } = useAuthStore.getState();
+        if (currentUser) {
+          // временно поднимем токен, чтобы запрос /me прошёл
+          // (user обновится ниже после ответа)
+          login(accessToken, currentUser);
+        } else {
+          // если user ещё пустой — всё равно поставим токен через минимальный login с пустым user
+          // но чтобы не сломать типизацию/логику, поднимем только состояние через register
+          // (getMe вернет user, и мы повторно вызовем login)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          login(accessToken, {} as any);
         }
-      } catch (error) {
-        // Если бэкенд еще не запущен или другая ошибка - просто отмечаем инициализацию как завершенную
-        // и пользователь останется неавторизованным, что нормально
-        console.debug('Проверка аутентификации завершена, пользователь не авторизован');
-      } finally {
-        setLoading(false);
-        setIsInitialized(true);
-      }
-    };
+
+        const userData = await authApi.getMe();
+        if (userData) {
+          login(accessToken, userData);
+        }
+  } catch (error) {
+    console.debug('Проверка аутентификации завершена, пользователь не авторизован');
+  } finally {
+    setLoading(false);
+    setIsInitialized(true);
+  }
+};
+
     
     initializeAuth();
 
-  }, []); // Убираем зависимость от hasInitialized, так как теперь она в глобальном store
+  }, []); 
 
   return null; 
 }
