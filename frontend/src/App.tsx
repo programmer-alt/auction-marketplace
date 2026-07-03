@@ -60,24 +60,26 @@ function AuthInitializer() {
           login(accessToken, userData);
         }
 
-  } catch (error) {
-    // Если /me упал, значит токен невалиден. Очищаем seeded accessToken,
-    // чтобы interceptor больше не слал Authorization и приложение осталось
-    // в корректном состоянии «не аутентифицировано».
-    useAuthStore.getState().logout()
+  } catch (error: any) {
+    // Если /me упал из-за невалидного токена (обычно 401/403) — очищаем token,
+    // чтобы axios interceptor больше не слал Authorization.
+    // Если же проблема временная (сеть/5xx) — не выкидываем пользователя.
+    const status = error?.response?.status
+
+    if (status === 401 || status === 403) {
+      const { token } = useAuthStore.getState()
+      if (token) {
+        useAuthStore.getState().logout()
+      }
+    }
     console.debug('Проверка аутентификации завершена, пользователь не авторизован');
   } finally {
-
     setLoading(false);
     setIsInitialized(true);
   }
 };
-
-    
     initializeAuth();
-
   }, []); 
-
   return null; 
 }
 
