@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout'
 import { useAuthStore } from './store/auth.store'
 import LoadingSpinner from './components/shared/LoadingSpinner'
 
+
 // Lazy loaded components for code splitting
 const Home = lazy(() => import('./pages/Home/Home.index'))
 const AuctionDetails = lazy(() => import('./pages/AuctionDetails/AuctionDetails.index'))
@@ -20,7 +21,8 @@ const Contacts = lazy(() => import('./pages/Contacts/Contacts.index'))
 
 // Компонент для инициализации аутентификации
 function AuthInitializer() {
-  const { login, setLoading, isInitialized, setIsInitialized } = useAuthStore();
+  const { login, seedAccessToken, setLoading, isInitialized, setIsInitialized } = useAuthStore();
+
 
   useEffect(() => {
     // Если уже инициализировано, ничего не делаем
@@ -50,23 +52,14 @@ function AuthInitializer() {
 
         // 2) Сохраняем access token в store ДО запроса /me,
         // чтобы axios interceptor добавил Authorization для authApi.getMe().
-        const { user: currentUser } = useAuthStore.getState();
-        if (currentUser) {
-          // временно поднимем токен, чтобы запрос /me прошёл
-          // (user обновится ниже после ответа)
-          login(accessToken, currentUser);
-        } else {
-          // если user ещё пустой — всё равно поставим токен через минимальный login с пустым user
-          // но чтобы не сломать типизацию/логику, поднимем только состояние через register
-          // (getMe вернет user, и мы повторно вызовем login)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          login(accessToken, {} as any);
-        }
+        // Типобезопасно: не поднимаем временный user, пока не получили /me.
+        seedAccessToken(accessToken);
 
         const userData = await authApi.getMe();
         if (userData) {
           login(accessToken, userData);
         }
+
   } catch (error) {
     console.debug('Проверка аутентификации завершена, пользователь не авторизован');
   } finally {
