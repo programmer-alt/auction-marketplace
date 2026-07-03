@@ -61,8 +61,13 @@ function AuthInitializer() {
         }
 
   } catch (error) {
+    // Если /me упал, значит токен невалиден. Очищаем seeded accessToken,
+    // чтобы interceptor больше не слал Authorization и приложение осталось
+    // в корректном состоянии «не аутентифицировано».
+    useAuthStore.getState().logout()
     console.debug('Проверка аутентификации завершена, пользователь не авторизован');
   } finally {
+
     setLoading(false);
     setIsInitialized(true);
   }
