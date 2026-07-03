@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFormState } from 'react-hook-form';
 import { auctionsApi } from '../../../api/auctions';
@@ -47,12 +47,19 @@ export const useCreateAuction = () => {
     setImagePreview(null);
   }, []);
 
- const onSubmit = useCallback(async (data: CreateAuctionData): Promise<boolean> => {
+  const isSubmittingRef = useRef(false);
+
+  const onSubmit = useCallback(async (data: CreateAuctionData): Promise<boolean> => {
     if (!formState.isValid) {
       toast.error('Заполните все обязательные поля корректно');
       return false;
     } 
 
+    if (isSubmittingRef.current) {
+      return false;
+    }
+
+    isSubmittingRef.current = true;
     setUploadState({ status: 'loading' });
     
     try {
@@ -85,6 +92,7 @@ export const useCreateAuction = () => {
       return false;
     } finally {
       setUploadState({ status: 'idle' });
+      isSubmittingRef.current = false;
     }
   }, [formState.isValid, imageFile, navigate]);
 
