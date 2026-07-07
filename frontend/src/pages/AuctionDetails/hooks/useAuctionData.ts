@@ -44,9 +44,20 @@ export const useAuctionData = (id: string | undefined) => {
       }
     } catch (error) {
       if (isCancelError(error)) return;
-      console.error('Ошибка при загрузке аукциона:', error);
+      console.error('Ошибка при загрузке аукциона (useAuctionData):', error);
+      // Для диагностики: покажем что именно прилетело/какой тип ошибки
+      try {
+        // eslint-disable-next-line no-console
+        console.log('useAuctionData error raw:', JSON.stringify(error));
+      } catch {
+        // eslint-disable-next-line no-console
+        console.log('useAuctionData error raw (unstringifiable):', error);
+      }
       setError(error instanceof Error ? error : new Error(String(error)));
-      toast.error('Аукцион не найден');
+      // Не показываем “Аукцион не найден”, если запрос был отменён (StrictMode/AbortController)
+      if (!isCancelError(error)) {
+        toast.error('Аукцион не найден');
+      }
     } finally {
       if (!signal?.aborted) {
         setLoading(false);

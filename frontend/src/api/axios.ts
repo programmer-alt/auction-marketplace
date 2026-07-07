@@ -83,20 +83,42 @@ function safeRedirectToLogin() {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.error || error.response?.data?.message || 'Произошла ошибка'
+    const url = error?.config?.url
+    const status = error.response?.status
+    const respData = error.response?.data
 
-    if (error.response?.status === 401) {
+    // Логируем, чтобы понять, какой именно endpoint триггерит “Произошла ошибка”
+    console.error('[API ERROR]', { url, status, data: respData })
+
+    // Если запрос отменён/abort — не спамим toast'ами.
+    const isCanceled =
+      error?.code === 'ERR_CANCELED' ||
+      error?.name === 'CanceledError' ||
+      error instanceof DOMException && error.name === 'AbortError' ||
+      typeof error?.message === 'string' && error.message.toLowerCase().includes('canceled')
+
+    if (isCanceled) {
+      return Promise.reject(error)
+    }
+
+    const messageFromServer =
+      error.response?.data?.error || error.response?.data?.message
+
+    const message = messageFromServer || 'Ошибка запроса'
+
+
+    if (status === 401) {
       safeRedirectToLogin()
-    } else if (error.response?.status === 403) {
-      toast.error('Доступ запрещен')
-    } else if (error.response?.status === 429) {
-      // Показываем уведомление не чаще одного раза в 5 секунд, чтобы не спамить пользователя
+    } else if (status === 403) {
+      // не теряем исходную причину, если сервер отдал её в body
+      toast.error(messageFromServer || 'Доступ запрещен')
+    } else if (status === 429) {
       const currentTime = Date.now()
       if (currentTime - lastRateLimitNotification > 5000) {
         lastRateLimitNotification = currentTime
         toast.error('Слишком много запросов. Пожалуйста, немного замедлитесь.')
       }
-    } else if (error.response?.status >= 500) {
+    } else if (status >= 500) {
       toast.error('Ошибка сервера. Пожалуйста, попробуйте позже.')
     } else {
       toast.error(message)
