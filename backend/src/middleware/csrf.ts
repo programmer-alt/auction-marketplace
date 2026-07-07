@@ -144,15 +144,27 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
     return next();
   }
 
-  // Пропускаем auth маршруты — они защищены JWT
-  if (path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/refresh' || path === '/api/auth/logout' || path === '/api/auth/me') {
+  // Пропускаем auth маршруты — они защищены JWT.
+  // В Express внутри router req.path иногда приходит обрезанным (например, /refresh), поэтому делаем проверку более гибкой.
+  const isAuthEndpoint =
+    path === '/api/auth/login' ||
+    path === '/api/auth/register' ||
+    path === '/api/auth/refresh' ||
+    path === '/api/auth/logout' ||
+    path === '/api/auth/me' ||
+    path === '/auth/login' ||
+    path === '/auth/register' ||
+    path === '/auth/refresh' ||
+    path === '/auth/logout' ||
+    path === '/auth/me' ||
+    path?.includes('/api/auth/') ||
+    path?.includes('/auth/') ||
+    ['/login', '/register', '/refresh', '/logout', '/me'].some(ep => path?.endsWith(ep));
+
+  if (isAuthEndpoint) {
     return next();
   }
-  
-  // Альтернативно: проверяем, если путь содержит '/api/auth' как отдельный сегмент
-  if (path?.startsWith('/api/auth') && ['/login', '/register', '/refresh', '/logout', '/me'].some(endpoint => path?.endsWith(endpoint))) {
-    return next();
-  }
+
 
   const tokenFromCookie = getCsrfTokenFromCookies(req);
   const tokenFromHeader = req.headers['x-csrf-token'] as string;

@@ -46,7 +46,7 @@ api.interceptors.request.use(
         await fetchCsrfToken()
       }
       if (csrfToken) {
-        config.headers.set('X-CSRF-Token', csrfToken)
+        config.headers.set('x-csrf-token', csrfToken)
       }
     }
     
