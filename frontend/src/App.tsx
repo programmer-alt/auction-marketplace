@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
 import { useAuthStore } from './store/auth.store'
 import LoadingSpinner from './components/shared/LoadingSpinner'
+import api from './api/axios'
 
 
 // Lazy loaded components for code splitting
@@ -38,17 +39,20 @@ function AuthInitializer() {
     const { authApi } = await import('./api/auth');
 
     // 1) Сначала обновляем accessToken через refresh cookie
-    const refreshResponse = await fetch('/api/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const refreshResponse = await api.post('/auth/refresh');
 
-    if (!refreshResponse.ok) {
+    if (!refreshResponse) {
+      // Refresh не прошёл (например 403: refresh токен не найден/устарел)
+      // Значит пользователь не авторизован — сбрасываем auth state.
+      const { token } = useAuthStore.getState();
+      if (token) {
+        useAuthStore.getState().logout();
+      }
       return;
     }
 
-        const { accessToken } = await refreshResponse.json();
+
+        const { accessToken } = refreshResponse.data;
 
         // 2) Сохраняем access token в store ДО запроса /me,
         // чтобы axios interceptor добавил Authorization для authApi.getMe().

@@ -3,6 +3,7 @@ import jwt, { SignOptions } from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
 import { safeRedis } from "../config/redis";
+import logger from "../config/logger";
 import {
   getUserByEmail,
   createUser,
@@ -79,7 +80,16 @@ async function saveRefreshToken(userId: number, refreshToken: string) {
   const key = `refresh:${userId}`;
   const ttl = 7 * 24 * 60 * 60; // 7 дней в секундах
   await safeRedis.setex(key, ttl, refreshToken);
+
+  // Диагностика: проверим, что ключ реально записался
+  try {
+    const stored = await safeRedis.get(key);
+    logger.info(`[REFRESH_TOKEN_SAVE] key=${key} stored=${stored ? 'yes' : 'no'} ttl~=${ttl}`);
+  } catch (e) {
+    logger.warn('[REFRESH_TOKEN_SAVE] failed to verify stored token in redis:', e);
+  }
 }
+
 
 /**
  * Проверка, находится ли токен в черном списке
@@ -206,10 +216,26 @@ export async function refresh(refreshToken: string) {
   const role = payload.role;
 
   // Проверка, что refresh токен сохранен в Redis
-  const storedToken = await safeRedis.get(`refresh:${userId}`);
+  const key = `refresh:${userId}`;
+  const storedToken = await safeRedis.get(key);
+
+  const safeTail = (t: string | null | undefined) => {
+    if (!t) return 'null';
+    const head = t.slice(0, 6);
+    const tail = t.slice(-6);
+    return `${head}...${tail}(len=${t.length})`;
+  };
+
+  logger.info(
+    `[REFRESH_TOKEN_CHECK] key=${key} stored=${storedToken ? 'yes' : 'no'} ` +
+    `stored=${safeTail(storedToken)} refresh=${safeTail(refreshToken)}`
+  );
+
   if (!storedToken || storedToken !== refreshToken) {
     throw createForbiddenError("Refresh токен не найден или устарел");
   }
+
+
 
   // Генерация новой пары токенов
   const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(userId, email, role);
