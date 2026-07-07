@@ -119,6 +119,7 @@ export async function rateLimit(
   if (
     req.path === '/api/csrf-token' || 
     req.path === '/api/auth/me' ||
+    req.path === '/api/upload' ||
     req.path === '/uploads' ||
     req.path.startsWith('/uploads/')
   ) return next();
