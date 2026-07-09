@@ -87,8 +87,13 @@ api.interceptors.response.use(
     const status = error.response?.status
     const respData = error.response?.data
 
-    // Логируем, чтобы понять, какой именно endpoint триггерит “Произошла ошибка”
+    // Логируем, чтобы понять, какой именно endpoint триггерит "Произошла ошибка"
     console.error('[API ERROR]', { url, status, data: respData })
+
+    // Проверяем, была ли ошибка уже обработана локально
+    if (error.config?.handled) {
+      return Promise.reject(error)
+    }
 
     // Если запрос отменён/abort — не спамим toast'ами.
     const isCanceled =
@@ -98,6 +103,19 @@ api.interceptors.response.use(
       typeof error?.message === 'string' && error.message.toLowerCase().includes('canceled')
 
     if (isCanceled) {
+      return Promise.reject(error)
+    }
+
+    // Проверяем наличие network ошибки (когда error.response отсутствует)
+    if (!error.response) {
+      // Это network ошибка (соединение потеряно, сервер недоступен и т.д.)
+      if (error.request) {
+        // Network ошибка - нет соединения с сервером
+        toast.error('Нет соединения с сервером. Проверьте подключение к интернету.')
+      } else {
+        // Неизвестная ошибка
+        toast.error('Произошла ошибка при выполнении запроса.')
+      }
       return Promise.reject(error)
     }
 

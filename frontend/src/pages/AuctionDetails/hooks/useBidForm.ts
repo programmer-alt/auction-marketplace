@@ -5,6 +5,7 @@ import type {
   AsyncState, 
   Bid
 } from '../../../types/advanced';
+import { markErrorAsHandled } from '../../../utils/errorHandler';
 
 export interface BidFormData {
   amount: number;
@@ -66,6 +67,8 @@ export const useBidForm = (auctionId: number | undefined, currentPrice: number |
       setError(errorMessage);
       setBidState({ status: 'error', error: errorMessage, retryCount: 0 });
       toast.error(errorMessage);
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(err);
       return false;
     } finally {
       setIsSubmitting(false);

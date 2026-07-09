@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import type { Auction } from '../../../types'
 import { useStripe, useElements } from '@stripe/react-stripe-js'
+import { markErrorAsHandled } from '../../../utils/errorHandler'
 
 export const useCardForm = (auction: Auction | null) => {
   const navigate = useNavigate()
@@ -48,6 +49,8 @@ export const useCardForm = (auction: Auction | null) => {
       const msg = err?.message ?? 'Ошибка оплаты. Попробуйте ещё раз.'
       setError(msg)
       toast.error(msg)
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(err);
     } finally {
       setProcessing(false)
     }

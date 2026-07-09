@@ -4,6 +4,7 @@ import { auctionsApi } from '../../../api/auctions';
 import { Auction } from '../../../types';
 import type { User } from '../../../types/advanced';
 import toast from 'react-hot-toast';
+import { markErrorAsHandled } from '../../../utils/errorHandler';
 
 export const useProfileData = (user: User | null) => {
   const [myAuctions, setMyAuctions] = useState<Auction[]>([]);
@@ -26,6 +27,8 @@ export const useProfileData = (user: User | null) => {
         }
       } catch (error) {
         toast.error('Не удалось загрузить данные');
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
         console.error('Failed to fetch auctions:', error);
       } finally {
         setLoading(false);
