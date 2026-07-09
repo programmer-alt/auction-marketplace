@@ -8,6 +8,8 @@ import type {
   ApiResponse, 
   AuctionDetail
 } from '../../../types/advanced';
+import { isApiSuccess } from '../../../types/advanced';
+import { markErrorAsHandled } from '../../../utils/errorHandler';
 
 
 type EditAuctionData = {
@@ -72,6 +74,8 @@ export const useEditAuction = (id: string | undefined) => {
           retryCount: 0 
         });
         toast.error(errorMsg);
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
         navigate('/');
       }
     };
@@ -123,18 +127,25 @@ export const useEditAuction = (id: string | undefined) => {
         endsAt: data.endsAt,
       };
 
-      const result = await auctionsApi.updateAuction(Number(id), updateData as any) as ApiResponse<any>;
+      const result = await auctionsApi.updateAuction(Number(id), {
+        ...data,
+        startingPrice: parseFloat(data.startingPrice),
+        endsAt: new Date(data.endsAt).toISOString(),
+        imageUrl,
+      }) as ApiResponse<any>;
 
-        if ('success' in result && result.success) {
-          toast.success('Аукцион обновлён!');
+      if (isApiSuccess(result)) {
+        toast.success('Аукцион успешно обновлен!');
         navigate(`/auctions/${id}`);
         return true;
       } else {
-        toast.error('Не удалось обновить аукцион');
+        toast.error(result.error || 'Не удалось обновить аукцион');
         return false;
       }
     } catch (error: any) {
       toast.error(error.message || 'Не удалось обновить аукцион');
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(error);
       return false;
     } finally {
       setUploadState({ status: 'idle' });

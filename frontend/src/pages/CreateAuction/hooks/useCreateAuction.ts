@@ -8,6 +8,7 @@ import type {
   ApiResponse
 } from '../../../types/advanced';
 import { isApiSuccess } from '../../../types/advanced';
+import { markErrorAsHandled } from '../../../utils/errorHandler';
 
 
 type CreateAuctionData = {
@@ -89,6 +90,8 @@ export const useCreateAuction = () => {
       }
     } catch (error: any) {
       toast.error(error.message || 'Не удалось создать аукцион');
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(error);
       return false;
     } finally {
       setUploadState({ status: 'idle' });

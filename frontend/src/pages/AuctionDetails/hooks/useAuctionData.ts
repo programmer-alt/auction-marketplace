@@ -3,6 +3,7 @@ import { auctionsApi } from '../../../api/auctions';
 import { bidsApi } from '../../../api/bids';
 import { Auction, Bid, isApiSuccess } from '../../../types';
 import toast from 'react-hot-toast';
+import { markErrorAsHandled } from '../../../utils/errorHandler';
 
 const isCancelError = (error: unknown): boolean => {
   if (error instanceof DOMException && error.name === 'AbortError') return true;
@@ -54,9 +55,11 @@ export const useAuctionData = (id: string | undefined) => {
         console.log('useAuctionData error raw (unstringifiable):', error);
       }
       setError(error instanceof Error ? error : new Error(String(error)));
-      // Не показываем “Аукцион не найден”, если запрос был отменён (StrictMode/AbortController)
+      // Не показываем "Аукцион не найден", если запрос был отменён (StrictMode/AbortController)
       if (!isCancelError(error)) {
         toast.error('Аукцион не найден');
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
       }
     } finally {
       if (!signal?.aborted) {
@@ -79,8 +82,10 @@ export const useAuctionData = (id: string | undefined) => {
     if (id) {
       try {
         await fetchAuction(id);
-      } catch {
+      } catch (error) {
         toast.error('Не удалось обновить данные аукциона');
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
       }
     }
   }, [id, fetchAuction]);
