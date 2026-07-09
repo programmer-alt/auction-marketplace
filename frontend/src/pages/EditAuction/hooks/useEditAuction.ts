@@ -10,7 +10,7 @@ import type {
 } from '../../../types/advanced';
 import { isApiSuccess } from '../../../types/advanced';
 import { markErrorAsHandled } from '../../../utils/errorHandler';
-import type { CreateAuctionData } from '../../../types';
+import type { Auction, CreateAuctionData } from '../../../types';
 
 
 type EditAuctionData = {
@@ -129,10 +129,10 @@ export const useEditAuction = (id: string | undefined) => {
 
       // Only add imageUrl to the payload if it's not undefined (add it if it's a string or null)
       if (imageUrl !== undefined) {
-        (updatePayload as any).imageUrl = imageUrl;
+        Object.assign(updatePayload, { imageUrl });
       }
 
-      const result = await auctionsApi.updateAuction(Number(id), updatePayload) as ApiResponse<any>;
+      const result = await auctionsApi.updateAuction(Number(id), updatePayload) as ApiResponse<Auction>;
 
       if (isApiSuccess(result)) {
         toast.success('Аукцион успешно обновлен!');
