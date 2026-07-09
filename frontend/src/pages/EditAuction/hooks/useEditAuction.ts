@@ -10,6 +10,7 @@ import type {
 } from '../../../types/advanced';
 import { isApiSuccess } from '../../../types/advanced';
 import { markErrorAsHandled } from '../../../utils/errorHandler';
+import type { CreateAuctionData } from '../../../types';
 
 
 type EditAuctionData = {
@@ -118,21 +119,20 @@ export const useEditAuction = (id: string | undefined) => {
         imageUrl = null;
       }
 
-      // Используем обычный тип для обновления аукциона
-      const updateData: Partial<EditAuctionData> = {
+      // Prepare the update payload, handling the imageUrl type correctly
+      const updatePayload: Partial<CreateAuctionData> = {
         title: data.title,
         description: data.description || undefined,
-        ...(imageUrl !== undefined && { imageUrl }),
-        startingPrice: data.startingPrice,
-        endsAt: data.endsAt,
-      };
-
-      const result = await auctionsApi.updateAuction(Number(id), {
-        ...data,
         startingPrice: parseFloat(data.startingPrice),
         endsAt: new Date(data.endsAt).toISOString(),
-        imageUrl,
-      }) as ApiResponse<any>;
+      };
+
+      // Only add imageUrl to the payload if it's not undefined (add it if it's a string or null)
+      if (imageUrl !== undefined) {
+        (updatePayload as any).imageUrl = imageUrl;
+      }
+
+      const result = await auctionsApi.updateAuction(Number(id), updatePayload) as ApiResponse<any>;
 
       if (isApiSuccess(result)) {
         toast.success('Аукцион успешно обновлен!');
