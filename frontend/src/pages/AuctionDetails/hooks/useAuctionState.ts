@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Auction } from '../../../types';
-import { useStatusBadge } from '../../../hooks/useStatusBadge';
+import { Auction } from '@/types';
+import { useStatusBadge } from '@/hooks/useStatusBadge';
 
 export interface UseAuctionStateResult {
   isOwner: boolean;

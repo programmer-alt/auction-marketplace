@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auctionsApi } from '../../../api/auctions';
+import { auctionsApi } from '@/api/auctions';
 import toast from 'react-hot-toast';
-import { markErrorAsHandled } from '../../../utils/errorHandler';
+import { markErrorAsHandled } from '@/utils/errorHandler';
 
 export const useAuctionActions = (auctionId: number | undefined, navigate: ReturnType<typeof useNavigate>) => {
   const handleDelete = useCallback(async () => {

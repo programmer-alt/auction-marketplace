@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, Pencil, CreditCard } from 'lucide-react';
-import { Auction, User } from '../../../types';
+import { Auction, User } from '@/types';
 import { Modal } from './Modal';
 
 interface AuctionActionsProps {

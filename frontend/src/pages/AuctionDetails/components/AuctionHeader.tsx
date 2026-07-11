@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Auction } from '../../../types';
+import { Auction } from '@/types';
 
 interface AuctionHeaderProps {
   auction: Auction;

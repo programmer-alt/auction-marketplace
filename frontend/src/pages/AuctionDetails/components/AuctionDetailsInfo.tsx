@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { DollarSign, Gavel, User, Clock } from 'lucide-react';
-import { Auction } from '../../../types';
+import { Auction } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 

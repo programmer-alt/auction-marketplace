@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { auctionsApi } from '../../../api/auctions';
-import { bidsApi } from '../../../api/bids';
-import { Auction, Bid, isApiSuccess } from '../../../types';
-import { handleError, handleBusinessLogicError } from '../../../utils/universalErrorHandler';
+import { auctionsApi } from '@/api/auctions';
+import { bidsApi } from '@/api/bids';
+import { Auction, Bid, isApiSuccess } from '@/types';
+import { handleError, handleBusinessLogicError } from '@/utils/universalErrorHandler';
 
 const isCancelError = (error: unknown): boolean => {
   if (error instanceof DOMException && error.name === 'AbortError') return true;
