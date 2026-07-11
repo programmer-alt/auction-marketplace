@@ -11,13 +11,27 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
     if (!id || !user) return;
 
     const auctionIdRaw = id;
-    const auctionIdNumber = Number(auctionIdRaw);
-    const auctionId = Number.isNaN(auctionIdNumber) ? undefined : auctionIdNumber;
+    const auctionId = Number.isNaN(Number(auctionIdRaw))
+      ? undefined
+      : Number(auctionIdRaw);
+
+    if (!auctionId) {
+      handleBusinessLogicError(
+        new Error('Некорректный ID аукциона'),
+        {
+          auctionIdRaw,
+          auctionId: undefined,
+          context: 'payment-authorization'
+        }
+      );
+      setLoading(false);
+      return;
+    }
 
     const fetchAuction = async () => {
       try {
         setLoading(true);
-        const data = await auctionsApi.getAuctionById(auctionIdNumber);
+        const data = await auctionsApi.getAuctionById(auctionId);
 
         if (isApiSuccess(data) && data.data) {
           const auctionData = data.data;
