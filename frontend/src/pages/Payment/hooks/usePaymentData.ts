@@ -19,10 +19,13 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
           const auctionData = data.data;
           
           // Проверяем, что пользователь является победителем аукциона
-          if (auctionData.winnerId !== user.id) {
+          // Используем winnerId как основной способ, но проверяем winner.id как резервный вариант
+          const actualWinnerId = auctionData.winnerId ?? auctionData.winner?.id;
+          
+          if (actualWinnerId !== user.id) {
             handleBusinessLogicError(new Error('Только победитель аукциона может произвести оплату'), { 
               userId: user.id, 
-              winnerId: auctionData.winnerId, 
+              winnerId: actualWinnerId, 
               auctionId: Number(id),
               context: 'payment-authorization' 
             });

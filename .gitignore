@@ -90,3 +90,5 @@ desktop.ini
 .codegeex/agent/configs/user_mcp_config.json
 .gigacode/rules/mcp mirror .md
 AGENTS.md
+.blackbox/skills/mcp-orchestrator/SKILL.md
+.blackbox/skills/orchestrator/SKILL.md
