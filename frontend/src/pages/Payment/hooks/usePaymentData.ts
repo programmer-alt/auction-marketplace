@@ -9,45 +9,58 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
 
   useEffect(() => {
     if (!id || !user) return;
-    
+
+    const auctionIdRaw = id;
+    const auctionIdNumber = Number(auctionIdRaw);
+    const auctionId = Number.isNaN(auctionIdNumber) ? undefined : auctionIdNumber;
+
     const fetchAuction = async () => {
       try {
         setLoading(true);
-        const data = await auctionsApi.getAuctionById(Number(id));
-        
+        const data = await auctionsApi.getAuctionById(auctionIdNumber);
+
         if (isApiSuccess(data) && data.data) {
           const auctionData = data.data;
-          
+
           // Проверяем, что пользователь является победителем аукциона
           // Используем winnerId как основной способ, но проверяем winner.id как резервный вариант
           const actualWinnerId = auctionData.winnerId ?? auctionData.winner?.id;
-          
+
           if (actualWinnerId !== user.id) {
-            handleBusinessLogicError(new Error('Только победитель аукциона может произвести оплату'), { 
-              userId: user.id, 
-              winnerId: actualWinnerId, 
-              auctionId: Number(id),
-              context: 'payment-authorization' 
-            });
+            handleBusinessLogicError(
+              new Error('Только победитель аукциона может произвести оплату'),
+              {
+                userId: user.id,
+                winnerId: actualWinnerId,
+                auctionIdRaw,
+                auctionId,
+                context: 'payment-authorization'
+              }
+            );
             return;
           }
-          
+
           // Проверяем статус аукциона
           if (auctionData.status !== 'COMPLETED') {
-            handleBusinessLogicError(new Error('Оплата возможна только за завершенные аукционы'), { 
-              status: auctionData.status, 
-              auctionId: Number(id),
-              context: 'payment-status-check' 
-            });
+            handleBusinessLogicError(
+              new Error('Оплата возможна только за завершенные аукционы'),
+              {
+                status: auctionData.status,
+                auctionIdRaw,
+                auctionId,
+                context: 'payment-status-check'
+              }
+            );
             return;
           }
-          
+
           setAuction(data.data);
         } else if (isApiError(data)) {
           // Теперь мы уверены, что data - это ApiError, и свойство error существует
-          handleBusinessLogicError(new Error(data.error || 'Аукцион не найден'), { 
-            auctionId: Number(id), 
-            context: 'auction-not-found' 
+          handleBusinessLogicError(new Error(data.error || 'Аукцион не найден'), {
+            auctionIdRaw,
+            auctionId,
+            context: 'auction-not-found'
           });
         }
       } catch (error) {
