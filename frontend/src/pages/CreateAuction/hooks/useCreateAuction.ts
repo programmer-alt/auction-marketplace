@@ -1,13 +1,14 @@
 import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFormState } from 'react-hook-form';
-import { auctionsApi } from '../../../api/auctions';
+import { auctionsApi } from '@/api/auctions';
 import toast from 'react-hot-toast';
 import type { 
   AsyncState,
   ApiResponse
-} from '../../../types/advanced';
-import { isApiSuccess } from '../../../types/advanced';
+} from '@/types/advanced';
+import { isApiSuccess } from '@/types/advanced';
+import { markErrorAsHandled } from '@/utils/errorHandler';
 
 
 type CreateAuctionData = {
@@ -89,6 +90,8 @@ export const useCreateAuction = () => {
       }
     } catch (error: any) {
       toast.error(error.message || 'Не удалось создать аукцион');
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(error);
       return false;
     } finally {
       setUploadState({ status: 'idle' });

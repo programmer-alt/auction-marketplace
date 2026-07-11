@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore } from '@/store/auth.store';
 import { ArrowLeft, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 import { usePaymentData } from './hooks/usePaymentData';
 import { useCardForm } from './hooks/useCardForm';
@@ -9,7 +9,8 @@ import CardForm from './components/CardForm';
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import { useState, useEffect } from 'react'
-import { paymentsApi } from '../../api/payments'
+import { paymentsApi } from '@/api/payments'
+import { handleBusinessLogicError } from '@/utils/universalErrorHandler'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
 
@@ -38,7 +39,13 @@ function PaymentInner() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setSecretError(err?.response?.data?.message ?? 'Не удалось инициализировать платёж')
+          const errorMessage = err?.response?.data?.message ?? 'Не удалось инициализировать платёж'
+          setSecretError(errorMessage)
+          handleBusinessLogicError(err, { 
+            auctionId: auction.id, 
+            context: 'payment-intent-creation',
+            originalError: err
+          })
           setSecretLoading(false)
         }
       })

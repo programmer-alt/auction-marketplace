@@ -1,6 +1,6 @@
 import React from 'react'
 import { CheckCircle } from 'lucide-react'
-import LoadingSpinner from '../../../components/shared/LoadingSpinner'
+import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { PaymentElement } from '@stripe/react-stripe-js'
 
 

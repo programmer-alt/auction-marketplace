@@ -1,5 +1,5 @@
 import React from 'react';
-import { Auction } from '../../../types';
+import { Auction } from '@/types';
 
 interface AuctionStatusProps {
   status: Auction['status'];

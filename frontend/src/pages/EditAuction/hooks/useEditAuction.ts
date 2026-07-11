@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFormState } from 'react-hook-form';
-import { auctionsApi } from '../../../api/auctions';
+import { auctionsApi } from '@/api/auctions';
 import toast from 'react-hot-toast';
 import type { 
   AsyncState, 
   ApiResponse, 
   AuctionDetail
-} from '../../../types/advanced';
+} from '@/types/advanced';
+import { isApiSuccess } from '@/types/advanced';
+import { markErrorAsHandled } from '@/utils/errorHandler';
+import type { Auction, CreateAuctionData } from '@/types';
 
 
 type EditAuctionData = {
@@ -72,6 +75,8 @@ export const useEditAuction = (id: string | undefined) => {
           retryCount: 0 
         });
         toast.error(errorMsg);
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
         navigate('/');
       }
     };
@@ -114,27 +119,33 @@ export const useEditAuction = (id: string | undefined) => {
         imageUrl = null;
       }
 
-      // Используем обычный тип для обновления аукциона
-      const updateData: Partial<EditAuctionData> = {
+      // Prepare the update payload, handling the imageUrl type correctly
+      const updatePayload: Partial<CreateAuctionData> = {
         title: data.title,
         description: data.description || undefined,
-        ...(imageUrl !== undefined && { imageUrl }),
-        startingPrice: data.startingPrice,
-        endsAt: data.endsAt,
+        startingPrice: parseFloat(data.startingPrice),
+        endsAt: new Date(data.endsAt).toISOString(),
       };
 
-      const result = await auctionsApi.updateAuction(Number(id), updateData as any) as ApiResponse<any>;
+      // Only add imageUrl to the payload if it's not undefined (add it if it's a string or null)
+      if (imageUrl !== undefined) {
+        Object.assign(updatePayload, { imageUrl });
+      }
 
-        if ('success' in result && result.success) {
-          toast.success('Аукцион обновлён!');
+      const result = await auctionsApi.updateAuction(Number(id), updatePayload) as ApiResponse<Auction>;
+
+      if (isApiSuccess(result)) {
+        toast.success('Аукцион успешно обновлен!');
         navigate(`/auctions/${id}`);
         return true;
       } else {
-        toast.error('Не удалось обновить аукцион');
+        toast.error(result.error || 'Не удалось обновить аукцион');
         return false;
       }
     } catch (error: any) {
       toast.error(error.message || 'Не удалось обновить аукцион');
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(error);
       return false;
     } finally {
       setUploadState({ status: 'idle' });

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useStripe } from '@stripe/react-stripe-js'
 import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
-import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import LoadingSpinner from '@/components/shared/LoadingSpinner'
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams()

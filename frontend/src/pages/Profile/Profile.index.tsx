@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuthStore } from '../../store/auth.store';
-import { Auction } from '../../types';
+import { useAuthStore } from '@/store/auth.store';
+import { Auction } from '@/types';
 import { User, ShoppingBag, Gavel, Clock, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useProfileData } from './hooks/useProfileData';
-import { useStatusBadge } from '../../hooks/useStatusBadge';
+import { useStatusBadge } from '@/hooks/useStatusBadge';
 
 export default function Profile() {
   const { user } = useAuthStore();

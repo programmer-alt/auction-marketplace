@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auctionsApi } from '../../../api/auctions';
+import { auctionsApi } from '@/api/auctions';
 import toast from 'react-hot-toast';
+import { markErrorAsHandled } from '@/utils/errorHandler';
 
 export const useAuctionActions = (auctionId: number | undefined, navigate: ReturnType<typeof useNavigate>) => {
   const handleDelete = useCallback(async () => {
@@ -10,8 +11,10 @@ export const useAuctionActions = (auctionId: number | undefined, navigate: Retur
       await auctionsApi.deleteAuction(auctionId);
       toast.success('Аукцион удалён');
       navigate('/');
-    } catch {
+    } catch (error) {
       toast.error('Не удалось удалить аукцион');
+      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+      markErrorAsHandled(error);
     }
   }, [auctionId, navigate]);
 

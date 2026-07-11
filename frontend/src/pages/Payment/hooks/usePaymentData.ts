@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { auctionsApi } from '../../../api/auctions';
-import { User } from '../../../types';
-import toast from 'react-hot-toast';
+import { auctionsApi } from '@/api/auctions';
+import { User, isApiSuccess, isApiError } from '@/types';
+import { handleError, handleBusinessLogicError } from '@/utils/universalErrorHandler';
 
 export const usePaymentData = (id: string | undefined, user: User | null) => {
   const [auction, setAuction] = useState<any>(null);
@@ -9,34 +9,77 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
 
   useEffect(() => {
     if (!id || !user) return;
-    
+
+    const auctionIdRaw = id;
+    const auctionId = Number.isNaN(Number(auctionIdRaw))
+      ? undefined
+      : Number(auctionIdRaw);
+
+    if (!auctionId) {
+      handleBusinessLogicError(
+        new Error('Некорректный ID аукциона'),
+        {
+          auctionIdRaw,
+          auctionId: undefined,
+          context: 'payment-authorization'
+        }
+      );
+      setLoading(false);
+      return;
+    }
+
     const fetchAuction = async () => {
       try {
         setLoading(true);
-        const data = await auctionsApi.getAuctionById(Number(id));
-        
-        if ('success' in data && data.success && data.data) {
+        const data = await auctionsApi.getAuctionById(auctionId);
+
+        if (isApiSuccess(data) && data.data) {
           const auctionData = data.data;
-          
+
           // Проверяем, что пользователь является победителем аукциона
-          if (auctionData.winnerId !== user.id) {
-            toast.error('Только победитель аукциона может произвести оплату');
+          // Используем winnerId как основной способ, но проверяем winner.id как резервный вариант
+          const actualWinnerId = auctionData.winnerId ?? auctionData.winner?.id;
+
+          if (actualWinnerId !== user.id) {
+            handleBusinessLogicError(
+              new Error('Только победитель аукциона может произвести оплату'),
+              {
+                userId: user.id,
+                winnerId: actualWinnerId,
+                auctionIdRaw,
+                auctionId,
+                context: 'payment-authorization'
+              }
+            );
             return;
           }
-          
+
           // Проверяем статус аукциона
           if (auctionData.status !== 'COMPLETED') {
-            toast.error('Оплата возможна только за завершенные аукционы');
+            handleBusinessLogicError(
+              new Error('Оплата возможна только за завершенные аукционы'),
+              {
+                status: auctionData.status,
+                auctionIdRaw,
+                auctionId,
+                context: 'payment-status-check'
+              }
+            );
             return;
           }
-          
+
           setAuction(data.data);
-        } else {
-          toast.error((data as any).error || 'Аукцион не найден');
+        } else if (isApiError(data)) {
+          // Теперь мы уверены, что data - это ApiError, и свойство error существует
+          handleBusinessLogicError(new Error(data.error || 'Аукцион не найден'), {
+            auctionIdRaw,
+            auctionId,
+            context: 'auction-not-found'
+          });
         }
       } catch (error) {
         console.error('Ошибка при загрузке данных аукциона для оплаты:', error);
-        toast.error('Ошибка при загрузке данных аукциона');
+        handleError(error, 'Ошибка при загрузке данных аукциона', undefined);
       } finally {
         setLoading(false);
       }

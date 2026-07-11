@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 import { User } from 'lucide-react';
-import { Bid } from '../../../types';
+import { Bid } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
