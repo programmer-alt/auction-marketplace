@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { auctionsApi } from '../../../api/auctions';
 import { bidsApi } from '../../../api/bids';
 import { Auction, Bid, isApiSuccess } from '../../../types';
-import toast from 'react-hot-toast';
-import { markErrorAsHandled } from '../../../utils/errorHandler';
+import { handleError, handleBusinessLogicError } from '../../../utils/universalErrorHandler';
 
 const isCancelError = (error: unknown): boolean => {
   if (error instanceof DOMException && error.name === 'AbortError') return true;
@@ -57,9 +56,7 @@ export const useAuctionData = (id: string | undefined) => {
       setError(error instanceof Error ? error : new Error(String(error)));
       // Не показываем "Аукцион не найден", если запрос был отменён (StrictMode/AbortController)
       if (!isCancelError(error)) {
-        toast.error('Аукцион не найден');
-        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-        markErrorAsHandled(error);
+        handleBusinessLogicError(error, { auctionId, context: 'useAuctionData' });
       }
     } finally {
       if (!signal?.aborted) {
@@ -83,9 +80,7 @@ export const useAuctionData = (id: string | undefined) => {
       try {
         await fetchAuction(id);
       } catch (error) {
-        toast.error('Не удалось обновить данные аукциона');
-        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-        markErrorAsHandled(error);
+        handleError(error, 'Не удалось обновить данные аукциона', undefined);
       }
     }
   }, [id, fetchAuction]);
