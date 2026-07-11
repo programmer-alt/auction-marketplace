@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Calendar } from 'lucide-react';
-import ImageUploader from '../../components/shared/ImageUploader';
-import LoadingSpinner from '../../components/shared/LoadingSpinner';
+import ImageUploader from '@/components/shared/ImageUploader';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useCreateAuction } from './hooks/useCreateAuction';
 
 export default function CreateAuction() {

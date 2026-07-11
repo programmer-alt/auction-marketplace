@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../../store/auth.store'
+import { useAuthStore } from '@/store/auth.store'
 import { ShoppingBag, User, LogOut, LogIn, UserPlus } from 'lucide-react'
 
 export default function Header() {
