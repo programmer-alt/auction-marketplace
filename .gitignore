@@ -92,3 +92,6 @@ desktop.ini
 AGENTS.md
 .blackbox/skills/mcp-orchestrator/SKILL.md
 .blackbox/skills/orchestrator/SKILL.md
+
+# Uploads directory
+/backend/uploads/*
