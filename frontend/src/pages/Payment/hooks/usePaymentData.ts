@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { auctionsApi } from '../../../api/auctions';
-import { User, isApiSuccess, isApiError } from '../../../types';
-import { handleError, handleBusinessLogicError } from '../../../utils/universalErrorHandler';
+import { auctionsApi } from '@/api/auctions';
+import { User, isApiSuccess, isApiError } from '@/types';
+import { handleError, handleBusinessLogicError } from '@/utils/universalErrorHandler';
 
 export const usePaymentData = (id: string | undefined, user: User | null) => {
   const [auction, setAuction] = useState<any>(null);

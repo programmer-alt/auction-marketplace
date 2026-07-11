@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFormState } from 'react-hook-form';
-import { auctionsApi } from '../../../api/auctions';
+import { auctionsApi } from '@/api/auctions';
 import toast from 'react-hot-toast';
 import type { 
   AsyncState, 
   ApiResponse, 
   AuctionDetail
-} from '../../../types/advanced';
-import { isApiSuccess } from '../../../types/advanced';
-import { markErrorAsHandled } from '../../../utils/errorHandler';
-import type { Auction, CreateAuctionData } from '../../../types';
+} from '@/types/advanced';
+import { isApiSuccess } from '@/types/advanced';
+import { markErrorAsHandled } from '@/utils/errorHandler';
+import type { Auction, CreateAuctionData } from '@/types';
 
 
 type EditAuctionData = {

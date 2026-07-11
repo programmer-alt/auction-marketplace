@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { auctionsApi } from '../../../api/auctions';
-import type { Auction } from '../../../types';
+import { auctionsApi } from '@/api/auctions';
+import type { Auction } from '@/types';
 
 
 export const useAuctionList = () => {

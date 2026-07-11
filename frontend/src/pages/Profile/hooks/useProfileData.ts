@@ -1,10 +1,10 @@
 import { useState, useEffect
  } from 'react';
-import { auctionsApi } from '../../../api/auctions';
-import { Auction } from '../../../types';
-import type { User } from '../../../types/advanced';
+import { auctionsApi } from '@/api/auctions';
+import { Auction } from '@/types';
+import type { User } from '@/types/advanced';
 import toast from 'react-hot-toast';
-import { markErrorAsHandled } from '../../../utils/errorHandler';
+import { markErrorAsHandled } from '@/utils/errorHandler';
 
 export const useProfileData = (user: User | null) => {
   const [myAuctions, setMyAuctions] = useState<Auction[]>([]);

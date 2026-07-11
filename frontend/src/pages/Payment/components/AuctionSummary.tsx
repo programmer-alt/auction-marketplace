@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingBag, DollarSign } from 'lucide-react';
-import { Auction } from '../../../types';
+import { Auction } from '@/types';
 
 interface AuctionSummaryProps {
   auction: Auction;

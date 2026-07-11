@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import type { Auction } from '../../../types'
+import type { Auction } from '@/types'
 import { useStripe, useElements } from '@stripe/react-stripe-js'
-import { markErrorAsHandled } from '../../../utils/errorHandler'
+import { markErrorAsHandled } from '@/utils/errorHandler'
 
 export const useCardForm = (auction: Auction | null) => {
   const navigate = useNavigate()

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Auction } from '../../../types';
+import { Auction } from '@/types';
 
 interface BidFormProps {
   auction: Auction;

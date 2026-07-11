@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
-import { bidsApi } from '../../../api/bids';
+import { bidsApi } from '@/api/bids';
 import toast from 'react-hot-toast';
 import type { 
   AsyncState, 
   Bid
-} from '../../../types/advanced';
-import { markErrorAsHandled } from '../../../utils/errorHandler';
+} from '@/types/advanced';
+import { markErrorAsHandled } from '@/utils/errorHandler';
 
 export interface BidFormData {
   amount: number;
