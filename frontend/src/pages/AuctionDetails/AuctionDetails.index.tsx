@@ -12,7 +12,7 @@ import AuctionDetailsInfo from './components/AuctionDetailsInfo';
 import BidHistory from './components/BidHistory';
 import BidForm from './components/BidForm';
 import AuctionActions from './components/AuctionActions';
-import toast from 'react-hot-toast';
+import { handleBusinessLogicError } from '../../utils/universalErrorHandler';
 
 
 const LoadingSkeleton = () => (
@@ -28,7 +28,7 @@ const LoadingSkeleton = () => (
 const NotFound = () => {
   const navigate = useNavigate();
   React.useEffect(() => {
-    toast.error('Аукцион не найден');
+    handleBusinessLogicError(new Error('Аукцион не найден'), { context: 'auction-not-found-component' });
     navigate('/');
   }, [navigate]);
   return null;

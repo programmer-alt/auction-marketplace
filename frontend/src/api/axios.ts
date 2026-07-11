@@ -1,6 +1,7 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/auth.store'
+import { handleNetworkError, handleError } from '../utils/universalErrorHandler'
 
 const api = axios.create({
   baseURL: '/api',
@@ -109,13 +110,7 @@ api.interceptors.response.use(
     // Проверяем наличие network ошибки (когда error.response отсутствует)
     if (!error.response) {
       // Это network ошибка (соединение потеряно, сервер недоступен и т.д.)
-      if (error.request) {
-        // Network ошибка - нет соединения с сервером
-        toast.error('Нет соединения с сервером. Проверьте подключение к интернету.')
-      } else {
-        // Неизвестная ошибка
-        toast.error('Произошла ошибка при выполнении запроса.')
-      }
+      handleNetworkError(error);
       return Promise.reject(error)
     }
 
@@ -129,7 +124,7 @@ api.interceptors.response.use(
       safeRedirectToLogin()
     } else if (status === 403) {
       // не теряем исходную причину, если сервер отдал её в body
-      toast.error(messageFromServer || 'Доступ запрещен')
+      handleError(error, messageFromServer || 'Доступ запрещен')
     } else if (status === 429) {
       const currentTime = Date.now()
       if (currentTime - lastRateLimitNotification > 5000) {
@@ -137,9 +132,9 @@ api.interceptors.response.use(
         toast.error('Слишком много запросов. Пожалуйста, немного замедлитесь.')
       }
     } else if (status >= 500) {
-      toast.error('Ошибка сервера. Пожалуйста, попробуйте позже.')
+      handleError(error, 'Ошибка сервера. Пожалуйста, попробуйте позже.')
     } else {
-      toast.error(message)
+      handleError(error, message)
     }
 
     return Promise.reject(error)
