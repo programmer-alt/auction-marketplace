@@ -50,7 +50,7 @@ export function validateAuction(obj: unknown): obj is CacheAuction {
   }
   const auction = obj as Record<string, unknown>;
   if (
-     typeof auction.id !== "number" ||
+    typeof auction.id !== "number" ||
     typeof auction.title !== "string" ||
     typeof auction.startingPrice !== "number" ||
     typeof auction.sellerId !== "number" ||
@@ -59,6 +59,26 @@ export function validateAuction(obj: unknown): obj is CacheAuction {
   ) {
     return false;
   }
+  
+  // Проверяем поля winnerId и winner
+  if (auction.winnerId !== null && typeof auction.winnerId !== "number") {
+    return false;
+  }
+  
+  if (auction.winner !== null && typeof auction.winner === "object") {
+    const winner = auction.winner as Record<string, unknown>;
+    if (typeof winner.id !== "number" || typeof winner.email !== "string") {
+      return false;
+    }
+  }
+  
+  if (auction.seller !== null && typeof auction.seller === "object") {
+    const seller = auction.seller as Record<string, unknown>;
+    if (typeof seller.id !== "number" || typeof seller.email !== "string") {
+      return false;
+    }
+  }
+  
   return true;
 }
 

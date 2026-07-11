@@ -127,6 +127,17 @@ export interface CacheAuction {
   startingPrice: number;
   currentPrice: number;
   sellerId: number;
+  seller: {
+    id: number;
+    email: string;
+    name: string | null;
+  } | null;
+  winnerId: number | null;
+  winner: {
+    id: number;
+    email: string;
+    name: string | null;
+  } | null;
   currency: string;
   status: string;
   createdAt: string;
