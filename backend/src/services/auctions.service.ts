@@ -20,7 +20,62 @@ import {
 import { sanitizeObject } from "../utils/sanitization";
 import { Prisma } from "../types";
 
-type Auction = Prisma.AuctionGetPayload<{}>;
+// Тип для аукциона в списке (без детальных ставок, с количеством ставок)
+type ListAuction = Prisma.AuctionGetPayload<{
+  include: {
+    seller: {
+      select: {
+        id: true;
+        email: true;
+        name: true;
+      };
+    };
+    winner: {
+      select: {
+        id: true;
+        email: true;
+        name: true;
+      };
+    };
+    _count: {
+      select: {
+        bids: true;
+      };
+    };
+  };
+}>;
+
+// Тип для одиночного аукциона (с детальными ставками)
+type SingleAuction = Prisma.AuctionGetPayload<{
+  include: {
+    seller: {
+      select: {
+        id: true;
+        email: true;
+        name: true;
+      };
+    };
+    winner: {
+      select: {
+        id: true;
+        email: true;
+        name: true;
+      };
+    };
+    bids: {
+      include: {
+        user: {
+          select: {
+            id: true;
+            email: true;
+            name: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
 import {
   createValidationError,
   createForbiddenError,
@@ -57,7 +112,7 @@ async function getAuctionsListVersion(): Promise<string> {
   return initial;
 }
 
-function serializeAuctionForCache(auction: Auction) {
+function serializeAuctionForCache(auction: ListAuction | SingleAuction) {
   return {
     id: auction.id,
     title: auction.title,
@@ -70,6 +125,17 @@ function serializeAuctionForCache(auction: Auction) {
       ? auction.currentPrice.toNumber() 
       : Number(auction.currentPrice),
     sellerId: auction.sellerId,
+    seller: auction.seller ? {
+      id: auction.seller.id,
+      email: auction.seller.email,
+      name: auction.seller.name,
+    } : null,
+    winnerId: auction.winnerId,
+    winner: auction.winner ? {
+      id: auction.winner.id,
+      email: auction.winner.email,
+      name: auction.winner.name,
+    } : null,
     currency: auction.currency,
     status: auction.status,
     createdAt: auction.createdAt instanceof Date 
@@ -86,7 +152,7 @@ function serializeAuctionForCache(auction: Auction) {
 }
 
 function serializeAuctionsListForCache(result: {
-  auctions: Auction[];
+  auctions: ListAuction[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }) {
   return {
@@ -153,7 +219,7 @@ export async function getAuctions(options: GetAuctionsOptions) {
   if (status) where.status = status as "ACTIVE" | "COMPLETED" | "CANCELLED";
   if (sellerId) where.sellerId = sellerId;
 
-  const auctions = await getAuctionsRepo(prisma, where, skip, limit);
+  const auctions: ListAuction[] = await getAuctionsRepo(prisma, where, skip, limit);
   const total = await getAuctionsCount(prisma, where);
 
   const result = {
@@ -294,7 +360,7 @@ async function processEndsAt(
  * Проверка прав доступа и состояния аукциона
  */
 function validateAuctionForUpdate(
-  existingAuction: Auction,
+  existingAuction: SingleAuction,
   userId: number,
 ): void {
   if (existingAuction.sellerId !== userId) {

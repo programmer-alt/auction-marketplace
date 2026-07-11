@@ -21,12 +21,20 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
           const auctionData = data.data;
           
           // Проверяем, что пользователь является победителем аукциона
-          if (auctionData.winnerId !== user.id) {
+          // Backend может отдавать winner как winnerId (scalar) ИЛИ как winner (объект).
+          const winnerIdFromResponse =
+            auctionData.winnerId ?? auctionData.winner?.id;
+
+          // Проверяем, что winnerId соответствует ID текущего пользователя
+
+          if (winnerIdFromResponse !== user.id) {
             toast.error('Только победитель аукциона может произвести оплату');
             return;
           }
+
           
           // Проверяем статус аукциона
+
           if (auctionData.status !== 'COMPLETED') {
             toast.error('Оплата возможна только за завершенные аукционы');
             return;
