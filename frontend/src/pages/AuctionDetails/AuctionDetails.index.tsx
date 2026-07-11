@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore } from '@/store/auth.store';
 import { useAuctionData } from './hooks/useAuctionData';
 import { useBidForm } from './hooks/useBidForm';
 import { useAuctionActions } from './hooks/useAuctionActions';
@@ -12,7 +12,7 @@ import AuctionDetailsInfo from './components/AuctionDetailsInfo';
 import BidHistory from './components/BidHistory';
 import BidForm from './components/BidForm';
 import AuctionActions from './components/AuctionActions';
-import { handleBusinessLogicError } from '../../utils/universalErrorHandler';
+import { handleBusinessLogicError } from '@/utils/universalErrorHandler';
 
 
 const LoadingSkeleton = () => (
