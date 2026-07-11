@@ -112,7 +112,7 @@ async function getAuctionsListVersion(): Promise<string> {
   return initial;
 }
 
-function serializeAuctionForCache(auction: any) {
+function serializeAuctionForCache(auction: ListAuction | SingleAuction) {
   return {
     id: auction.id,
     title: auction.title,

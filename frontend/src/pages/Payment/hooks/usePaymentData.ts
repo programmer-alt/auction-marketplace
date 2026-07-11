@@ -25,20 +25,7 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
           const winnerIdFromResponse =
             auctionData.winnerId ?? auctionData.winner?.id;
 
-          // Временно логируем для диагностики несоответствия winnerId/user.id
-          console.log('[payment-check]', {
-            auctionId: auctionData.id,
-            keys: Object.keys(auctionData),
-            auctionWinnerId: auctionData.winnerId,
-            auctionWinnerObjId: auctionData.winner?.id,
-            resolvedWinnerId: winnerIdFromResponse,
-            userId: user.id,
-          });
-
-          // Доп. лог: если winnerId не приходит — выводим весь объект (можно сократить при необходимости)
-          if (winnerIdFromResponse === undefined) {
-            console.log('[payment-check] auctionData raw:', auctionData);
-          }
+          // Проверяем, что winnerId соответствует ID текущего пользователя
 
           if (winnerIdFromResponse !== user.id) {
             toast.error('Только победитель аукциона может произвести оплату');
