@@ -148,7 +148,7 @@ app.get("/metrics", async (_req, res) => {
 });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Статические файлы (загруженные изображения)
-app.use('/uploads', express.static(path.join(__dirname, '@/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
@@ -255,7 +255,7 @@ async function shutdown(signal: string) {
 
   // Сначала останавливаем Bull queue + закрываем bull redis клиенты.
   try {
-    const { gracefulShutdown } = await import("@/queues/auctionCompletionQueue");
+    const { gracefulShutdown } = await import('./queues/auctionCompletionQueue');
     await gracefulShutdown();
   } catch (error) {
     logger.error('Ошибка во время завершения Bull queue:', error);
@@ -314,7 +314,7 @@ httpServer.listen(PORT, async () => {
     logger.error('Ошибка подключения к Redis:', error);
   }
 
-  const { scheduleExistingAuctions } = await import('@/queues/auctionCompletionQueue');
+  const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
   await scheduleExistingAuctions();
 });
 
