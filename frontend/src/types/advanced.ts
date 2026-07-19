@@ -4,6 +4,7 @@
  */
 
 import { Auction, Bid, User, Payment } from './index';
+import { AxiosError } from 'axios';
 
 // Создаем типы статусов на основе существующих интерфейсов
 export type AuctionStatus = Auction['status'];
@@ -47,7 +48,8 @@ export interface DetailedError extends ErrorContract {
 }
 
 /**
- * Тип для пометки ошибок как обработанных
+ * Интерфейс для пометки ошибок как обработанных
+ * Расширяет Error и добавляет конфигурационное свойство handled
  */
 export interface HandledError extends Error {
   config?: {
@@ -461,7 +463,7 @@ export function isHandledError(error: any): error is HandledError {
 /**
  * Type guard для проверки ошибки как AxiosError
  */
-export function isAxiosError(error: any): error is import('axios').AxiosError {
+export function isAxiosError(error: any): error is AxiosError {
   return error && typeof error === 'object' && 'isAxiosError' in error;
 }
 
