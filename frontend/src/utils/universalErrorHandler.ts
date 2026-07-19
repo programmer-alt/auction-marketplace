@@ -1,32 +1,7 @@
 import toast from 'react-hot-toast';
 import { markErrorAsHandled } from './errorHandler';
-
-// Определяем контракт ошибки для унификации обработки
-export interface ErrorContract {
-  message: string;
-  level: 'info' | 'warning' | 'error' | 'critical';
-  context?: Record<string, any>;
-  handled?: boolean;
-  timestamp?: Date;
-}
-
-// Типы для классификации ошибок
-export enum ErrorCategory {
-  NETWORK = 'NETWORK',
-  VALIDATION = 'VALIDATION',
-  AUTHENTICATION = 'AUTHENTICATION',
-  AUTHORIZATION = 'AUTHORIZATION',
-  BUSINESS_LOGIC = 'BUSINESS_LOGIC',
-  SERVER_ERROR = 'SERVER_ERROR',
-  UNKNOWN = 'UNKNOWN'
-}
-
-// Интерфейс для детализации ошибки
-export interface DetailedError extends ErrorContract {
-  code?: string;
-  category: ErrorCategory;
-  originalError?: any;
-}
+import { PossibleError } from '../types/errorTypes';
+import { ErrorContract, ErrorCategory, DetailedError, isHandledError, isAxiosError } from '../types/advanced';
 
 /**
  * Универсальный обработчик ошибок
@@ -36,14 +11,15 @@ export interface DetailedError extends ErrorContract {
  * @returns Детализированная ошибка
  */
 export const handleError = (
-  error: any,
+  error: PossibleError,
   customMessage?: string,
   category?: ErrorCategory
 ): DetailedError => {
   // Если ошибка уже отмечена как обработанная, просто возвращаем её
-  if (error?.config?.handled) {
+  if (isHandledError(error)) {
+    const errorMessage = error.message || 'Unknown error';
     return {
-      message: error.message || 'Unknown error',
+      message: errorMessage,
       level: 'error',
       handled: true,
       category: category || ErrorCategory.UNKNOWN,
@@ -59,12 +35,18 @@ export const handleError = (
 
   if (!message) {
     // Проверяем различные источники сообщений об ошибке
-    if (error?.response?.data?.error) {
-      message = error.response.data.error;
-    } else if (error?.response?.data?.message) {
-      message = error.response.data.message;
-    } else if (error?.message) {
-      message = error.message;
+    if (isAxiosError(error)) {
+      // Используем явное приведение к типу для доступа к свойствам
+      const axiosErr = error as import('axios').AxiosError;
+      if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'error' in axiosErr.response.data) {
+        message = (axiosErr.response.data as any).error;
+      } else if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'message' in axiosErr.response.data) {
+        message = (axiosErr.response.data as any).message;
+      } else if (axiosErr.message) {
+        message = axiosErr.message;
+      }
+    } else if ((error as Error)?.message) {
+      message = (error as Error).message;
     } else if (typeof error === 'string') {
       message = error;
     } else {
@@ -88,7 +70,9 @@ export const handleError = (
   showNotification(errorContract);
 
   // Помечаем ошибку как обработанную
-  markErrorAsHandled(error);
+  if (error && typeof error === 'object' && error.constructor !== String && error.constructor !== Number && error.constructor !== Boolean) {
+    markErrorAsHandled(error);
+  }
 
   return errorContract;
 };
@@ -96,49 +80,60 @@ export const handleError = (
 /**
  * Классифицирует ошибку на основе её характеристик
  */
-const categorizeError = (error: any): ErrorCategory => {
-  // Проверяем, является ли ошибка сетевой ошибкой
-  if (!error?.response) {
-    if (error?.request) {
-      // Network error (no response received)
-      return ErrorCategory.NETWORK;
-    } else {
-      // Request was made but no response received
-      return ErrorCategory.NETWORK;
-    }
-  }
-
-  // Проверяем статус ошибки
-  const status = error.response?.status;
-  switch (status) {
-    case 400:
-      return ErrorCategory.VALIDATION;
-    case 401:
-      return ErrorCategory.AUTHENTICATION;
-    case 403:
-      return ErrorCategory.AUTHORIZATION;
-    case 404:
-      return ErrorCategory.BUSINESS_LOGIC;
-    case 409:
-      return ErrorCategory.BUSINESS_LOGIC;
-    case 422:
-      return ErrorCategory.VALIDATION;
-    case 429:
-      return ErrorCategory.BUSINESS_LOGIC;
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      return ErrorCategory.SERVER_ERROR;
-    default:
-      if (status && status >= 400 && status < 500) {
-        return ErrorCategory.BUSINESS_LOGIC;
-      } else if (status && status >= 500) {
-        return ErrorCategory.SERVER_ERROR;
+const categorizeError = (error: PossibleError): ErrorCategory => {
+  // Проверяем, является ли ошибка axios ошибкой
+  if (isAxiosError(error)) {
+    const axiosErr = error as import('axios').AxiosError;
+    
+    if (!axiosErr.response) {
+      if (axiosErr.request) {
+        // Network error (no response received)
+        return ErrorCategory.NETWORK;
+      } else {
+        // Request was made but no response received
+        return ErrorCategory.NETWORK;
       }
-      return ErrorCategory.UNKNOWN;
+    }
+
+    // Проверяем статус ошибки
+    const status = axiosErr.response?.status;
+    switch (status) {
+      case 400:
+        return ErrorCategory.VALIDATION;
+      case 401:
+        return ErrorCategory.AUTHENTICATION;
+      case 403:
+        return ErrorCategory.AUTHORIZATION;
+      case 404:
+        return ErrorCategory.BUSINESS_LOGIC;
+      case 409:
+        return ErrorCategory.BUSINESS_LOGIC;
+      case 422:
+        return ErrorCategory.VALIDATION;
+      case 429:
+        return ErrorCategory.BUSINESS_LOGIC;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return ErrorCategory.SERVER_ERROR;
+      default:
+        if (status && status >= 400 && status < 500) {
+          return ErrorCategory.BUSINESS_LOGIC;
+        } else if (status && status >= 500) {
+          return ErrorCategory.SERVER_ERROR;
+        }
+        return ErrorCategory.UNKNOWN;
+    }
+  } else if (error && typeof error === 'object') {
+    // Проверяем другие типы ошибок
+    return ErrorCategory.UNKNOWN;
+  } else {
+    return ErrorCategory.UNKNOWN;
   }
 };
+
+// ... остальная часть файла остается без изменений ...
 
 /**
  * Определяет уровень логирования на основе категории ошибки
@@ -186,7 +181,7 @@ const showNotification = (errorContract: DetailedError) => {
 /**
  * Вспомогательная функция для обработки бизнес-логики ошибок
  */
-export const handleBusinessLogicError = (error: any, context?: Record<string, any>): DetailedError => {
+export const handleBusinessLogicError = (error: PossibleError, context?: Record<string, any>): DetailedError => {
   const result = handleError(error, undefined, ErrorCategory.BUSINESS_LOGIC);
   // Если передан контекст, добавляем его к результату
   if (context) {
@@ -198,8 +193,8 @@ export const handleBusinessLogicError = (error: any, context?: Record<string, an
 /**
  * Вспомогательная функция для обработки сетевых ошибок
  */
-export const handleNetworkError = (error: any): DetailedError => {
-  const message = !error?.response 
+export const handleNetworkError = (error: PossibleError): DetailedError => {
+  const message = isAxiosError(error) && !(error as import('axios').AxiosError).response
     ? 'Нет соединения с сервером. Проверьте подключение к интернету.' 
     : 'Ошибка сети при выполнении запроса.';
   
@@ -209,27 +204,27 @@ export const handleNetworkError = (error: any): DetailedError => {
 /**
  * Вспомогательная функция для обработки ошибок валидации
  */
-export const handleValidationError = (error: any): DetailedError => {
+export const handleValidationError = (error: PossibleError): DetailedError => {
   return handleError(error, undefined, ErrorCategory.VALIDATION);
 };
 
 /**
  * Вспомогательная функция для обработки ошибок аутентификации
  */
-export const handleAuthError = (error: any): DetailedError => {
+export const handleAuthError = (error: PossibleError): DetailedError => {
   return handleError(error, undefined, ErrorCategory.AUTHENTICATION);
 };
 
 /**
  * Вспомогательная функция для обработки ошибок авторизации
  */
-export const handleAuthzError = (error: any): DetailedError => {
+export const handleAuthzError = (error: PossibleError): DetailedError => {
   return handleError(error, undefined, ErrorCategory.AUTHORIZATION);
 };
 
 /**
  * Вспомогательная функция для обработки ошибок сервера
  */
-export const handleServerError = (error: any): DetailedError => {
+export const handleServerError = (error: PossibleError): DetailedError => {
   return handleError(error, undefined, ErrorCategory.SERVER_ERROR);
 };

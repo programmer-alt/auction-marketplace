@@ -4,10 +4,58 @@
  */
 
 import { Auction, Bid, User, Payment } from './index';
+import { AxiosError } from 'axios';
 
 // Создаем типы статусов на основе существующих интерфейсов
 export type AuctionStatus = Auction['status'];
 export type PaymentStatus = Payment['status'];
+
+// ========================================
+// Типы для обработки ошибок
+// ========================================
+
+/**
+ * Определяем контракт ошибки для унификации обработки
+ */
+export interface ErrorContract {
+  message: string;
+  level: 'info' | 'warning' | 'error' | 'critical';
+  context?: Record<string, any>;
+  handled?: boolean;
+  timestamp?: Date;
+}
+
+/**
+ * Категории ошибок для классификации
+ */
+export enum ErrorCategory {
+  NETWORK = 'NETWORK',
+  VALIDATION = 'VALIDATION',
+  AUTHENTICATION = 'AUTHENTICATION',
+  AUTHORIZATION = 'AUTHORIZATION',
+  BUSINESS_LOGIC = 'BUSINESS_LOGIC',
+  SERVER_ERROR = 'SERVER_ERROR',
+  UNKNOWN = 'UNKNOWN'
+}
+
+/**
+ * Интерфейс для детализации ошибки
+ */
+export interface DetailedError extends ErrorContract {
+  code?: string;
+  category: ErrorCategory;
+  originalError?: any;
+}
+
+/**
+ * Интерфейс для пометки ошибок как обработанных
+ * Расширяет Error и добавляет конфигурационное свойство handled
+ */
+export interface HandledError extends Error {
+  config?: {
+    handled?: boolean;
+  };
+}
 
 // ========================================
 // Базовые утилиты
@@ -403,6 +451,20 @@ export function isCompletedAuction(auction: Auction): auction is CompletedAuctio
  */
 export function isSuccessState<T>(state: AsyncState<T>): state is SuccessState<T> {
   return state.status === 'success';
+}
+
+/**
+ * Type guard для проверки ошибки как HandledError
+ */
+export function isHandledError(error: any): error is HandledError {
+  return error && typeof error === 'object' && error.config?.handled === true;
+}
+
+/**
+ * Type guard для проверки ошибки как AxiosError
+ */
+export function isAxiosError(error: any): error is AxiosError {
+  return error && typeof error === 'object' && 'isAxiosError' in error;
 }
 
 // ========================================

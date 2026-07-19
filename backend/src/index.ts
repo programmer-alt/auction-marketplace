@@ -1,31 +1,31 @@
 
 import "dotenv/config";
 import { exec, type ExecException } from "child_process";
-import { prisma, pool } from "./config/db";
+import { prisma, pool } from "@/config/db";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { redis as pubClient } from "./config/redis";
+import { redis as pubClient } from "@/config/redis";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
-import { compressionOptions } from "./config/compression";
-import { rateLimit } from "./middleware/rateLimit";
-import { socketConnectionRateLimit } from "./middleware/socketRateLimit";
-import { parseAuthToken, authMiddleware } from "./middleware/auth";
+import { compressionOptions } from "@/config/compression";
+import { rateLimit } from "@/middleware/rateLimit";
+import { socketConnectionRateLimit } from "@/middleware/socketRateLimit";
+import { parseAuthToken, authMiddleware } from "@/middleware/auth";
 import {
   generateCsrfToken,
   verifyCsrfToken,
-} from "./middleware/csrf";
-import { validateEnv } from "./config/env";
-import { corsOriginHandler } from "./config/cors";
-import logger from "./config/logger";
-import { metricsMiddleware, register } from "./config/metrics";
-import { setResourceLimits, checkMemoryLeak } from "./config/resources";
+} from "@/middleware/csrf";
+import { validateEnv } from "@/config/env";
+import { corsOriginHandler } from "@/config/cors";
+import logger from "@/config/logger";
+import { metricsMiddleware, register } from "@/config/metrics";
+import { setResourceLimits, checkMemoryLeak } from "@/config/resources";
 
-import { upload } from './config/upload';
+import { upload } from "@/config/upload";
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -33,15 +33,15 @@ import { fileURLToPath } from 'url';
 
 
 // Routes
-import authRouter from "./routes/auth.routes";
-import auctionsRouter from "./routes/auctions.routes";
-import bidsRouter from "./routes/bids.routes";
-import paymentsRouter from "./routes/payments.routes";
-import adminRouter from "./routes/admin.routes";
+import authRouter from "@/routes/auth.routes";
+import auctionsRouter from "@/routes/auctions.routes";
+import bidsRouter from "@/routes/bids.routes";
+import paymentsRouter from "@/routes/payments.routes";
+import adminRouter from "@/routes/admin.routes";
 
 // Import error handler
-import { errorHandler } from "./errors/handler";
-import { securityHeaders } from "./middleware/securityHeaders";
+import { errorHandler } from "@/errors/handler";
+import { securityHeaders } from "@/middleware/securityHeaders";
 
 validateEnv();
 
@@ -78,7 +78,7 @@ subClient.on("error", (err: Error & { code?: string }) => {
   console.error("Redis sub client error:", err);
 });
 
-import { initSocket } from "./config/socket";
+import { initSocket } from "@/config/socket";
 const io = initSocket(httpServer, corsOriginHandler);
 io.adapter(createAdapter(pubClient, subClient));
 export { io };
@@ -255,7 +255,7 @@ async function shutdown(signal: string) {
 
   // Сначала останавливаем Bull queue + закрываем bull redis клиенты.
   try {
-    const { gracefulShutdown } = await import("./queues/auctionCompletionQueue");
+    const { gracefulShutdown } = await import('./queues/auctionCompletionQueue');
     await gracefulShutdown();
   } catch (error) {
     logger.error('Ошибка во время завершения Bull queue:', error);
