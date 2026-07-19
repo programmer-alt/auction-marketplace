@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
-import { markErrorAsHandled, PossibleError } from './errorHandler';
-import { ErrorContract, ErrorCategory, DetailedError } from '../types/advanced';
+import { markErrorAsHandled } from './errorHandler';
+import { PossibleError } from '../types/errorTypes';
+import { ErrorContract, ErrorCategory, DetailedError, isHandledError, isAxiosError } from '../types/advanced';
 
 /**
  * Универсальный обработчик ошибок
@@ -15,9 +16,8 @@ export const handleError = (
   category?: ErrorCategory
 ): DetailedError => {
   // Если ошибка уже отмечена как обработанная, просто возвращаем её
-  if (error && typeof error === 'object' && 'config' in error && (error as any).config?.handled) {
-    const typedError = error as any;
-    const errorMessage = typedError.message || (typedError as Error)?.message || 'Unknown error';
+  if (isHandledError(error)) {
+    const errorMessage = error.message || 'Unknown error';
     return {
       message: errorMessage,
       level: 'error',
@@ -35,14 +35,15 @@ export const handleError = (
 
   if (!message) {
     // Проверяем различные источники сообщений об ошибке
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as any;
-      if (axiosError.response?.data?.error) {
-        message = axiosError.response.data.error;
-      } else if (axiosError.response?.data?.message) {
-        message = axiosError.response.data.message;
-      } else if (axiosError.message) {
-        message = axiosError.message;
+    if (isAxiosError(error)) {
+      // Используем явное приведение к типу для доступа к свойствам
+      const axiosErr = error as import('axios').AxiosError;
+      if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'error' in axiosErr.response.data) {
+        message = (axiosErr.response.data as any).error;
+      } else if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'message' in axiosErr.response.data) {
+        message = (axiosErr.response.data as any).message;
+      } else if (axiosErr.message) {
+        message = axiosErr.message;
       }
     } else if ((error as Error)?.message) {
       message = (error as Error).message;
@@ -69,7 +70,9 @@ export const handleError = (
   showNotification(errorContract);
 
   // Помечаем ошибку как обработанную
-  markErrorAsHandled(error);
+  if (error && typeof error === 'object' && error.constructor !== String && error.constructor !== Number && error.constructor !== Boolean) {
+    markErrorAsHandled(error);
+  }
 
   return errorContract;
 };
@@ -78,11 +81,12 @@ export const handleError = (
  * Классифицирует ошибку на основе её характеристик
  */
 const categorizeError = (error: PossibleError): ErrorCategory => {
-  // Проверяем, является ли ошибка сетевой ошибкой
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as any;
-    if (!axiosError.response) {
-      if (axiosError.request) {
+  // Проверяем, является ли ошибка axios ошибкой
+  if (isAxiosError(error)) {
+    const axiosErr = error as import('axios').AxiosError;
+    
+    if (!axiosErr.response) {
+      if (axiosErr.request) {
         // Network error (no response received)
         return ErrorCategory.NETWORK;
       } else {
@@ -92,7 +96,7 @@ const categorizeError = (error: PossibleError): ErrorCategory => {
     }
 
     // Проверяем статус ошибки
-    const status = axiosError.response?.status;
+    const status = axiosErr.response?.status;
     switch (status) {
       case 400:
         return ErrorCategory.VALIDATION;
@@ -128,6 +132,8 @@ const categorizeError = (error: PossibleError): ErrorCategory => {
     return ErrorCategory.UNKNOWN;
   }
 };
+
+// ... остальная часть файла остается без изменений ...
 
 /**
  * Определяет уровень логирования на основе категории ошибки
@@ -188,7 +194,7 @@ export const handleBusinessLogicError = (error: PossibleError, context?: Record<
  * Вспомогательная функция для обработки сетевых ошибок
  */
 export const handleNetworkError = (error: PossibleError): DetailedError => {
-  const message = error && typeof error === 'object' && !('response' in error)
+  const message = isAxiosError(error) && !(error as import('axios').AxiosError).response
     ? 'Нет соединения с сервером. Проверьте подключение к интернету.' 
     : 'Ошибка сети при выполнении запроса.';
   

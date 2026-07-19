@@ -7,8 +7,12 @@ declare module 'axios' {
   }
 
   interface AxiosError<T = any> {
-    config: AxiosRequestConfig & {
+    config: InternalAxiosRequestConfig & {
       handled?: boolean;
     };
+  }
+  
+  interface InternalAxiosRequestConfig<D = any> {
+    handled?: boolean;
   }
 }
