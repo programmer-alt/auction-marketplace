@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
-import { ArrowLeft, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard } from 'lucide-react';
 import { usePaymentData } from './hooks/usePaymentData';
 import { useCardForm } from './hooks/useCardForm';
 import AuctionSummary from './components/AuctionSummary';
@@ -8,7 +8,7 @@ import CardForm from './components/CardForm';
 
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { paymentsApi } from '@/api/payments'
 import { handleBusinessLogicError } from '@/utils/universalErrorHandler'
 
@@ -24,10 +24,23 @@ function PaymentInner() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [secretLoading, setSecretLoading] = useState(true)
   const [secretError, setSecretError] = useState<string | null>(null)
+  
+  // Добавляем ref для отслеживания состояния загрузки и предотвращения дублирующихся вызовов
+  const isFetchingSecret = useRef(false);
 
   useEffect(() => {
-    if (!auction) return
+    if (!auction || isFetchingSecret.current) return
+    
     let cancelled = false
+
+    // Проверяем, что у нас еще нет clientSecret для этого аукциона или уже произошла ошибка
+    if (clientSecret || secretError) {
+      setSecretLoading(false);
+      return;
+    }
+
+    // Устанавливаем флаг, что запрос уже выполняется
+    isFetchingSecret.current = true;
 
     paymentsApi
       .createPaymentIntent(auction.id)
@@ -49,9 +62,17 @@ function PaymentInner() {
           setSecretLoading(false)
         }
       })
+      .finally(() => {
+        // Сбрасываем флаг после завершения запроса
+        isFetchingSecret.current = false;
+      })
 
-    return () => { cancelled = true }
-  }, [auction])
+    return () => { 
+      cancelled = true 
+      // Сбрасываем флаг при размонтировании компонента
+      isFetchingSecret.current = false;
+    }
+  }, [auction, clientSecret]) 
 
   if (loading || secretLoading) {
     return (
@@ -103,46 +124,28 @@ function PaymentInner() {
 
         <AuctionSummary auction={auction} />
 
-        <Elements stripe={stripePromise} options={{ clientSecret }}>
-          <CardForm
-            processing={processing}
-            currentPrice={auction.currentPrice}
-            onSubmit={handlePayment}
-            error={error}
-          />
-        </Elements>
-
-        <div className="mt-6 pt-6 border-t text-center text-sm text-gray-500">
-          <div className="flex items-center justify-center gap-4">
-            <span className="flex items-center gap-1">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              SSL шифрование
-            </span>
-            <span className="flex items-center gap-1">
-              <XCircle className="h-4 w-4 text-green-500" />
-              Безопасные платежи
-            </span>
-          </div>
+        <div className="mt-8">
+          <Elements 
+            stripe={stripePromise} 
+            options={{ 
+              clientSecret,
+              appearance: { theme: 'stripe' }
+            }}
+          >
+            <CardForm 
+              processing={processing} 
+              currentPrice={auction.currentPrice} 
+              onSubmit={handlePayment}
+              error={error}
+            />
+          </Elements>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function Payment() {
-  const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-
-  if (!publishableKey) {
-    return (
-      <div className="max-w-lg mx-auto">
-        <div className="card">
-          <h1 className="text-2xl font-bold mb-2">Stripe не настроен</h1>
-          <p className="text-gray-600">Не задан VITE_STRIPE_PUBLISHABLE_KEY</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <Elements stripe={stripePromise}>
       <PaymentInner />

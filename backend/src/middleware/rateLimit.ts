@@ -88,7 +88,7 @@ function getClientIp(req: Request): string {
   return remoteIp;
 }
 
-// Нормализация IP: преобразует IPv4-mapped IPv6 адреса в IPv4
+// Нормализация IP: пре��бразует IPv4-mapped IPv6 адреса в IPv4
 function normalizeIp(ip: string): string {
   // IPv4-mapped IPv6 адрес вида ::ffff:192.168.1.1 → 192.168.1.1
   const ipv4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
@@ -184,6 +184,9 @@ export async function rateLimit(
       return res.status(429).json({
         error: "Слишком много запросов от этого IP-адреса.",
         message: `Превышен лимит запросов. Попробуйте через ${WINDOW_SIZE_IN_SECONDS} секунд.`,
+        retryAfter: WINDOW_SIZE_IN_SECONDS,
+        path: req.path,
+        method: req.method,
       });
     }
 
@@ -210,6 +213,9 @@ export async function rateLimit(
         return res.status(429).json({
           error: "Слишком много запросов от этого IP-адреса.",
           message: `Превышен лимит запросов. Попробуйте через ${Math.ceil((currentEntry.resetAt - now) / 1000)} секунд.`,
+          retryAfter: Math.ceil((currentEntry.resetAt - now) / 1000),
+          path: req.path,
+          method: req.method,
         });
       }
     } else {
