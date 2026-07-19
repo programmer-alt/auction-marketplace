@@ -83,7 +83,9 @@ function AuthInitializer() {
       }
     };
     initializeAuth();
-  }, [isInitialized]); // Добавляем isInitialized в зависимости
+
+  }, []); // Пустой массив зависимостей для однократного выполнения
+  
   return null; 
 }
 
