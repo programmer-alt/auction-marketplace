@@ -88,7 +88,7 @@ function getClientIp(req: Request): string {
   return remoteIp;
 }
 
-// Нормализация IP: пре��бразует IPv4-mapped IPv6 адреса в IPv4
+// Нормализация IP: преобразует IPv4-mapped IPv6 адреса в IPv4
 function normalizeIp(ip: string): string {
   // IPv4-mapped IPv6 адрес вида ::ffff:192.168.1.1 → 192.168.1.1
   const ipv4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);

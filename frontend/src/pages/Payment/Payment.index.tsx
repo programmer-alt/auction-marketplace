@@ -72,7 +72,17 @@ function PaymentInner() {
       // Сбрасываем флаг при размонтировании компонента
       isFetchingSecret.current = false;
     }
-  }, [auction, clientSecret]) 
+  }, [auction?.id, secretError])
+
+  // Сбрасываем clientSecret при изменении auction, чтобы избежать использования старого secret
+  useEffect(() => {
+    if (auction) {
+      setClientSecret(null)
+      setSecretError(null)
+      setSecretLoading(true)
+      isFetchingSecret.current = false
+    }
+  }, [auction?.id])
 
   if (loading || secretLoading) {
     return (
@@ -146,9 +156,5 @@ function PaymentInner() {
 }
 
 export default function Payment() {
-  return (
-    <Elements stripe={stripePromise}>
-      <PaymentInner />
-    </Elements>
-  )
+  return <PaymentInner />
 }
