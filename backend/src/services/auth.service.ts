@@ -11,7 +11,7 @@ import {
 } from "../repositories/users.repository";
 import { createValidationError, createForbiddenError } from "../errors/factories";
 
-import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn } from "../config/jwt";
+import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, parseDurationToSeconds } from "../config/jwt";
 
 // ========================================
 // Типы
@@ -51,8 +51,9 @@ function generateTokens(userId: number, email: string, role: string) {
   const accessExpiresIn = getJwtAccessExpiresIn();
   const refreshExpiresIn = getJwtRefreshExpiresIn();
 
-  
-  const safeAccessExpiresIn = accessExpiresIn ?? "7d";
+  // По умолчанию access-токен живет заметно меньше, чем refresh-токен.
+  // Если значения не заданы в конфиге, используем "1h" для access и "7d" для refresh.
+  const safeAccessExpiresIn = accessExpiresIn ?? "1h";
   const safeRefreshExpiresIn = refreshExpiresIn ?? "7d";
 
   // ВАЖНО: refresh() на сервере ожидает payload.type === 'refresh'
@@ -78,13 +79,19 @@ function generateTokens(userId: number, email: string, role: string) {
  */
 async function saveRefreshToken(userId: number, refreshToken: string) {
   const key = `refresh:${userId}`;
-  const ttl = 7 * 24 * 60 * 60; // 7 дней в секундах
+
+  // выравниваем TTL в Redis с конфигурацией JWT refresh токена
+  const refreshExpiresIn = getJwtRefreshExpiresIn();
+  const ttl = parseDurationToSeconds(refreshExpiresIn);
+
   await safeRedis.setex(key, ttl, refreshToken);
 
   // Диагностика: проверим, что ключ реально записался
   try {
     const stored = await safeRedis.get(key);
-    logger.info(`[REFRESH_TOKEN_SAVE] key=${key} stored=${stored ? 'yes' : 'no'} ttl~=${ttl}`);
+    logger.info(
+      `[REFRESH_TOKEN_SAVE] key=${key} stored=${stored ? 'yes' : 'no'} ttl=${ttl} refreshExpiresIn=${refreshExpiresIn}`,
+    );
   } catch (e) {
     logger.warn('[REFRESH_TOKEN_SAVE] failed to verify stored token in redis:', e);
   }
@@ -112,16 +119,16 @@ async function blacklistToken(token: string, expiresInSeconds: number) {
  * Регистрация пользователя
  */
 export async function register(email: string, password: string, name?: string) {
-  console.log(`[REGISTER] Попытка регистрации для email: ${email}`);
+  logger.info('[REGISTER] Попытка регистрации', { email });
 
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    console.log(`[REGISTER] Пользователь уже существует: ${email}`);
+    logger.warn('[REGISTER] Пользователь уже существует', { email });
     throw createValidationError("Пользователь уже существует");
   }
 
-  console.log(`[REGISTER] Пользователь не найден, создаем новый аккаунт`);
+  logger.info('[REGISTER] Пользователь не найден, создаем новый аккаунт', { email });
 
   // Хеширование пароля
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -133,7 +140,7 @@ export async function register(email: string, password: string, name?: string) {
     name,
   });
 
-  console.log(`[REGISTER] Пользователь создан: ${user.id}, ${user.email}`);
+  logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: user.email });
 
   // Генерация пары токенов
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
@@ -154,25 +161,28 @@ export async function register(email: string, password: string, name?: string) {
  * Вход пользователя
  */
 export async function login(email: string, password: string) {
-  console.log(`[LOGIN] Попытка входа для email: ${email}`);
+  // Маскирование email для логов (чтобы не логировать полный адрес)
+  const maskedEmail = email.replace(/(.{2}).+(@.*)/, "$1***$2");
+
+  logger.info('[LOGIN] Попытка входа', { email: maskedEmail });
 
   // Поиск пользователя
   const user = await getUserByEmail(prisma, email);
   if (!user) {
-    console.log(`[LOGIN] Пользователь не найден: ${email}`);
+    logger.warn('[LOGIN] Пользователь не найден', { email: maskedEmail });
     throw createForbiddenError("Неверные учетные данные");
   }
 
-  console.log(`[LOGIN] Пользователь найден: ${user.id}, ${user.email}`);
+  logger.info('[LOGIN] Пользователь найден', { userId: user.id, email: maskedEmail });
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
-    console.log(`[LOGIN] Неверный пароль для пользователя: ${user.email}`);
+    logger.warn('[LOGIN] Неверный пароль', { email: maskedEmail });
     throw createForbiddenError("Неверные учетные данные");
   }
 
-  console.log(`[LOGIN] Успешный вход для пользователя: ${user.email}`);
+  logger.info('[LOGIN] Успешный вход', { userId: user.id, email: maskedEmail });
 
   // Генерация пары токенов
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
