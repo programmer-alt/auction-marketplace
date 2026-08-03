@@ -1,6 +1,6 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../types";
 import { prisma } from "../config/db";
 import { safeRedis } from "../config/redis";
 import logger from "../config/logger";
@@ -212,8 +212,7 @@ export async function refresh(refreshToken: string) {
   }
 
   const userId = payload.id;
-  const email = payload.email;
-  const role = payload.role;
+  const {email, role} = payload;
 
   // Проверка, что refresh токен сохранен в Redis
   const key = `refresh:${userId}`;
