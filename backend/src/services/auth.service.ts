@@ -122,7 +122,7 @@ async function blacklistToken(token: string, expiresInSeconds: number) {
  * Регистрация пользователя
  */
 export async function register(email: string, password: string, name?: string) {
-  const maskedEmail = maskEmail(email);
+  const maskedEmail = maskEmail(email.trim());
   logger.info('[REGISTER] Попытка регистрации', { email: maskedEmail });
 
   // Проверка, существует ли пользователь

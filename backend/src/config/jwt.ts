@@ -26,17 +26,26 @@ export function maskEmail(email: string): string {
     // нет символа @ или он первый — маскируем всё
     return '***';
   }
+
   const local = email.slice(0, atIndex);
   const domain = email.slice(atIndex);
-  // Оставляем первые 2 символа локальной части, остальное маскируем
-  const visible = local.length <= 2 ? local : local.slice(0, 2);
-  const masked = '*'.repeat(Math.max(local.length - 2, 1));
+
+  // Никогда не показываем всю локальную часть:
+  // - при длине 1–2 показываем только первый символ, остальное маскируем
+  // - при длине >= 3 показываем первые 2 символа, остальное маскируем
+  const visibleLength = local.length <= 2 ? 1 : 2;
+  const maskedLength = Math.max(local.length - visibleLength, 1);
+
+  const visible = local.slice(0, visibleLength);
+  const masked = '*'.repeat(maskedLength);
+
   return `${visible}${masked}${domain}`;
 }
 
 /**
  * Маскированный email из исходного.
  * Если параметр не строка — возвращает '***'.
+ * Используется для безопасной обработки email типа unknown перед передачей в maskEmail.
  */
 export function maskEmailInput(email: unknown): string {
   if (typeof email !== 'string' || !email) return '***';
@@ -50,10 +59,12 @@ export function maskEmailInput(email: unknown): string {
  */
 export function parseDurationToSeconds(duration: string, safeDefault: number = 7 * 24 * 60 * 60): number {
   if (typeof duration !== 'string' || !duration.trim()) {
+    console.warn(`[PARSE_DURATION] Invalid or empty duration, using safeDefault: ${safeDefault}s`);
     return safeDefault;
   }
   const match = duration.trim().match(/^(\d+)(d|h|m|s)$/);
   if (!match) {
+    console.warn(`[PARSE_DURATION] Unrecognized duration format "${duration}", using safeDefault: ${safeDefault}s`);
     return safeDefault;
   }
   const value = parseInt(match[1], 10);
