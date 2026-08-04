@@ -11,7 +11,7 @@ import {
 } from "../repositories/users.repository";
 import { createValidationError, createForbiddenError } from "../errors/factories";
 
-import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, parseDurationToSeconds } from "../config/jwt";
+import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, parseDurationToSeconds, maskEmail } from "../config/jwt";
 
 // ========================================
 // Типы
@@ -89,9 +89,12 @@ async function saveRefreshToken(userId: number, refreshToken: string) {
   // Диагностика: проверим, что ключ реально записался
   try {
     const stored = await safeRedis.get(key);
-    logger.info(
-      `[REFRESH_TOKEN_SAVE] key=${key} stored=${stored ? 'yes' : 'no'} ttl=${ttl} refreshExpiresIn=${refreshExpiresIn}`,
-    );
+    logger.info('[REFRESH_TOKEN_SAVE]', {
+      key,
+      stored: stored ? 'yes' : 'no',
+      ttl,
+      refreshExpiresIn,
+    });
   } catch (e) {
     logger.warn('[REFRESH_TOKEN_SAVE] failed to verify stored token in redis:', e);
   }
@@ -119,16 +122,17 @@ async function blacklistToken(token: string, expiresInSeconds: number) {
  * Регистрация пользователя
  */
 export async function register(email: string, password: string, name?: string) {
-  logger.info('[REGISTER] Попытка регистрации', { email });
+  const maskedEmail = maskEmail(email);
+  logger.info('[REGISTER] Попытка регистрации', { email: maskedEmail });
 
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    logger.warn('[REGISTER] Пользователь уже существует', { email });
+    logger.warn('[REGISTER] Пользователь уже существует', { email: maskedEmail });
     throw createValidationError("Пользователь уже существует");
   }
 
-  logger.info('[REGISTER] Пользователь не найден, создаем новый аккаунт', { email });
+  logger.info('[REGISTER] Пользователь не найден, создаем новый аккаунт', { email: maskedEmail });
 
   // Хеширование пароля
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -140,7 +144,7 @@ export async function register(email: string, password: string, name?: string) {
     name,
   });
 
-  logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: user.email });
+  logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: maskEmail(user.email) });
 
   // Генерация пары токенов
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
@@ -162,7 +166,7 @@ export async function register(email: string, password: string, name?: string) {
  */
 export async function login(email: string, password: string) {
   // Маскирование email для логов (чтобы не логировать полный адрес)
-  const maskedEmail = email.replace(/(.{2}).+(@.*)/, "$1***$2");
+  const maskedEmail = maskEmail(email);
 
   logger.info('[LOGIN] Попытка входа', { email: maskedEmail });
 
