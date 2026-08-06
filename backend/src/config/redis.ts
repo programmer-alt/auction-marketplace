@@ -135,8 +135,7 @@ export const safeRedis = {
     if (!redis) return null;
     try {
       await ensureConnected();
-      const result = await redis.incr(key);
-      return result;
+      return await redis.incr(key);
     } catch (err) {
       logger.error('Redis incr failed:', err);
       return null;

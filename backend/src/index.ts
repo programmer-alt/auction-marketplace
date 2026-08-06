@@ -1,5 +1,5 @@
-
 import "dotenv/config";
+import { closeRedis } from "@/config/redis";
 import { exec, type ExecException } from "child_process";
 import { prisma, pool } from "@/config/db";
 import express, { Request, Response } from "express";
@@ -278,6 +278,9 @@ async function shutdown(signal: string) {
     logger.warn('Ошибка закрытия Redis pubClient (игнорируем при shutdown):', error);
   }
 
+
+  // Закрываем подключение Redis
+  await closeRedis();
 
   // Закрываем подключение Prisma и пул PostgreSQL
   try {
