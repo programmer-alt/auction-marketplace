@@ -229,6 +229,7 @@ io.on("connection", (socket) => {
 
 // Flag to prevent recursive shutdown calls
 let isShuttingDown = false;
+let shutdownFailed = false;
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
@@ -280,14 +281,24 @@ async function shutdown(signal: string) {
 
 
   // Закрываем подключение Redis
-  await closeRedis();
-
+  try {
+    await closeRedis();
+  } catch (error) {
+    logger.error('Ошибка закрытия Redis:', error);
+    shutdownFailed = true;
+  }
   // Закрываем подключение Prisma и пул PostgreSQL
   try {
     await prisma.$disconnect();
     await pool.end();
   } catch (error) {
     logger.error('Ошибка отключения от базы данных:', error);
+    shutdownFailed = true;
+  }
+
+  if (shutdownFailed) {
+    logger.error('Приложение завершено с ошибками');
+    process.exit(1);
   }
 
   logger.info('Приложение успешно завершено');

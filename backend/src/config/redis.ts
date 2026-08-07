@@ -90,8 +90,7 @@ export const safeRedis = {
     if (!redis) return null;
     try {
       await ensureConnected();
-      const result = await redis.get(key);
-      return result;
+      return await redis.get(key);
     } catch (err) {
       logger.error('Redis get failed:', err);
       return null;
