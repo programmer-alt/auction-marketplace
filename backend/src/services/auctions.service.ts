@@ -268,9 +268,9 @@ export async function getAuctionById(id: number) {
  */
 export async function createAuction(data: CreateAuctionInput, userId: number) {
   // Очистка входных данных от потенциально опасного контента
-  const sanitizedData = sanitizeObject(data, {
+  const sanitizedData = sanitizeObject(data as unknown as Record<string, unknown>, {
     skipKeys: ['endsAt', 'startingPrice'],
-  });
+  }) as unknown as CreateAuctionInput;
   
   const { title, description, imageUrl, startingPrice, currency, endsAt } =
     sanitizedData;
@@ -284,14 +284,14 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
   }
 
   // Валюта по умолчанию — usd
-  const auctionCurrency = currency ? currency.toLowerCase() : "usd";
+  const auctionCurrency = (currency && typeof currency === 'string') ? currency.toLowerCase() : 'usd';
 
   const auction = await createAuctionRepo(prisma, {
-    title,
-    description,
-    imageUrl: imageUrl || null,
-    startingPrice: new Prisma.Decimal(startingPrice),
-    currentPrice: new Prisma.Decimal(startingPrice),
+    title: title as string,
+    description: description as string | null,
+    imageUrl: (imageUrl as string | null) || null,
+    startingPrice: new Prisma.Decimal(startingPrice as number),
+    currentPrice: new Prisma.Decimal(startingPrice as number),
     currency: auctionCurrency,
     sellerId: userId,
     endsAt: endsAtDate,
@@ -382,9 +382,9 @@ export async function updateAuction(
   userId: number,
 ) {
   // Очистка входных данных от потенциально опасного контента
-  const sanitizedData = sanitizeObject(data, {
+  const sanitizedData = sanitizeObject(data as unknown as Record<string, unknown>, {
     skipKeys: ['endsAt', 'startingPrice'],
-  });
+  }) as unknown as UpdateAuctionInput;
   
   // Формируем данные для обновления
   const updateData = buildUpdateData(sanitizedData);

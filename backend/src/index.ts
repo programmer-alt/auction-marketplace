@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { closeRedis } from "@/config/redis";
-import { exec, type ExecException } from "child_process";
+import { spawn } from "child_process";
 import { prisma, pool } from "@/config/db";
-import express, { Request, Response } from "express";
+import express, { type Request, type Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
@@ -58,7 +58,20 @@ let leakCheckInterval: NodeJS.Timeout | undefined = setInterval(() => {
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 5000;
+
+/**
+ * Валидирует PORT: исключает NaN, NaN-строки, вне диапазона 1-65535.
+ * Возвращает safe number или бросает ошибку.
+ */
+function validatePort(input: string | number): number {
+  const port = Number(input);
+  if (!Number.isFinite(port) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${input} (должен быть integer 1-65535)`);
+  }
+  return port;
+}
+
+const PORT = validatePort(process.env.PORT ?? 5000);
 
 
 export { prisma };
@@ -338,104 +351,99 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
     logger.error(`Порт ${PORT} уже занят. Пожалуйста, остановите процесс, который использует этот порт, прежде чем продолжить.`);
     logger.info(`Попытка найти и завершить процесс на порту ${PORT}...`);
     
+    const spawnChild = (command: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
+      return new Promise((resolve, reject) => {
+        const child = spawn(command, args, { shell: true });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+        child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+        child.on('close', (code) => {
+          if (code === 0) resolve({ stdout, stderr });
+          else reject(new Error(`Process exited with code ${code}: ${stderr}`));
+        });
+        child.on('error', reject);
+      });
+    };
+    
     if (process.platform === 'win32') {
-      // Используем PowerShell для более надежного определения процесса
-      exec(`powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess"`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
-        if (err) {
-          logger.error('Не удалось выполнить команду PowerShell для поиска процесса:', err);
-          logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
-          logger.info(`Вы можете попробовать выполнить: Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue`);
-          process.exit(1);
-        }
-        
-        const pids = (stdout as string).trim().split(/\r?\n/).map(pid => pid.trim()).filter(pid => pid !== '' && pid !== '0');
+      // Используем PowerShell — PORT валидирован, инъекция невозможна
+      try {
+        const result = await spawnChild('powershell', [
+          '-Command', `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess`
+        ]);
+        const pids = result.stdout.trim().split(/\r?\n/).map(pid => pid.trim()).filter(pid => pid !== '' && pid !== '0');
         
         if (pids.length === 0) {
-          // Проверяем, нет ли TIME_WAIT состояния (сокет еще не освободился после завершения процесса)
-          exec(`powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Format-Table -AutoSize"`, undefined, (checkErr: ExecException | null, checkStdout: string | NonSharedBuffer) => {
-            if (!checkErr) {
-              const hasTimeWait = (checkStdout as string).includes('TimeWait');
-              if (hasTimeWait) {
-                logger.warn(`Порт ${PORT} находится в состоянии TIME_WAIT (ожидание освобождения после закрытия соединения).`);
-                logger.info('Это нормально, процесс уже завершился, но сокет еще не освободился системой.');
-                logger.info('Пожалуйста, подождите 30-60 секунд и попробуйте снова.');
-                process.exit(1);
-              }
+          // Проверяем TIME_WAIT
+          try {
+            const checkResult = await spawnChild('powershell', [
+              '-Command', `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Format-Table -AutoSize`
+            ]);
+            if (checkResult.stdout.includes('TimeWait')) {
+              logger.warn(`Порт ${PORT} находится в состоянии TIME_WAIT (ожидание освобождения после закрытия соединения).`);
+              logger.info('Это нормально, процесс уже завершился, но сокет еще не освободился системой.');
+              logger.info('Пожалуйста, подождите 30-60 секунд и попробуйте снова.');
+              process.exit(1);
             }
-            logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-            logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
-            logger.info('Пожалуйста, подождите немного и попробуйте перезапустить приложение.');
-            process.exit(1);
-          });
+          } catch { /* ignore format errors */ }
+          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+          logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
+          process.exit(1);
         } else {
-          // Найдены активные процессы
-          let foundPid = false;
           for (const pid of pids) {
             if (pid && !isNaN(parseInt(pid))) {
-              foundPid = true;
-              logger.info(`Найден процесс с PID: ${pid}`);
-              logger.info(`Попытка завершить процесс ${pid}...`);
-              
-              exec(`powershell -Command "Stop-Process -Id ${pid} -Force"`, undefined, (killErr: ExecException | null) => {
-                if (killErr) {
-                  logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
-                  logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав администратора.`);
-                  logger.info(`Пожалуйста, вручную завершите процесс, использующий порт ${PORT}, и перезапустите приложение.`);
-                  logger.info(`Вы можете попробовать выполнить: Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue`);
-                  logger.info(`Затем попробуйте: Stop-Process -Id ${pid} -Force (от имени администратора)`);
-                  process.exit(1);
-                } else {
-                  logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
-                  process.exit(1);
-                }
-              });
-              // Прерываем цикл после первого PID, чтобы не завершать несколько процессов
+              logger.info(`Найден процесс с PID: ${pid}. Попытка завершить...`);
+              try {
+                await spawnChild('powershell', [
+                  '-Command', `Stop-Process -Id ${pid} -Force`
+                ]);
+                logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+                process.exit(1);
+              } catch (killErr: unknown) {
+                const msg = killErr instanceof Error ? killErr.message : String(killErr);
+                logger.error(`Не удалось завершить процесс ${pid}: ${msg}`);
+                logger.info(`ВНИМАНИЕ: Может потребоваться запуск от имени администратора.`);
+                process.exit(1);
+              }
               break;
             }
           }
-          
-          if (!foundPid) {
-            logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-            logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
-            logger.info('Пожалуйста, подождите немного и попробуйте перезапустить приложение.');
-            process.exit(1);
-          }
-        }
-      });
-    } else {
-      // For Unix-like systems
-      exec(`lsof -i :${PORT} | grep LISTEN | awk '{print $2}'`, undefined, (err: ExecException | null, stdout: string | NonSharedBuffer) => {
-        if (err) {
-          logger.error('Не удалось найти процесс, использующий порт:', err);
-          logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
           process.exit(1);
         }
-        
-        const pid = (stdout as string).trim();
+      } catch (err: unknown) {
+        logger.error('Не удалось выполнить команду PowerShell для поиска процесса:', err);
+        logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+        process.exit(1);
+      }
+    } else {
+      // Unix-like systems — lsof + kill через spawn
+      try {
+        const result = await spawnChild('lsof', ['-i', `:${PORT}`, '-t']);
+        const pid = result.stdout.trim();
         if (pid) {
-          logger.info(`Найден процесс с PID: ${pid}`);
-          logger.info(`Попытка завершить процесс ${pid}...`);
-          
-          exec(`kill -9 ${pid}`, undefined, (killErr: ExecException | null) => {
-            if (killErr) {
-              logger.error(`Не удалось завершить процесс ${pid}:`, killErr);
-              logger.info(`ВНИМАНИЕ: Не удалось завершить процесс ${pid}. Это может потребовать прав sudo.`);
-              logger.info('Пожалуйста, вручную завершите процесс, использующий порт 5000, и перезапустите приложение.');
-              logger.info(`Вы можете попробовать выполнить: lsof -i :${PORT} для определения процесса`);
-              logger.info(`Затем попробуйте: kill -9 ${pid} (с sudo при необходимости)`);
-              process.exit(1);
-            } else {
-              logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
-              process.exit(1);
-            }
-          });
+          logger.info(`Найден процесс с PID: ${pid}. Попытка завершить...`);
+          try {
+            await spawnChild('kill', ['-9', pid]);
+            logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+            process.exit(1);
+          } catch (killErr: unknown) {
+            const msg = killErr instanceof Error ? killErr.message : String(killErr);
+            logger.error(`Не удалось завершить процесс ${pid}: ${msg}`);
+            logger.info(`ВНИМАНИЕ: Может потребоваться sudo.`);
+            process.exit(1);
+          }
         } else {
           logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
           logger.info('Это может быть связано с устаревшим сокетом или другой сетевой проблемой.');
-          logger.info(`Пожалуйста, подождите немного и попробуйте перезапустить приложение, или проверьте вручную: lsof -i :${PORT}`);
           process.exit(1);
         }
-      });
+      } catch (err: unknown) {
+        logger.error('Не удалось найти процесс, использующий порт:', err);
+        logger.info('Пожалуйста, вручную проверьте процессы, использующие порт 5000.');
+        process.exit(1);
+      }
     }
   } else {
     logger.error('Ошибка сервера:', error);

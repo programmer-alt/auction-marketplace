@@ -1,5 +1,5 @@
-import { useState, useEffect
- } from 'react';
+import { useState, useEffect } from 'react';
+import { AxiosError } from 'axios';
 import { auctionsApi } from '@/api/auctions';
 import { Auction } from '@/types';
 import type { User } from '@/types/advanced';
@@ -28,7 +28,7 @@ export const useProfileData = (user: User | null) => {
       } catch (error) {
         toast.error('Не удалось загрузить данные');
         // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-        markErrorAsHandled(error);
+        markErrorAsHandled(error as Error | AxiosError);
         console.error('Failed to fetch auctions:', error);
       } finally {
         setLoading(false);

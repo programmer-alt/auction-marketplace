@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
 import { markErrorAsHandled } from './errorHandler';
 import { PossibleError } from '../types/errorTypes';
 import { ErrorContract, ErrorCategory, DetailedError, isHandledError, isAxiosError } from '../types/advanced';
@@ -71,7 +72,7 @@ export const handleError = (
 
   // Помечаем ошибку как обработанную
   if (error && typeof error === 'object' && error.constructor !== String && error.constructor !== Number && error.constructor !== Boolean) {
-    markErrorAsHandled(error);
+    markErrorAsHandled(error as Error | AxiosError);
   }
 
   return errorContract;

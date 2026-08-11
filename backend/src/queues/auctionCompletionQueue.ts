@@ -51,7 +51,7 @@ export async function gracefulShutdown() {
 
 
 // Глобальный объект для хранения клиентов Redis, чтобы можно было их корректно закрыть при shutdown
-export const sharedBullClients: Record<string, any> = {
+export const sharedBullClients: Record<string, unknown> = {
   client: null,
   subscriber: null,
   bclient: null,
@@ -114,7 +114,7 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
 
 
 // Обработчик задачи
-auctionCompletionQueue.process(async (job: any) => {
+auctionCompletionQueue.process(async (job: { data: { auctionId: number; completedBy?: string } }) => {
   const { auctionId } = job.data as AuctionCompletionJobData;
 
   if (!auctionId || typeof auctionId !== "number") {

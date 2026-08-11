@@ -56,7 +56,7 @@ export const useAuctionData = (id: string | undefined) => {
       setError(error instanceof Error ? error : new Error(String(error)));
       // Не показываем "Аукцион не найден", если запрос был отменён (StrictMode/AbortController)
       if (!isCancelError(error)) {
-        handleBusinessLogicError(error, { auctionId, context: 'useAuctionData' });
+        handleBusinessLogicError(error as any, { auctionId, context: 'useAuctionData' });
       }
     } finally {
       if (!signal?.aborted) {
@@ -80,7 +80,7 @@ export const useAuctionData = (id: string | undefined) => {
       try {
         await fetchAuction(id);
       } catch (error) {
-        handleError(error, 'Не удалось обновить данные аукциона', undefined);
+        handleError(error as any, 'Не удалось обновить данные аукциона', undefined);
       }
     }
   }, [id, fetchAuction]);

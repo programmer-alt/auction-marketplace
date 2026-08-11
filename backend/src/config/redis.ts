@@ -1,5 +1,7 @@
 import Redis from 'ioredis';
 import logger from './logger';
+import fs from 'fs';
+import path from 'path';
 
 // Проверяем наличие конфигурации Redis
 const redisHost = process.env.REDIS_HOST;
@@ -38,6 +40,38 @@ const redisUrl = getRedisUrl();
 // Проверяем, является ли URL защищенным (rediss://)
 const isSecureConnection = redisUrl?.startsWith("rediss://") || false;
 
+// Безопасное конфигурирование TLS: загружаем CA из REDIS_CA_PATH если задан
+function getTlsConfig(): Record<string, unknown> | undefined {
+  if (!isSecureConnection) return undefined;
+
+  const caPath = process.env.REDIS_CA_PATH;
+  let ca: Buffer | string | undefined;
+
+  if (caPath) {
+    // Protect against path traversal: use only the basename,
+    // resolve relative to the project root (backend/ directory).
+    const baseName = path.basename(caPath);
+    const resolvedPath = path.resolve(process.cwd(), 'certs', baseName);
+    
+    try {
+      fs.accessSync(resolvedPath, fs.constants.R_OK);
+      ca = fs.readFileSync(resolvedPath);
+    } catch (err) {
+      logger.warn(`REDIS_CA_PATH "${resolvedPath}" недоступен для чтения, используем системные CA:`, err);
+    }
+  }
+
+  // В продакшене валидация обязательна; в dev можно отключить только с явным флагом
+  const rejectUnauthorized =
+    process.env.REDIS_DISABLE_TLS_VERIFY !== 'true' &&
+    process.env.NODE_ENV !== 'development';
+
+  return {
+    ca,
+    rejectUnauthorized,
+  };
+}
+
 export const redis = redisUrl
   ? new Redis(redisUrl, {
       lazyConnect: false, // Подключаться сразу, а не лениво
@@ -45,12 +79,7 @@ export const redis = redisUrl
       maxRetriesPerRequest: null, // Отключаем встроенную систему повторных попыток Bull (null означает отсутствие лимита)
       enableReadyCheck: false, // Отключаем проверку готовности, чтобы избежать конфликта с Bull
       connectionName: 'main-app',
-      // Добавляем SSL параметры, если используется защищенное соединение
-      ...(isSecureConnection && { 
-        tls: { 
-          rejectUnauthorized: false // Отключаем проверку сертификатов для облачных провайдеров Redis
-        } 
-      }),
+      tls: getTlsConfig(),
     })
   : null;
 

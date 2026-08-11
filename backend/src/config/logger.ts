@@ -15,6 +15,14 @@ const levels = {
 
 type LogLevel = keyof typeof levels;
 
+// Safe type for Winston log info (flexible internal structure)
+interface LogInfo {
+  level?: unknown;
+  message?: unknown;
+  timestamp?: unknown;
+  [key: string]: unknown;
+}
+
 const level = () => {
   const env = process.env.NODE_ENV || 'development';
   const isDevelopment = env === 'development';
@@ -29,18 +37,18 @@ const colors: Record<LogLevel, string> = {
   debug: 'white',
 };
 
-// В TransformableInfo `level` типизирован как string, поэтому убираем строгую типизацию.
-const colorizedFormat = printf((info: any) => {
-  const lvl = (info?.level as string) as LogLevel;
-  const color = colors[lvl] ?? colors.info;
-  const msg = info?.message ?? '';
+const colorizedFormat = printf((info: LogInfo) => {
+  const lvl = String(info?.level ?? 'info');
+  const safeLevel = (lvl in colors ? lvl : 'info') as LogLevel;
+  const color = colors[safeLevel];
+  const msg = String(info?.message ?? '');
   return `\u001b[${color}m${lvl}: ${msg}\u001b[0m`;
 });
 
-const fileFormat = printf((info: any) => {
-  const lvl = (info?.level as string) ?? 'info';
-  const ts = info?.timestamp ?? '';
-  const msg = info?.message ?? '';
+const fileFormat = printf((info: LogInfo) => {
+  const lvl = String(info?.level ?? 'info');
+  const ts = String(info?.timestamp ?? '');
+  const msg = String(info?.message ?? '');
   return `[${ts}] ${lvl}: ${msg}`;
 });
 
@@ -57,7 +65,7 @@ const transports: winston.transport[] = [
     level: 'info',
     format: fileFormat,
   }),
-  new (DailyRotateFile as any)({
+  new (DailyRotateFile as unknown as new (options: object) => winston.transport)({
     filename: path.join(process.cwd(), 'logs', 'error-%DATE%.log'),
     datePattern: 'YYYY-MM-DD',
     zippedArchive: true,
@@ -69,8 +77,8 @@ const transports: winston.transport[] = [
 ];
 
 const logger = winston.createLogger({
-  level: level() as any,
-  levels: levels as any,
+  level: level(),
+  levels,
   format,
   transports,
 });
@@ -81,7 +89,7 @@ if (process.env.NODE_ENV !== 'production') {
       format: combine(
         colorize(),
         timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        printf((info: any) => `${info.level}: ${info.message}`)
+        printf((info: LogInfo) => `${String(info.level ?? '')}: ${String(info.message ?? '')}`)
       ),
     })
   );

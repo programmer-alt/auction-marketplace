@@ -76,7 +76,10 @@ export const auctionsController = {
     const parsed = createAuctionSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
-    const result = await auctionsService.createAuction(parsed.data, req.user!.id);
+    const userId = req.user?.id;
+    if (!userId) return next(createValidationError("User not authenticated"));
+    
+    const result = await auctionsService.createAuction(parsed.data, userId);
     res.status(201).json({ message: "Аукцион успешно создан", auction: result });
   }),
 
@@ -87,7 +90,10 @@ export const auctionsController = {
     const parsed = updateAuctionSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
-    const result = await auctionsService.updateAuction(id, parsed.data, req.user!.id);
+    const userId = req.user?.id;
+    if (!userId) return next(createValidationError("User not authenticated"));
+    
+    const result = await auctionsService.updateAuction(id, parsed.data, userId);
     res.json({ message: "Аукцион успешно обновлён", auction: result });
   }),
 
@@ -95,7 +101,10 @@ export const auctionsController = {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
 
-    await auctionsService.deleteAuction(id, req.user!.id);
+    const userId = req.user?.id;
+    if (!userId) return next(createValidationError("User not authenticated"));
+    
+    await auctionsService.deleteAuction(id, userId);
     res.json({ message: "Аукцион успешно удалён" });
   }),
 };
