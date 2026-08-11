@@ -79,6 +79,7 @@ skills-lock.json
 /.fitten/
 /.lingma/
 /.gigacode/
+.gigacode_vsc/
 /.codegeex/
 .agents/
 .kiro/
@@ -95,3 +96,8 @@ AGENTS.md
 
 # Uploads directory
 /backend/uploads/*
+
+# GitHub
+.github/
+
+.ai-memory/
