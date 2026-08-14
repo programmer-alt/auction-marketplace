@@ -164,7 +164,7 @@ export const getAuctionsWithCursor = async (
   prisma: PrismaClient,
   where: Prisma.AuctionWhereInput,
   options: CursorPaginationOptions & { cursorField?: string; cursorFields?: string[] },
-): Promise<CursorPaginationResult<any>> => {
+): Promise<CursorPaginationResult<Record<string, unknown>>> => {
   // Если указаны составные поля, используем составную пагинацию
   if (options.cursorFields && options.cursorFields.length > 0) {
     return getAuctionsWithCompositeCursor(prisma, where, {
@@ -230,7 +230,7 @@ export const getAuctionsWithCompositeCursor = async (
   prisma: PrismaClient,
   where: Prisma.AuctionWhereInput,
   options: CompositeCursorPaginationOptions,
-): Promise<CursorPaginationResult<any>> => {
+): Promise<CursorPaginationResult<Record<string, unknown>>> => {
   const { cursor, limit, direction, cursorFields } = parseCompositePaginationOptions(options);
   
   // Создаем условие для составного курсора

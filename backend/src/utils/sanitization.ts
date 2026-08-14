@@ -71,7 +71,7 @@ export function sanitizeUrl(input: string): string {
 /**
  * Очистка объекта, рекурсивно обрабатывая все строковые поля
  */
-export function sanitizeObject<T extends Record<string, any>>(
+export function sanitizeObject<T extends Record<string, unknown>>(
   obj: T,
   options: {
     skipKeys?: string[];
@@ -81,25 +81,32 @@ export function sanitizeObject<T extends Record<string, any>>(
 ): T {
   const { skipKeys = [], sanitizeHtml: allowHtml = false, allowedHtmlTags = [] } = options;
 
-  const sanitized = { ...obj };
+  const sanitized: Record<string, unknown> = { ...obj };
 
   for (const key in sanitized) {
     if (skipKeys.includes(key)) {
       continue;
     }
 
-    const value = sanitized[key as keyof T];
+    const value = sanitized[key as keyof typeof sanitized];
 
     if (typeof value === 'string') {
-      (sanitized as T)[key as keyof T] = allowHtml
-        ? (sanitizeHtml(value, allowedHtmlTags) as any)
-        : (sanitizeString(value) as any);
+      sanitized[key as keyof typeof sanitized] = allowHtml
+        ? sanitizeHtml(value, allowedHtmlTags)
+        : sanitizeString(value);
     } else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitizeObject(value, options);
+      // Use Record<string, unknown> for nested objects to avoid forcing
+      // incompatible shapes onto the parent generic T.  The final cast
+      // to T happens only once at the return statement.
+      const nestedResult = sanitizeObject<Record<string, unknown>>(
+        value as Record<string, unknown>,
+        options,
+      );
+      sanitized[key as keyof typeof sanitized] = nestedResult;
     }
   }
 
-  return sanitized;
+  return sanitized as T;
 }
 
 /**
@@ -124,7 +131,7 @@ export function sanitizeEmail(input: string): string {
 /**
  * Очистка числового значения
  */
-export function sanitizeNumber(input: any): number | null {
+export function sanitizeNumber(input: unknown): number | null {
   if (typeof input === 'number') {
     return isNaN(input) ? null : input;
   }

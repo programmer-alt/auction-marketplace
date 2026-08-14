@@ -127,11 +127,13 @@ export const paymentsProcessedTotal = new promClient.Counter({
   registers: [register],
 });
 
+import type { Request, Response, NextFunction } from 'express';
+
 // ========================================
 // Middleware для Express
 // ========================================
 
-export const metricsMiddleware = (req: any, res: any, next: any) => {
+export const metricsMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
 
   res.on('finish', () => {

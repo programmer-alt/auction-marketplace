@@ -323,13 +323,13 @@ export function createOrderBy(
  * Вспомогательная функция для использования пагинации в Prisma-транзакциях
  * Принимает Prisma-транзакцию и возвращает результат пагинации
  */
-export async function paginateWithTransaction<T extends Record<string, any>>(
-  prisma: any, // PrismaClient или транзакция
+export async function paginateWithTransaction<T extends Record<string, unknown>>(
+  prisma: unknown,
   findManyArgs: {
     where?: Record<string, unknown>;
     orderBy?: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
-    include?: any;
-    select?: any;
+    include?: unknown;
+    select?: unknown;
   },
   options: CompositeCursorPaginationOptions
 ): Promise<CursorPaginationResult<T>> {
@@ -342,7 +342,7 @@ export async function paginateWithTransaction<T extends Record<string, any>>(
     ...whereClause,
   };
 
-  const data = await prisma.findMany({
+  const data = await (prisma as any).findMany({
     ...findManyArgs,
     where: combinedWhere,
     orderBy,

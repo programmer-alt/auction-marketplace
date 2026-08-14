@@ -79,7 +79,7 @@ export const usePaymentData = (id: string | undefined, user: User | null) => {
         }
       } catch (error) {
         console.error('Ошибка при загрузке данных аукциона для оплаты:', error);
-        handleError(error, 'Ошибка при загрузке данных аукциона', undefined);
+        handleError(error as any, 'Ошибка при загрузке данных аукциона', undefined);
       } finally {
         setLoading(false);
       }

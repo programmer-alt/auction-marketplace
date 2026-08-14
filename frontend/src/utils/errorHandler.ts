@@ -5,24 +5,31 @@ import { DetailedError, HandledError, isAxiosError } from '../types/advanced';
  * Упрощенная функция для пометки ошибки как обработанной
  * Принимает только конкретные типы ошибок вместо unknown
  */
-export const markErrorAsHandled = (error: Error | AxiosError | DetailedError): void => {
+export const markErrorAsHandled = (error: Error | AxiosError | DetailedError | unknown): void => {
   if (!error) return;
 
   // Для AxiosError проверяем наличие config
   if (isAxiosError(error)) {
     if (!error.config) {
-      error.config = { headers: {} } as any; // Задаем базовую структуру для config
+      error.config = { headers: {} } as AxiosError['config'];
     }
-    (error.config as any).handled = true; // Явно приводим к any для обхода строгой проверки
+    if (error.config) {
+      const config = error.config as unknown as Record<string, unknown>;
+      config.handled = true;
+    }
     return;
   }
 
   // Для других типов ошибок добавляем свойство handled
   const handledError = error as HandledError;
-  if (!handledError.config) {
-    handledError.config = {};
+  if (handledError && typeof handledError === 'object') {
+    if (!handledError.config) {
+      (handledError as HandledError).config = {};
+    }
+    if (handledError.config) {
+      handledError.config.handled = true;
+    }
   }
-  handledError.config!.handled = true;
 };
 
 // Экспортируем типы для использования в других модулях

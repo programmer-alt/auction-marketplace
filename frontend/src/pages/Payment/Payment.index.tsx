@@ -117,7 +117,7 @@ function PaymentInner() {
             <CreditCard className="h-6 w-6 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Оплата</h1>
+            <h1 data-testid="payment-title" className="text-2xl font-bold">Оплата</h1>
             <p className="text-gray-600 text-sm">Безопасная оплата через Stripe</p>
           </div>
         </div>

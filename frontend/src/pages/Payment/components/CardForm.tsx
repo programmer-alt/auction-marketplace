@@ -17,8 +17,8 @@ const CardForm: React.FC<CardFormProps> = ({
   onSubmit,
   error,
 }) => (
-  <form onSubmit={onSubmit} className="space-y-5">
-    <div>
+  <form data-testid="payment-form" onSubmit={onSubmit} className="space-y-5">
+    <div data-testid="payment-method-container">
       <label className="block text-sm font-medium text-gray-700 mb-1">Способ оплаты</label>
       <div className="bg-white rounded-lg border border-gray-200 p-3">
         <PaymentElement />
@@ -26,7 +26,7 @@ const CardForm: React.FC<CardFormProps> = ({
     </div>
 
     {error ? (
-      <div className="bg-red-50 rounded-lg p-3 text-sm text-red-700">{error}</div>
+      <div data-testid="payment-error" className="bg-red-50 rounded-lg p-3 text-sm text-red-700">{error}</div>
     ) : null}
 
     <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-700">
@@ -36,6 +36,7 @@ const CardForm: React.FC<CardFormProps> = ({
     </div>
 
     <button
+      data-testid="payment-submit"
       type="submit"
       disabled={processing}
       className="w-full btn-primary flex items-center justify-center gap-2"

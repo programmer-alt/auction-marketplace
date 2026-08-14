@@ -39,6 +39,11 @@ export enum ErrorCategory {
 }
 
 /**
+ * Возможные типы ошибок - упрощаем до unknown
+ */
+export type PossibleError = unknown;
+
+/**
  * Интерфейс для детализации ошибки
  */
 export interface DetailedError extends ErrorContract {

@@ -1,5 +1,5 @@
 // Функция получения статистики очереди
-import Queue from "bull";
+import Queue, { type Job } from "bull";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
 import logger from "../config/logger";
@@ -51,7 +51,7 @@ export async function gracefulShutdown() {
 
 
 // Глобальный объект для хранения клиентов Redis, чтобы можно было их корректно закрыть при shutdown
-export const sharedBullClients: Record<string, any> = {
+export const sharedBullClients: Record<string, unknown> = {
   client: null,
   subscriber: null,
   bclient: null,
@@ -60,6 +60,7 @@ export const sharedBullClients: Record<string, any> = {
 // Типизация данных задачи
 interface AuctionCompletionJobData {
   auctionId: number;
+  completedBy?: string;
 }
 
 // Константы WebSocket событий
@@ -114,8 +115,8 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
 
 
 // Обработчик задачи
-auctionCompletionQueue.process(async (job: any) => {
-  const { auctionId } = job.data as AuctionCompletionJobData;
+auctionCompletionQueue.process(async (job: Job<AuctionCompletionJobData>) => {
+  const { auctionId, completedBy } = job.data;
 
   if (!auctionId || typeof auctionId !== "number") {
     logger.error(`Некорректный auctionId: ${auctionId}`);

@@ -72,7 +72,7 @@ export default function PaymentResult() {
   if (status === 'loading') {
     return (
       <div className="max-w-lg mx-auto">
-        <div className="card flex flex-col items-center py-12">
+        <div data-testid="payment-result-loading" className="card flex flex-col items-center py-12">
           <LoadingSpinner />
           <p className="mt-4 text-gray-600">Проверяем статус платежа...</p>
         </div>
@@ -83,7 +83,7 @@ export default function PaymentResult() {
   if (status === 'success') {
     return (
       <div className="max-w-lg mx-auto">
-        <div className="card text-center">
+        <div data-testid="payment-result-success" className="card text-center">
           <div className="bg-green-100 p-4 rounded-full inline-block mb-4">
             <CheckCircle className="h-12 w-12 text-green-600" />
           </div>
@@ -104,7 +104,7 @@ export default function PaymentResult() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="card text-center">
+      <div data-testid="payment-result-failed" className="card text-center">
         <div className="bg-red-100 p-4 rounded-full inline-block mb-4">
           <XCircle className="h-12 w-12 text-red-600" />
         </div>

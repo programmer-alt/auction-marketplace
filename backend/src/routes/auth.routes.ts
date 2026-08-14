@@ -32,7 +32,7 @@ const loginLimiter = rateLimit({
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Middleware для пропуска лимитов в разработке
-const skipRateLimit = (_req: Request, _res: Response, next: (err?: any) => void) => next();
+const skipRateLimit = (_req: Request, _res: Response, next: (err?: Error) => void) => next();
 
 // Добавляем новый рейт-лимитер для refresh
 const refreshLimiter = rateLimit({
