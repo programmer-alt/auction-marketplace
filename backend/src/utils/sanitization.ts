@@ -95,8 +95,14 @@ export function sanitizeObject<T extends Record<string, unknown>>(
         ? sanitizeHtml(value, allowedHtmlTags)
         : sanitizeString(value);
     } else if (typeof value === 'object' && value !== null) {
-      const nestedResult = sanitizeObject(value as T, options);
-      (sanitized as T)[key as keyof T] = nestedResult as T[keyof T];
+      // Use Record<string, unknown> for nested objects to avoid forcing
+      // incompatible shapes onto the parent generic T.  The final cast
+      // to T happens only once at the return statement.
+      const nestedResult = sanitizeObject<Record<string, unknown>>(
+        value as Record<string, unknown>,
+        options,
+      );
+      sanitized[key as keyof typeof sanitized] = nestedResult;
     }
   }
 

@@ -48,16 +48,60 @@ function getTlsConfig(): Record<string, unknown> | undefined {
   let ca: Buffer | string | undefined;
 
   if (caPath) {
-    // Protect against path traversal: use only the basename,
-    // resolve relative to the project root (backend/ directory).
-    const baseName = path.basename(caPath);
-    const resolvedPath = path.resolve(process.cwd(), 'certs', baseName);
-    
+    let resolvedPath: string;
+
+    // REDIS_CA_DIR — необязательный пользовательский каталог для CA-сертификатов.
+    // Если задан, относительные пути resolves относительно него вместо certs/.
+    const caDirEnv = process.env.REDIS_CA_DIR;
+    let baseDir: string;
+
+    if (path.isAbsolute(caPath)) {
+      // Абсолютный путь: используем как есть после базовой валидации
+      resolvedPath = path.resolve(caPath);
+    } else if (caDirEnv && path.isAbsolute(caDirEnv)) {
+      // Относительный путь + пользовательский каталог: resolves относительно REDIS_CA_DIR
+      baseDir = path.resolve(caDirEnv);
+      resolvedPath = path.resolve(baseDir, caPath);
+    } else {
+      // Относительный путь: resolves относительно certs/
+      resolvedPath = path.resolve(process.cwd(), 'certs', caPath);
+    }
+
+    // Безопасность: базовые проверки без жёсткого whitelisting директорий
+    const normalizedPath = path.normalize(resolvedPath);
+
+    // Reject paths with directory traversal (e.g. .., dotdotdot)
+    const parts = normalizedPath.split(path.sep);
+    if (parts.some(p => p === '..')) {
+      logger.warn(`REDIS_CA_PATH "${caPath}" содержит dangerous sequence "..", используем системные CA`);
+      return { rejectUnauthorized: true };
+    }
+
+    // Reject hidden files/directories (dotfiles)
+    if (parts.some(p => p.startsWith('.') && p !== '')) {
+      logger.warn(`REDIS_CA_PATH "${caPath}" находится в скрытом каталоге или является dotfile, используем системные CA`);
+      return { rejectUnauthorized: true };
+    }
+
+    // Ensure the resolved path is a file, not a directory
+    try {
+      const stats = fs.statSync(resolvedPath);
+      if (!stats.isFile()) {
+        logger.warn(`REDIS_CA_PATH "${resolvedPath}" указывает на каталог, а не на файл, используем системные CA`);
+        return { rejectUnauthorized: true };
+      }
+    } catch {
+      // statSync throws if file doesn't exist — will be caught below
+    }
+
     try {
       fs.accessSync(resolvedPath, fs.constants.R_OK);
       ca = fs.readFileSync(resolvedPath);
+      logger.info(`TLS CA certificate loaded from ${resolvedPath}`);
     } catch (err) {
-      logger.warn(`REDIS_CA_PATH "${resolvedPath}" недоступен для чтения, используем системные CA:`, err);
+      logger.warn(
+        `REDIS_CA_PATH "${resolvedPath}" недоступен для чтения, используем системные CA`
+      );
     }
   }
 

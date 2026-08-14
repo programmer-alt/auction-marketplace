@@ -78,7 +78,7 @@ export default function Home() {
             {auctions.map((auction) => {
               const statusInfo = getStatusBadge(auction.status);
               return (
-                <Link key={auction.id} to={`/auctions/${auction.id}`} className="card hover:shadow-md transition-shadow block">
+                <Link key={auction.id} to={`/auctions/${auction.id}`} data-testid={`auction-card-${auction.id}`} className="card hover:shadow-md transition-shadow block">
                   {auction.imageUrl ? (
                     <img src={auction.imageUrl} alt={auction.title} className="w-full h-40 object-cover rounded-lg mb-4" />
                   ) : (

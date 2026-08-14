@@ -353,7 +353,8 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
     
     const spawnChild = (command: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
-        const child = spawn(command, args, { shell: true });
+        // No shell: use direct command execution for better security
+        const child = spawn(command, args);
         let stdout = '';
         let stderr = '';
         child.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
@@ -367,18 +368,20 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
     };
     
     if (process.platform === 'win32') {
-      // Используем PowerShell — PORT валидирован, инъекция невозможна
+      // PowerShell with native commands — PORT is validated as number, injection impossible
       try {
         const result = await spawnChild('powershell', [
-          '-Command', `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess`
+          '-Command', 
+          `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess`
         ]);
         const pids = result.stdout.trim().split(/\r?\n/).map(pid => pid.trim()).filter(pid => pid !== '' && pid !== '0');
         
         if (pids.length === 0) {
-          // Проверяем TIME_WAIT
+          // Check TIME_WAIT state
           try {
             const checkResult = await spawnChild('powershell', [
-              '-Command', `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Format-Table -AutoSize`
+              '-Command',
+              `Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Format-Table -AutoSize`
             ]);
             if (checkResult.stdout.includes('TimeWait')) {
               logger.warn(`Порт ${PORT} находится в состоянии TIME_WAIT (ожидание освобождения после закрытия соединения).`);
@@ -396,7 +399,8 @@ httpServer.on('error', async (error: NodeJS.ErrnoException) => {
               logger.info(`Найден процесс с PID: ${pid}. Попытка завершить...`);
               try {
                 await spawnChild('powershell', [
-                  '-Command', `Stop-Process -Id ${pid} -Force`
+                  '-Command',
+                  `Stop-Process -Id ${pid} -Force`
                 ]);
                 logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
                 process.exit(1);

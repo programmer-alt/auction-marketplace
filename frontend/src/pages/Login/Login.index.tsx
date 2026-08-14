@@ -99,6 +99,7 @@ export default function Login() {
             </label>
             <input
               id="email"
+              data-testid="login-email"
               type="email"
               className="input-field animate-pulse-glow"
               placeholder="your@email.com"
@@ -115,6 +116,7 @@ export default function Login() {
             </label>
             <input
               id="password"
+              data-testid="login-password"
               type="password"
               className="input-field animate-pulse-glow"
               placeholder="••••••••"
@@ -126,6 +128,7 @@ export default function Login() {
           </div>
 
           <button
+            data-testid="login-submit"
             type="submit"
             disabled={isLoading}
             className="w-full btn-primary flex items-center justify-center animate-pulse-button"

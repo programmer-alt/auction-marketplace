@@ -1,5 +1,5 @@
 // Функция получения статистики очереди
-import Queue from "bull";
+import Queue, { type Job } from "bull";
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
 import logger from "../config/logger";
@@ -60,6 +60,7 @@ export const sharedBullClients: Record<string, unknown> = {
 // Типизация данных задачи
 interface AuctionCompletionJobData {
   auctionId: number;
+  completedBy?: string;
 }
 
 // Константы WebSocket событий
@@ -114,8 +115,8 @@ export const auctionCompletionQueue = new Queue<AuctionCompletionJobData>(
 
 
 // Обработчик задачи
-auctionCompletionQueue.process(async (job: { data: { auctionId: number; completedBy?: string } }) => {
-  const { auctionId } = job.data as AuctionCompletionJobData;
+auctionCompletionQueue.process(async (job: Job<AuctionCompletionJobData>) => {
+  const { auctionId, completedBy } = job.data;
 
   if (!auctionId || typeof auctionId !== "number") {
     logger.error(`Некорректный auctionId: ${auctionId}`);
