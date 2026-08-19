@@ -1,13 +1,10 @@
 import "dotenv/config";
-import { closeRedis } from "@/config/redis";
 import { spawn } from "child_process";
 import { prisma, pool } from "@/config/db";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
-import { createAdapter } from "@socket.io/redis-adapter";
-import { redis as pubClient } from "@/config/redis";
 import helmet from "helmet";
 import hpp from "hpp";
 import compression from "compression";
@@ -28,6 +25,14 @@ import { setResourceLimits, checkMemoryLeak } from "@/config/resources";
 import { upload } from "@/config/upload";
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Таймаут для async операций
+function timeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(errorMsg)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]);
+}
 
 
 
@@ -76,24 +81,8 @@ const PORT = validatePort(process.env.PORT ?? 5000);
 
 export { prisma };
 
-// Redis клиенты для Socket.io адаптера (теперь используем ioredis)
-
-
-if (!pubClient) {
-  throw new Error('Redis client is not available');
-}
-
-// Для Socket.IO адаптера используем ioredis.duplicate()
-const subClient = pubClient.duplicate();
-
-subClient.on("error", (err: Error & { code?: string }) => {
-  if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
-  console.error("Redis sub client error:", err);
-});
-
 import { initSocket } from "@/config/socket";
 const io = initSocket(httpServer, corsOriginHandler);
-io.adapter(createAdapter(pubClient, subClient));
 export { io };
 // ========================================
 // Middleware безопасности и производительности
@@ -243,15 +232,36 @@ io.on("connection", (socket) => {
 // Flag to prevent recursive shutdown calls
 let isShuttingDown = false;
 let shutdownFailed = false;
+let shutdownTimeout: NodeJS.Timeout | null = null; // Таймер для принудительного завершения
 
 // Функция корректного завершения работы
 async function shutdown(signal: string) {
   if (isShuttingDown) {
-    logger.info(`Завершение уже в процессе. Сигнал ${signal} игнорируется.`);
-    return;
+    // Если shutdown уже в процессе и мы получаем SIGINT, планируем принудительный выход асинхронно
+    if (signal === 'SIGINT') {
+      logger.info(`Получен повторный сигнал SIGINT. Планируется принудительное завершение.`);
+      // Используем setTimeout(0) для выхода из текущего стека вызовов
+      setImmediate(() => {
+         logger.info('Выполняется принудительное завершение из setImmediate.');
+         process.exit(130); // Стандартный код выхода для SIGINT
+      });
+      // Не возвращаемся, чтобы позволить остальной части shutdown() завершиться, но процесс уже запланирован к выходу
+    } else {
+      logger.info(`Завершение уже в процессе. Сигнал ${signal} игнорируется.`);
+      return;
+    }
   }
   
+  // Устанавливаем флаг и таймер для принудительного выхода
   isShuttingDown = true;
+  if (shutdownTimeout) {
+     clearTimeout(shutdownTimeout);
+  }
+  shutdownTimeout = setTimeout(() => {
+    logger.warn('Таймаут ожидания корректного завершения. Принудительное завершение.');
+    process.exit(130);
+  }, 10000); // 10 секунд таймаута
+
   logger.info(`Получен сигнал ${signal}. Корректное завершение...`);
 
   // Закрываем соединения HTTP сервера
@@ -267,47 +277,23 @@ async function shutdown(signal: string) {
     logger.error('Ошибка очистки интервала проверки утечки памяти:', error);
   }
 
-  // Сначала останавливаем Bull queue + закрываем bull redis клиенты.
-  try {
-    const { gracefulShutdown } = await import('./queues/auctionCompletionQueue');
-    await gracefulShutdown();
-  } catch (error) {
-    logger.error('Ошибка во время завершения Bull queue:', error);
-  }
 
-  // Затем закрываем Redis клиенты для Socket.io адаптера.
-  // Важно: ошибки Connection is closed при shutdown — не критичны.
-  try {
-    if (subClient && typeof subClient.quit === 'function') {
-      await subClient.quit();
-    }
-  } catch (error) {
-    logger.warn('Ошибка закрытия Redis subClient (игнорируем при shutdown):', error);
-  }
-  try {
-    if (pubClient && typeof pubClient.quit === 'function') {
-      await pubClient.quit();
-    }
-  } catch (error) {
-    logger.warn('Ошибка закрытия Redis pubClient (игнорируем при shutdown):', error);
-  }
-
-
-  // Закрываем подключение Redis
-  try {
-    await closeRedis();
-  } catch (error) {
-    logger.error('Ошибка закрытия Redis:', error);
-    shutdownFailed = true;
-  }
   // Закрываем подключение Prisma и пул PostgreSQL
   try {
-    await prisma.$disconnect();
-    await pool.end();
+    await timeout(prisma.$disconnect(), 5000, "Таймаут ожидания отключения Prisma");
+    await timeout(pool.end(), 5000, "Таймаут ожидания закрытия пула PostgreSQL");
   } catch (error) {
-    logger.error('Ошибка отключения от базы данных:', error);
+    logger.error('Ошибка отключения от базы данных (возможно, таймаут):', error);
     shutdownFailed = true;
   }
+
+  // Очищаем таймер принудительного завершения и сбрасываем флаг
+  if (shutdownTimeout) {
+    clearTimeout(shutdownTimeout);
+    shutdownTimeout = null;
+  }
+
+  isShuttingDown = false;
 
   if (shutdownFailed) {
     logger.error('Приложение завершено с ошибками');
@@ -329,20 +315,6 @@ httpServer.listen(PORT, async () => {
   } catch (error) {
     logger.error('Ошибка подключения к базе данных:', error);
   }
-
-  try {
-    if (pubClient) {
-      await pubClient.ping();
-      logger.info('Redis подключен');
-    } else {
-      logger.warn('Redis недоступен');
-    }
-  } catch (error) {
-    logger.error('Ошибка подключения к Redis:', error);
-  }
-
-  const { scheduleExistingAuctions } = await import('./queues/auctionCompletionQueue');
-  await scheduleExistingAuctions();
 });
 
 // Обработка ошибки EADDRINUSE

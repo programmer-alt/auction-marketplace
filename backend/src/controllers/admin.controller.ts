@@ -1,17 +1,16 @@
 import { Request, Response } from "express";
-import { auctionCompletionQueue } from "../queues/auctionCompletionQueue";
 import { asyncHandler } from "../utils/asyncHandler";
 
+// Статистика очереди отключена (Bull удалён)
 export const getQueueStats = asyncHandler(async (_req: Request, res: Response) => {
-  const counts = await auctionCompletionQueue.getJobCounts();
   res.json({
     queue: "auctionCompletion",
     stats: {
-      waiting: counts.waiting,
-      active: counts.active,
-      delayed: counts.delayed,
-      completed: counts.completed,
-      failed: counts.failed,
+      waiting: 0,
+      active: 0,
+      delayed: 0,
+      completed: 0,
+      failed: 0,
     },
     timestamp: new Date().toISOString(),
   });

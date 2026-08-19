@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
 import { getJwtSecret } from "../config/jwt";
-import { safeRedis } from "../config/redis";
 
 export interface AuthContext {
   id: number;
@@ -17,13 +16,6 @@ export type AuthResult =
   | { success: true; user: AuthContext }
   | { success: false; error: string };
 
-// Проверка, находится ли токен в черном списке
-async function isTokenBlacklisted(token: string): Promise<boolean> {
-  const key = `blacklist:${token}`;
-  const exists = await safeRedis.get(key);
-  return exists === "1";
-}
-
 // Функциональная версия проверки токена
 export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
   if (!token || token.trim() === "") {
@@ -31,12 +23,6 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
   }
 
   const cleanToken = token.replace("Bearer ", "");
-
-  // Проверяем, находится ли токен в черном списке
-  const isBlacklisted = await isTokenBlacklisted(cleanToken);
-  if (isBlacklisted) {
-    return { success: false, error: "Token is blacklisted" };
-  }
 
   try {
     const decoded = jwt.verify(

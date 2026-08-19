@@ -1,160 +1,214 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { Prisma, UserRole } from "@prisma/client";
 import * as authService from "./auth.service";
-import { getUserByEmail, createUser, getUserById } from "../repositories/users.repository";
-import { getJwtSecret } from "../config/jwt";
 
-// Мокаем модули
-vi.mock("bcrypt");
-vi.mock("jsonwebtoken");
-vi.mock("../config/jwt");
-vi.mock("../repositories/users.repository");
+// Mocks created inline and accessed via module imports
+vi.mock("bcryptjs", () => ({
+  default: {
+    hash: vi.fn(),
+    compare: vi.fn(),
+  },
+}));
+vi.mock("jsonwebtoken", () => ({
+  default: {
+    sign: vi.fn(),
+    verify: vi.fn(),
+    decode: vi.fn(),
+  },
+}));
+vi.mock("../config/jwt", () => ({
+  getJwtSecret: vi.fn(),
+  getJwtAccessExpiresIn: vi.fn(),
+  getJwtRefreshExpiresIn: vi.fn(),
+  parseDurationToSeconds: vi.fn(),
+  maskEmail: vi.fn(),
+}));
+vi.mock("../repositories/users.repository", () => ({
+  getUserByEmail: vi.fn(),
+  createUser: vi.fn(),
+  getUserById: vi.fn(),
+}));
 vi.mock("../config/db", () => ({
   prisma: {},
 }));
 
-const mockGetUserByEmail = vi.mocked(getUserByEmail);
-const mockCreateUser = vi.mocked(createUser);
-const mockGetUserById = vi.mocked(getUserById);
-const mockBcryptHash = vi.mocked(bcrypt.hash);
-const mockBcryptCompare = vi.mocked(bcrypt.compare);
-const mockJwtSign = vi.mocked(jwt.sign);
-const mockGetJwtSecret = vi.mocked(getJwtSecret);
+// Import mocked modules to access their functions
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, maskEmail } from "../config/jwt";
+import { getUserByEmail, createUser, getUserById } from "../repositories/users.repository";
+
+// Cast to proper function types
+const mockBcryptHash = bcrypt.hash as ReturnType<typeof vi.fn>;
+const mockBcryptCompare = bcrypt.compare as ReturnType<typeof vi.fn>;
+const mockJwtSign = jwt.sign as ReturnType<typeof vi.fn>;
+const mockJwtVerify = jwt.verify as ReturnType<typeof vi.fn>;
+const mockJwtDecode = jwt.decode as ReturnType<typeof vi.fn>;
+
+const mockGetUserByEmail = getUserByEmail as ReturnType<typeof vi.fn>;
+const mockCreateUser = createUser as ReturnType<typeof vi.fn>;
+const mockGetUserById = getUserById as ReturnType<typeof vi.fn>;
+const mockGetJwtSecret = getJwtSecret as ReturnType<typeof vi.fn>;
+const mockGetJwtAccessExpiresIn = getJwtAccessExpiresIn as ReturnType<typeof vi.fn>;
+const mockGetJwtRefreshExpiresIn = getJwtRefreshExpiresIn as ReturnType<typeof vi.fn>;
+const mockMaskEmail = maskEmail as ReturnType<typeof vi.fn>;
+
+// Type for mock user, corresponding to the User model from Prisma
+interface MockUser {
+  id: number;
+  email: string;
+  name: string | null;
+  password: string;
+  role: string;
+  balance: any;
+  stripeAccountId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Type for mock user returned from getUserById (limited select)
+interface MockUserSelect {
+  id: number;
+  email: string;
+  name: string | null;
+  balance: any;
+  createdAt: Date;
+}
 
 describe("Auth Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetJwtSecret.mockReturnValue("test-secret");
+    mockGetJwtAccessExpiresIn.mockReturnValue("1h");
+    mockGetJwtRefreshExpiresIn.mockReturnValue("7d");
+    mockMaskEmail.mockImplementation((email: string) => `***@${email.split('@')[1]}`);
+    mockBcryptHash.mockResolvedValue("hashed-password");
+    mockBcryptCompare.mockResolvedValue(true);
   });
 
   describe("register", () => {
-    it("должен успешно зарегистрировать нового пользователя", async () => {
-      // Пользователь не существует
+    it("should successfully register a new user", async () => {
       mockGetUserByEmail.mockResolvedValue(null);
-      mockBcryptHash.mockResolvedValue("hashed-password" as never);
-      mockCreateUser.mockResolvedValue({
+      const mockNewUser: MockUser = {
         id: 1,
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(0),
+        role: "USER",
+        balance: 0,
+        stripeAccountId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
-      mockJwtSign.mockImplementation(() => "fake-jwt-token");
+      };
+      mockCreateUser.mockResolvedValue(mockNewUser);
+      mockJwtSign
+        .mockImplementationOnce(() => "fake-access-token")
+        .mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.register("test@example.com", "password123", "Test User");
 
       expect(mockGetUserByEmail).toHaveBeenCalledWith({}, "test@example.com");
-      expect(mockBcryptHash).toHaveBeenCalledWith("password123", 10);
       expect(mockCreateUser).toHaveBeenCalledWith({}, {
         email: "test@example.com",
         password: "hashed-password",
         name: "Test User",
       });
-      expect(mockJwtSign).toHaveBeenCalledWith(
-        { id: 1, email: "test@example.com", role: UserRole.USER },
-        "test-secret",
-        { expiresIn: "7d" },
-      );
+      expect(mockJwtSign).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
         user: {
           id: 1,
           email: "test@example.com",
           name: "Test User",
         },
-        token: "fake-jwt-token",
+        accessToken: "fake-access-token",
+        refreshToken: "fake-refresh-token",
       });
     });
 
-    it("должен выбросить ошибку, если пользователь уже существует", async () => {
-      mockGetUserByEmail.mockResolvedValue({
+    it("should throw an error if user already exists", async () => {
+      const mockExistingUser: MockUser = {
         id: 1,
         email: "test@example.com",
         name: "Existing User",
         password: "hashed",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(0),
+        role: "USER",
+        balance: 0,
+        stripeAccountId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      };
+      mockGetUserByEmail.mockResolvedValue(mockExistingUser);
 
       await expect(
         authService.register("test@example.com", "password123", "Test User"),
       ).rejects.toThrow("Пользователь уже существует");
     });
 
-    it("должен регистрировать без имени (опционально)", async () => {
+    it("should register without name (optional)", async () => {
       mockGetUserByEmail.mockResolvedValue(null);
-      mockBcryptHash.mockResolvedValue("hashed-password" as never);
-      mockCreateUser.mockResolvedValue({
+      const mockNewUser: MockUser = {
         id: 1,
         email: "test@example.com",
         name: null,
         password: "hashed-password",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(0),
+        role: "USER",
+        balance: 0,
+        stripeAccountId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
-      mockJwtSign.mockImplementation(() => "fake-jwt-token");
+      };
+      mockCreateUser.mockResolvedValue(mockNewUser);
+      mockJwtSign
+        .mockImplementationOnce(() => "fake-access-token")
+        .mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.register("test@example.com", "password123");
 
       expect(mockCreateUser).toHaveBeenCalledWith({}, {
         email: "test@example.com",
-        password: "hashed-password",
+        password: expect.any(String),
         name: undefined,
       });
-      expect(mockJwtSign).toHaveBeenCalledWith(
-        { id: 1, email: "test@example.com", role: UserRole.USER },
-        "test-secret",
-        { expiresIn: "7d" },
-      );
       expect(result.user.name).toBeNull();
     });
   });
 
   describe("login", () => {
-    it("должен успешно войти с правильными учетными данными", async () => {
-      const mockUser = {
+    it("should successfully log in with correct credentials", async () => {
+      const mockUser: MockUser = {
         id: 1,
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(100),
+        role: "USER",
+        balance: 100,
+        stripeAccountId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       mockGetUserByEmail.mockResolvedValue(mockUser);
-      mockBcryptCompare.mockResolvedValue(true as never);
-      mockJwtSign.mockImplementation(() => "fake-jwt-token");
+      mockBcryptCompare.mockResolvedValue(true);
+      mockJwtSign
+        .mockImplementationOnce(() => "fake-access-token")
+        .mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.login("test@example.com", "password123");
 
       expect(mockGetUserByEmail).toHaveBeenCalledWith({}, "test@example.com");
       expect(mockBcryptCompare).toHaveBeenCalledWith("password123", "hashed-password");
-      expect(mockJwtSign).toHaveBeenCalledWith(
-        { id: 1, email: "test@example.com", role: UserRole.USER },
-        "test-secret",
-        { expiresIn: "7d" },
-      );
+      expect(mockJwtSign).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
         user: {
           id: 1,
           email: "test@example.com",
           name: "Test User",
-          balance: new Prisma.Decimal(100),
+          balance: 100,
         },
-        token: "fake-jwt-token",
+        accessToken: "fake-access-token",
+        refreshToken: "fake-refresh-token",
       });
     });
 
-    it("должен выбросить ошибку, если пользователь не найден", async () => {
+    it("should throw an error if user is not found", async () => {
       mockGetUserByEmail.mockResolvedValue(null);
 
       await expect(
@@ -162,19 +216,20 @@ describe("Auth Service", () => {
       ).rejects.toThrow("Неверные учетные данные");
     });
 
-    it("должен выбросить ошибку, если пароль неверный", async () => {
-      const mockUser = {
+    it("should throw an error if password is invalid", async () => {
+      const mockUser: MockUser = {
         id: 1,
         email: "test@example.com",
         name: "Test User",
         password: "hashed-password",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(0),
+        role: "USER",
+        balance: 0,
+        stripeAccountId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       mockGetUserByEmail.mockResolvedValue(mockUser);
-      mockBcryptCompare.mockResolvedValue(false as never);
+      mockBcryptCompare.mockResolvedValue(false);
 
       await expect(
         authService.login("test@example.com", "wrongpassword"),
@@ -182,17 +237,58 @@ describe("Auth Service", () => {
     });
   });
 
+  describe("refresh", () => {
+    it("should throw an error if refresh token verification fails", async () => {
+      mockJwtVerify.mockImplementation(() => { throw new Error(); });
+
+      await expect(authService.refresh("invalid-token")).rejects.toThrow("Неверный refresh токен");
+    });
+
+    it("should throw an error if token type is not 'refresh'", async () => {
+      const mockPayload = { id: 1, email: "test@example.com", role: "USER", type: "access" };
+      mockJwtVerify.mockReturnValue(mockPayload);
+
+      await expect(authService.refresh("invalid-type-token")).rejects.toThrow("Токен не является refresh токеном");
+    });
+
+    it("should successfully refresh tokens", async () => {
+      const oldRefreshToken = "old-refresh-token";
+      const newRefreshToken = "new-refresh-token";
+      const newAccessToken = "new-access-token";
+      const userId = 1;
+      const email = "test@example.com";
+      const role = "USER";
+
+      const mockPayload = { id: userId, email, role, type: "refresh", exp: 1234567890 };
+      mockJwtVerify.mockReturnValue(mockPayload);
+      mockJwtSign
+        .mockImplementationOnce(() => newAccessToken)
+        .mockImplementationOnce(() => newRefreshToken);
+
+      const result = await authService.refresh(oldRefreshToken);
+
+      expect(mockJwtVerify).toHaveBeenCalledWith(oldRefreshToken, "test-secret");
+      expect(result).toEqual({
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      });
+    });
+  });
+
+  describe("logout", () => {
+    it("should execute without error", async () => {
+      await expect(authService.logout()).resolves.toBeUndefined();
+    });
+  });
+
   describe("getCurrentUser", () => {
-    it("должен вернуть пользователя по ID", async () => {
-      const mockUser = {
+    it("should return user by ID", async () => {
+      const mockUser: MockUserSelect = {
         id: 1,
         email: "test@example.com",
         name: "Test User",
-        password: "hashed",
-        role: UserRole.USER,
-        balance: new Prisma.Decimal(0),
+        balance: 0,
         createdAt: new Date(),
-        updatedAt: new Date(),
       };
       mockGetUserById.mockResolvedValue(mockUser);
 

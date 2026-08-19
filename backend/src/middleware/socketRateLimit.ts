@@ -1,5 +1,4 @@
 import { Socket } from "socket.io";
-import { safeRedis } from "../config/redis";
 import { LRUCache } from "lru-cache";
 
 interface ErrorWithData extends Error {
@@ -12,7 +11,7 @@ const WS_CONNECTION_WINDOW = 60; // 60 секунд
 const WS_BID_LIMIT = 1; // 1 ставка
 const WS_BID_WINDOW = 5; // 5 секунд
 
-// Memory fallback для WebSocket rate limiting
+// Memory store для WebSocket rate limiting
 const wsMemoryStore = new LRUCache<string, { count: number; resetAt: number }>({
   max: 10_000,
   ttl: Math.max(WS_CONNECTION_WINDOW, WS_BID_WINDOW) * 1000,
@@ -36,80 +35,43 @@ function getSocketIp(socket: Socket): string {
 }
 
 /**
- * Проверка rate limit с fallback на память
+ * Проверка rate limit с использованием memory store
  */
-async function checkRateLimit(
+function checkRateLimitMemory(
   key: string,
   limit: number,
   windowSeconds: number,
-): Promise<{ allowed: boolean; remaining: number; resetAfter: number }> {
-  const redisKey = `ws:rate_limit:${key}`;
+): { allowed: boolean; remaining: number; resetAfter: number } {
+  const now = Date.now();
+  const windowMs = windowSeconds * 1000;
 
-  try {
-    // Пытаемся использовать Redis
-    const current = await safeRedis.get(redisKey);
-    if (current === null) {
-      // Первый запрос в окне
-      await safeRedis.setex(redisKey, windowSeconds, "1");
-      return {
-        allowed: true,
-        remaining: limit - 1,
-        resetAfter: windowSeconds,
-      };
-    }
+  let record = wsMemoryStore.get(key);
+  if (!record) {
+    record = { count: 0, resetAt: now + windowMs };
+    wsMemoryStore.set(key, record);
+  }
 
-    const requestCount = parseInt(current, 10);
-    if (requestCount >= limit) {
-      const ttl = await safeRedis.ttl(redisKey);
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAfter: ttl !== null && ttl > 0 ? ttl : windowSeconds,
-      };
-    }
+  if (now > record.resetAt) {
+    record.count = 0;
+    record.resetAt = now + windowMs;
+  }
 
-    // Увеличиваем счётчик
-    await safeRedis.incr(redisKey);
+  if (record.count >= limit) {
     return {
-      allowed: true,
-      remaining: limit - requestCount - 1,
-      resetAfter: windowSeconds,
-    };
-  } catch (error) {
-    console.error("[WS Rate Limit] Redis error:", error);
-    // Fallback на memory store при ошибке Redis
-    const memoryKey = `mem:${key}`;
-    const now = Date.now();
-    const windowMs = windowSeconds * 1000;
-    
-    let record = wsMemoryStore.get(memoryKey);
-    if (!record) {
-      record = { count: 0, resetAt: now + windowMs };
-      wsMemoryStore.set(memoryKey, record);
-    }
-
-    if (now > record.resetAt) {
-      record.count = 0;
-      record.resetAt = now + windowMs;
-    }
-
-    if (record.count >= limit) {
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAfter: Math.ceil((record.resetAt - now) / 1000),
-      };
-    }
-
-    record.count++;
-    wsMemoryStore.set(memoryKey, record);
-    
-    return {
-      allowed: true,
-      remaining: limit - record.count,
+      allowed: false,
+      remaining: 0,
       resetAfter: Math.ceil((record.resetAt - now) / 1000),
     };
   }
+
+  record.count++;
+  wsMemoryStore.set(key, record);
+  
+  return {
+    allowed: true,
+    remaining: limit - record.count,
+    resetAfter: Math.ceil((record.resetAt - now) / 1000),
+  };
 }
 
 /**
@@ -119,7 +81,7 @@ export async function socketConnectionRateLimit(socket: Socket, next: (err?: Err
   const ip = getSocketIp(socket);
   const key = `connection:${ip}`;
   
-  const result = await checkRateLimit(key, WS_CONNECTION_LIMIT, WS_CONNECTION_WINDOW);
+  const result = checkRateLimitMemory(key, WS_CONNECTION_LIMIT, WS_CONNECTION_WINDOW);
   
   if (!result.allowed) {
     const error = new Error(`Too many connections from this IP. Try again in ${result.resetAfter} seconds.`) as ErrorWithData;
@@ -143,7 +105,7 @@ export async function socketBidRateLimit(socket: Socket, next: (err?: Error) => 
   }
   
   const key = `bid:${user.id}`;
-  const result = await checkRateLimit(key, WS_BID_LIMIT, WS_BID_WINDOW);
+  const result = checkRateLimitMemory(key, WS_BID_LIMIT, WS_BID_WINDOW);
   
   if (!result.allowed) {
     const error = new Error(`Too many bids. Please wait ${result.resetAfter} seconds before placing another bid.`) as ErrorWithData;
@@ -166,7 +128,7 @@ export function createSocketEventRateLimit(eventName: string, limit: number, win
     const identifier = user ? `user:${user.id}` : `ip:${ip}`;
     const key = `event:${eventName}:${identifier}`;
     
-    const result = await checkRateLimit(key, limit, windowSeconds);
+    const result = checkRateLimitMemory(key, limit, windowSeconds);
     
     if (!result.allowed) {
       const error = new Error(`Rate limit exceeded for event "${eventName}". Try again in ${result.resetAfter} seconds.`) as ErrorWithData;

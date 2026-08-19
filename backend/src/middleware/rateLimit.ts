@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from "express";
-import { safeRedis, redis } from "../config/redis";
 import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 
@@ -15,19 +14,6 @@ const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }
   ttl: WINDOW_SIZE_IN_SECONDS * 1000,
   ttlAutopurge: true,    // ponytail: включаем автоочистку
 });
-
-// ponytail: флаг для отслеживания готовности Redis при первом запуске
-// если Redis еще не готов, rate limiting отключен
-let isRedisReady = false;
-
-
-// ponytail: слушаем событие 'connect' Redis для отслеживания готовности
-if (redis) {
-  redis.on('connect', () => {
-    isRedisReady = true;
-    console.log('Rate limit: Redis готов');
-  });
-}
 
 // Список доверенных прокси-подсетей (локальная сеть, Docker, CDN)
 const TRUSTED_PROXY_RANGES = [
@@ -88,7 +74,7 @@ function getClientIp(req: Request): string {
   return remoteIp;
 }
 
-// Нормализация IP: пре��бразует IPv4-mapped IPv6 адреса в IPv4
+// Нормализация IP: преобразует IPv4-mapped IPv6 адреса в IPv4
 function normalizeIp(ip: string): string {
   // IPv4-mapped IPv6 адрес вида ::ffff:192.168.1.1 → 192.168.1.1
   const ipv4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
@@ -135,7 +121,6 @@ export async function rateLimit(
 
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
-  const key = `rate_limit:${ip}`;
   const now = Date.now();
 
   // ponytail: логирование для диагностики - какие запросы приходят к /api
@@ -144,42 +129,17 @@ export async function rateLimit(
     console.log(`[RateLimit] Request: ${req.method} ${req.originalUrl} - IP: ${ip}`);
   }
 
-  try {
-    // ponytail: если Redis еще не готов (первый запуск), пропускаем все запросы
-    if (!isRedisReady) {
-      return next();
-    }
+  const currentEntry = memoryLimitStore.get(ip);
 
-    // Синхронизация: Redis восстановился — переносим счётчик из памяти
-    const memoryEntry = memoryLimitStore.get(ip);
-    if (memoryEntry && memoryEntry.resetAt > now) {
-      const remainingSeconds = Math.ceil((memoryEntry.resetAt - now) / 1000);
-      const existing = await safeRedis.get(key);
-      if (existing === null) {
-        await safeRedis.setex(key, remainingSeconds, String(memoryEntry.count));
+  if (currentEntry && currentEntry.resetAt > now) {
+    if (currentEntry.count >= MAX_REQUESTS_PER_WINDOW) {
+      if (shouldLogRequestCount(currentEntry.count)) {
+        console.log(
+          `[RateLimit] Request count for ${req.method} ${req.path} - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}`
+        );
       }
-      memoryLimitStore.delete(ip);
-    }
-
-    const current = await safeRedis.get(key);
-    if (current === null) {
-      // Первый запрос в окне
-      await safeRedis.setex(key, WINDOW_SIZE_IN_SECONDS, "1");
-      return next();
-    }
-
-    const requestCount = parseInt(current, 10);
-    
-    // ponytail: логируем req.method и req.path только при кратных значениях
-    if (shouldLogRequestCount(requestCount)) {
       console.log(
-        `[RateLimit] Request count for ${req.method} ${req.path} - IP: ${ip}, Key: ${key}, RequestCount: ${requestCount}, Max: ${MAX_REQUESTS_PER_WINDOW}, RedisReady: ${isRedisReady}`
-      );
-    }
-    
-    if (requestCount >= MAX_REQUESTS_PER_WINDOW) {
-      console.log(
-        `[RateLimit] Redis block - IP: ${ip}, Key: ${key}, RequestCount: ${requestCount}, Max: ${MAX_REQUESTS_PER_WINDOW}, RedisReady: ${isRedisReady}, Path: ${req.path}, Method: ${req.method}`
+        `[RateLimit] Memory block - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}, Path: ${req.path}, Method: ${req.method}`
       );
       return res.status(429).json({
         error: "Слишком много запросов от этого IP-адреса.",
@@ -189,39 +149,10 @@ export async function rateLimit(
         method: req.method,
       });
     }
-
-    // Увеличиваем счётчик (TTL не сбрасывается)
-    await safeRedis.incr(key);
-    next();
-  } catch (error) {
-    console.error("Rate limit error (Redis unavailable):", error);
-
-    // ponytail: если Redis недоступен и это первый запуск, пропускаем запросы
-    if (!isRedisReady) {
-      return next();
-    }
-
-    // Memory fallback: LRUCache автоматически удаляет записи по TTL (ttlAutopurge: true)
-    const currentEntry = memoryLimitStore.get(ip);
-
-    if (currentEntry) {
-      currentEntry.count++;
-      if (currentEntry.count >= MAX_REQUESTS_PER_WINDOW) {
-        console.log(
-          `[RateLimit] Memory fallback block - IP: ${ip}, Key: ${key}, CurrentCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}, RedisReady: ${isRedisReady}, Path: ${req.path}, Method: ${req.method}`
-        );
-        return res.status(429).json({
-          error: "Слишком много запросов от этого IP-адреса.",
-          message: `Превышен лимит запросов. Попробуйте через ${Math.ceil((currentEntry.resetAt - now) / 1000)} секунд.`,
-          retryAfter: Math.ceil((currentEntry.resetAt - now) / 1000),
-          path: req.path,
-          method: req.method,
-        });
-      }
-    } else {
-      memoryLimitStore.set(ip, { count: 1, resetAt: now + WINDOW_SIZE_IN_SECONDS * 1000 });
-    }
-
-    next();
+    currentEntry.count++;
+  } else {
+    memoryLimitStore.set(ip, { count: 1, resetAt: now + WINDOW_SIZE_IN_SECONDS * 1000 });
   }
+
+  next();
 }
