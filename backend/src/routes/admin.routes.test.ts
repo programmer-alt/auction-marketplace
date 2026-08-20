@@ -49,6 +49,7 @@ describe("Admin Routes", () => {
           failed: 0,
         },
         timestamp: "2026-04-05T12:00:00.000Z",
+        note: "Queue disabled — Bull removed. Auction completion not yet implemented.",
       };
       mockGetQueueStats.mockImplementation(async (req: any, res: any) => {
         res.json(mockStats);
@@ -58,6 +59,7 @@ describe("Admin Routes", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.queue).toBe("auctionCompletion");
+      expect(response.body.note).toBeDefined();
       expect(response.body.stats.delayed).toBe(5);
     });
 

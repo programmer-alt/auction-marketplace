@@ -99,7 +99,7 @@ export const authController = {
     if (!req.user) {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
-    await authService.logout();
+    await authService.logout(req.user.id);
     // Удаляем refresh токен из cookie
     res.clearCookie('refreshToken');
     res.json({ message: "Выход выполнен успешно" });

@@ -229,71 +229,70 @@ io.on("connection", (socket) => {
   });
 });
 
-// Flag to prevent recursive shutdown calls
+// Flag to prevent recursive shutdown calls — НЕ сбрасываем, т.к. процесс выходит
 let isShuttingDown = false;
 let shutdownFailed = false;
-let shutdownTimeout: NodeJS.Timeout | null = null; // Таймер для принудительного завершения
+let shutdownTimeout: NodeJS.Timeout | null = null;
 
-// Функция корректного завершения работы
+/**
+ * Graceful shutdown: закрывает соединения, очищает ресурсы, завершает процесс.
+ * Гарантии:
+ *   - isShuttingDown остаётся true до самого process.exit() — защищает от рекурсии.
+ *   - Принудительный exit через таймаут происходит ПОСЛЕ завершения cleanup
+ *     (если cleanup не уложится в 10с — kill происходит, но ресурсы уже закрыты).
+ *   - isShuttingDown НЕ сбрасывается до process.exit() — предотвращает race-conditions.
+ */
 async function shutdown(signal: string) {
   if (isShuttingDown) {
-    // Если shutdown уже в процессе и мы получаем SIGINT, планируем принудительный выход асинхронно
-    if (signal === 'SIGINT') {
-      logger.info(`Получен повторный сигнал SIGINT. Планируется принудительное завершение.`);
-      // Используем setTimeout(0) для выхода из текущего стека вызовов
-      setImmediate(() => {
-         logger.info('Выполняется принудительное завершение из setImmediate.');
-         process.exit(130); // Стандартный код выхода для SIGINT
-      });
-      // Не возвращаемся, чтобы позволить остальной части shutdown() завершиться, но процесс уже запланирован к выходу
-    } else {
-      logger.info(`Завершение уже в процессе. Сигнал ${signal} игнорируется.`);
-      return;
-    }
+    // Второй сигнал — планируем принудительный выход, но НЕ запускаем cleanup заново
+    if (shutdownTimeout) return; // уже запланирован
+
+    logger.info(`Получен повторный сигнал ${signal}. Планируется принудительное завершение.`);
+    shutdownTimeout = setTimeout(() => {
+      logger.warn('Принудительное завершение (повторный сигнал).');
+      shutdownFailed = true;
+      process.exit(130);
+    }, 5000); // 5с на повторный сигнал — меньше, т.к. cleanup уже частично выполнен
+    return;
   }
-  
-  // Устанавливаем флаг и таймер для принудительного выхода
+
   isShuttingDown = true;
-  if (shutdownTimeout) {
-     clearTimeout(shutdownTimeout);
-  }
+
+  // Таймер: если cleanup зависнет — kill через 10с
   shutdownTimeout = setTimeout(() => {
-    logger.warn('Таймаут ожидания корректного завершения. Принудительное завершение.');
+    logger.warn('Таймаут 10с превышен. Принудительное завершение.');
+    shutdownFailed = true;
     process.exit(130);
-  }, 10000); // 10 секунд таймаута
+  }, 10000);
 
   logger.info(`Получен сигнал ${signal}. Корректное завершение...`);
 
-  // Закрываем соединения HTTP сервера
-  httpServer.closeAllConnections();
-  httpServer.close();
-
-  // Останавливаем периодическую проверку на утечки памяти
   try {
+    // 1. Закрываем HTTP-соединения (новые запросы не принимаем)
+    httpServer.closeAllConnections();
+    httpServer.close();
+
+    // 2. Останавливаем таймеры
     if (leakCheckInterval) {
       clearInterval(leakCheckInterval);
     }
-  } catch (error) {
-    logger.error('Ошибка очистки интервала проверки утечки памяти:', error);
-  }
 
-
-  // Закрываем подключение Prisma и пул PostgreSQL
-  try {
-    await timeout(prisma.$disconnect(), 5000, "Таймаут ожидания отключения Prisma");
-    await timeout(pool.end(), 5000, "Таймаут ожидания закрытия пула PostgreSQL");
+    // 3. Закрываем БД
+    await timeout(prisma.$disconnect(), 5000, 'Таймаут отключения Prisma');
+    await timeout(pool.end(), 5000, 'Таймаут закрытия пула PostgreSQL');
   } catch (error) {
-    logger.error('Ошибка отключения от базы данных (возможно, таймаут):', error);
+    logger.error('Ошибка отключения от базы данных:', error);
     shutdownFailed = true;
   }
 
-  // Очищаем таймер принудительного завершения и сбрасываем флаг
+  // Таймер уже сработает сам, если мы не завершимся — но мы завершаемся ниже.
   if (shutdownTimeout) {
     clearTimeout(shutdownTimeout);
     shutdownTimeout = null;
   }
 
-  isShuttingDown = false;
+  // isShuttingDown НЕ сбрасываем — process.exit() завершит процесс.
+  // Если бы мы хотели re-entrance (например, в тестах), сбросили бы здесь.
 
   if (shutdownFailed) {
     logger.error('Приложение завершено с ошибками');

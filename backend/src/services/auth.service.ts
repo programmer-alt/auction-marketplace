@@ -41,11 +41,11 @@ export interface AuthResult {
 /**
  * Генерация пары токенов (access + refresh)
  */
-function generateTokens(userId: number, email: string, role: string) {
+function generateTokens(userId: number, email: string, role: string, tokenVersion: number) {
   const secret = getJwtSecret();
 
   // Общие поля полезной нагрузки
-  const basePayload = { id: userId, email, role };
+  const basePayload = { id: userId, email, role, tokenVersion };
 
   const accessExpiresIn = getJwtAccessExpiresIn();
   const refreshExpiresIn = getJwtRefreshExpiresIn();
@@ -100,7 +100,12 @@ export async function register(email: string, password: string, name?: string) {
   logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: maskEmail(user.email) });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
+  const { accessToken, refreshToken } = generateTokens(
+    user.id,
+    user.email,
+    user.role,
+    user.tokenVersion ?? 0,
+  );
 
   return {
     user: {
@@ -141,7 +146,12 @@ export async function login(email: string, password: string) {
   logger.info('[LOGIN] Успешный вход', { userId: user.id, email: maskedEmail });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
+  const { accessToken, refreshToken } = generateTokens(
+    user.id,
+    user.email,
+    user.role,
+    user.tokenVersion ?? 0,
+  );
 
   return {
     user: {
@@ -161,7 +171,7 @@ export async function login(email: string, password: string) {
 export async function refresh(refreshToken: string) {
   let payload;
   try {
-    payload = jwt.verify(refreshToken, getJwtSecret()) as jwt.JwtPayload;
+    payload = jwt.verify(refreshToken, getJwtSecret()) as jwt.JwtPayload & { tokenVersion?: number };
   } catch (err) {
     throw createForbiddenError("Неверный refresh токен");
   }
@@ -169,16 +179,29 @@ export async function refresh(refreshToken: string) {
     throw createForbiddenError("Токен не является refresh токеном");
   }
   const userId = payload.id;
-  const {email, role} = payload;
-  const {accessToken: newAccessToken, refreshToken: newRefreshToken} = generateTokens(userId, email, role);
+  const {email, role, tokenVersion = 0} = payload;
+
+  // Проверка: если пользователь логался/менял пароль после выпуска токена — отозвать
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tokenVersion: true },
+  });
+  if (!user || tokenVersion !== user.tokenVersion) {
+    throw createForbiddenError("Refresh token revoked");
+  }
+
+  const {accessToken: newAccessToken, refreshToken: newRefreshToken} = generateTokens(userId, email, role, tokenVersion);
   return {accessToken: newAccessToken, refreshToken: newRefreshToken};
 }
 
 /**
- * Выход пользователя
+ * Выход пользователя — инвалидирует все active токены через инкремент tokenVersion
  */
-export async function logout() {
-  // Больше не инвалидирует токены — отзыв только через истечение срока JWT
+export async function logout(userId: number) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
+  });
 }
 
 /**

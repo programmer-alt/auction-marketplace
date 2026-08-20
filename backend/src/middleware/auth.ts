@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
 import { getJwtSecret } from "../config/jwt";
+import { prisma } from "../config/db";
 
 export interface AuthContext {
   id: number;
@@ -28,7 +29,21 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
     const decoded = jwt.verify(
       cleanToken,
       getJwtSecret(),
-    ) as { id: number; email: string; role: string };
+    ) as { id: number; email: string; role: string; tokenVersion?: number };
+
+    // tokenVersion может отсутствовать в старых токенах (issued до миграции).
+    // Treat missing version as 0 — matches the DB default.
+    const tokenVersion = decoded.tokenVersion ?? 0;
+
+    // Проверка tokenVersion — отзывает токены после logout / смены пароля
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { tokenVersion: true },
+    });
+
+    if (!user || tokenVersion !== user.tokenVersion) {
+      return { success: false, error: "Token revoked" };
+    }
 
     return {
       success: true,

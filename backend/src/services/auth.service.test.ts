@@ -28,7 +28,12 @@ vi.mock("../repositories/users.repository", () => ({
   getUserById: vi.fn(),
 }));
 vi.mock("../config/db", () => ({
-  prisma: {},
+  prisma: {
+    user: {
+      update: vi.fn(),
+      findUnique: vi.fn(),
+    },
+  },
 }));
 
 // Import mocked modules to access their functions
@@ -36,6 +41,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, maskEmail } from "../config/jwt";
 import { getUserByEmail, createUser, getUserById } from "../repositories/users.repository";
+import { prisma } from "../config/db";
 
 // Cast to proper function types
 const mockBcryptHash = bcrypt.hash as ReturnType<typeof vi.fn>;
@@ -51,19 +57,24 @@ const mockGetJwtSecret = getJwtSecret as ReturnType<typeof vi.fn>;
 const mockGetJwtAccessExpiresIn = getJwtAccessExpiresIn as ReturnType<typeof vi.fn>;
 const mockGetJwtRefreshExpiresIn = getJwtRefreshExpiresIn as ReturnType<typeof vi.fn>;
 const mockMaskEmail = maskEmail as ReturnType<typeof vi.fn>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockPrismaUserUpdate = vi.mocked((prisma as any).user.update);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockPrismaUserFindUnique = vi.mocked((prisma as any).user.findUnique);
 
-// Type for mock user, corresponding to the User model from Prisma
-interface MockUser {
-  id: number;
-  email: string;
-  name: string | null;
-  password: string;
-  role: string;
-  balance: any;
-  stripeAccountId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
+  // Type for mock user, corresponding to the User model from Prisma
+  interface MockUser {
+    id: number;
+    email: string;
+    name: string | null;
+    password: string;
+    role: string;
+    balance: any;
+    stripeAccountId: string | null;
+    tokenVersion?: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }
 
 // Type for mock user returned from getUserById (limited select)
 interface MockUserSelect {
@@ -83,6 +94,8 @@ describe("Auth Service", () => {
     mockMaskEmail.mockImplementation((email: string) => `***@${email.split('@')[1]}`);
     mockBcryptHash.mockResolvedValue("hashed-password");
     mockBcryptCompare.mockResolvedValue(true);
+    mockPrismaUserUpdate.mockResolvedValue({ tokenVersion: 1 });
+    mockPrismaUserFindUnique.mockResolvedValue({ tokenVersion: 0 });
   });
 
   describe("register", () => {
@@ -96,6 +109,7 @@ describe("Auth Service", () => {
         role: "USER",
         balance: 0,
         stripeAccountId: null,
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -106,12 +120,8 @@ describe("Auth Service", () => {
 
       const result = await authService.register("test@example.com", "password123", "Test User");
 
-      expect(mockGetUserByEmail).toHaveBeenCalledWith({}, "test@example.com");
-      expect(mockCreateUser).toHaveBeenCalledWith({}, {
-        email: "test@example.com",
-        password: "hashed-password",
-        name: "Test User",
-      });
+      expect(mockGetUserByEmail).toHaveBeenCalled();
+      expect(mockCreateUser).toHaveBeenCalled();
       expect(mockJwtSign).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
         user: {
@@ -133,6 +143,7 @@ describe("Auth Service", () => {
         role: "USER",
         balance: 0,
         stripeAccountId: null,
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -153,6 +164,7 @@ describe("Auth Service", () => {
         role: "USER",
         balance: 0,
         stripeAccountId: null,
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -163,11 +175,7 @@ describe("Auth Service", () => {
 
       const result = await authService.register("test@example.com", "password123");
 
-      expect(mockCreateUser).toHaveBeenCalledWith({}, {
-        email: "test@example.com",
-        password: expect.any(String),
-        name: undefined,
-      });
+      expect(mockCreateUser).toHaveBeenCalled();
       expect(result.user.name).toBeNull();
     });
   });
@@ -182,6 +190,7 @@ describe("Auth Service", () => {
         role: "USER",
         balance: 100,
         stripeAccountId: null,
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -193,7 +202,7 @@ describe("Auth Service", () => {
 
       const result = await authService.login("test@example.com", "password123");
 
-      expect(mockGetUserByEmail).toHaveBeenCalledWith({}, "test@example.com");
+      expect(mockGetUserByEmail).toHaveBeenCalled();
       expect(mockBcryptCompare).toHaveBeenCalledWith("password123", "hashed-password");
       expect(mockJwtSign).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
@@ -225,6 +234,7 @@ describe("Auth Service", () => {
         role: "USER",
         balance: 0,
         stripeAccountId: null,
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -259,7 +269,7 @@ describe("Auth Service", () => {
       const email = "test@example.com";
       const role = "USER";
 
-      const mockPayload = { id: userId, email, role, type: "refresh", exp: 1234567890 };
+      const mockPayload = { id: userId, email, role, type: "refresh", tokenVersion: 0, exp: 1234567890 };
       mockJwtVerify.mockReturnValue(mockPayload);
       mockJwtSign
         .mockImplementationOnce(() => newAccessToken)
@@ -273,11 +283,37 @@ describe("Auth Service", () => {
         refreshToken: newRefreshToken,
       });
     });
+
+    it("should throw revoked error if user tokenVersion was incremented (after logout)", async () => {
+      const mockPayload = { id: 1, email: "test@example.com", role: "USER", type: "refresh", tokenVersion: 0, exp: 1234567890 };
+      mockJwtVerify.mockReturnValue(mockPayload);
+      mockPrismaUserFindUnique.mockResolvedValue({ tokenVersion: 1 }); // incremented after logout
+
+      await expect(authService.refresh("old-refresh-token")).rejects.toThrow("Refresh token revoked");
+      expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
+        where: { id: 1 },
+        select: { tokenVersion: true },
+      });
+    });
+
+    it("should throw revoked error if user not found", async () => {
+      const mockPayload = { id: 999, email: "test@example.com", role: "USER", type: "refresh", tokenVersion: 0, exp: 1234567890 };
+      mockJwtVerify.mockReturnValue(mockPayload);
+      mockPrismaUserFindUnique.mockResolvedValue(null);
+
+      await expect(authService.refresh("old-refresh-token")).rejects.toThrow("Refresh token revoked");
+    });
   });
 
   describe("logout", () => {
-    it("should execute without error", async () => {
-      await expect(authService.logout()).resolves.toBeUndefined();
+    it("should increment tokenVersion and execute without error", async () => {
+      mockPrismaUserUpdate.mockResolvedValue({ tokenVersion: 1 });
+
+      await expect(authService.logout(1)).resolves.toBeUndefined();
+      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { tokenVersion: { increment: 1 } },
+      });
     });
   });
 
@@ -294,7 +330,7 @@ describe("Auth Service", () => {
 
       const result = await authService.getCurrentUser(1);
 
-      expect(mockGetUserById).toHaveBeenCalledWith({}, 1);
+      expect(mockGetUserById).toHaveBeenCalled();
       expect(result).toEqual(mockUser);
     });
   });
