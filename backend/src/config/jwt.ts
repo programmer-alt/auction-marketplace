@@ -54,7 +54,7 @@ export function maskEmailInput(email: unknown): string {
 
 /**
  * Парсит строку duration (например "7d", "24h", "3600s") в секунды.
- * Используется для выравнивания TTL Redis с JWT expiry.
+ * Используется для выравнивания TTL кэша с JWT expiry.
  * Возвращает safeDefault (по умолчанию 7 дней) при любом некорректном формате.
  */
 export function parseDurationToSeconds(duration: string, safeDefault: number = 7 * 24 * 60 * 60): number {

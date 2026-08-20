@@ -49,25 +49,6 @@ export const dbQueryCounter = new promClient.Counter({
 });
 
 // ========================================
-// Redis метрики
-// ========================================
-
-export const redisCommandDuration = new promClient.Histogram({
-  name: 'redis_command_duration_seconds',
-  help: 'Duration of Redis commands in seconds',
-  labelNames: ['command'],
-  buckets: [0.001, 0.005, 0.01, 0.05, 0.1],
-  registers: [register],
-});
-
-export const redisCommandCounter = new promClient.Counter({
-  name: 'redis_commands_total',
-  help: 'Total number of Redis commands',
-  labelNames: ['command'],
-  registers: [register],
-});
-
-// ========================================
 // WebSocket метрики
 // ========================================
 

@@ -1,18 +1,24 @@
 import { Request, Response } from "express";
-import { auctionCompletionQueue } from "../queues/auctionCompletionQueue";
 import { asyncHandler } from "../utils/asyncHandler";
+import logger from "../config/logger";
 
+/**
+ * Статистика очереди отключена (Bull удалён).
+ * TODO: реализовать worker/queue для автозавершения истёкших аукционов
+ *       и вернуть реальные данные или 501 Not Implemented.
+ */
 export const getQueueStats = asyncHandler(async (_req: Request, res: Response) => {
-  const counts = await auctionCompletionQueue.getJobCounts();
+  logger.warn("[TODO] getQueueStats — stub: очередь auctionCompletion отключена после удаления Bull");
   res.json({
     queue: "auctionCompletion",
     stats: {
-      waiting: counts.waiting,
-      active: counts.active,
-      delayed: counts.delayed,
-      completed: counts.completed,
-      failed: counts.failed,
+      waiting: 0,
+      active: 0,
+      delayed: 0,
+      completed: 0,
+      failed: 0,
     },
     timestamp: new Date().toISOString(),
+    note: "Queue disabled — Bull removed. Auction completion not yet implemented.",
   });
 });

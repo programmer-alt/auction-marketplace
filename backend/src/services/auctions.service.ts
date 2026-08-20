@@ -7,43 +7,19 @@ import {
   createAuction as createAuctionRepo,
   updateAuctionById as updateAuctionByIdRepo,
 } from "../repositories/auctions.repository";
-import {
-  scheduleAuctionCompletion,
-  removeScheduledAuctionCompletion,
-} from "../queues/auctionCompletionQueue";
-import { safeRedis } from "../config/redis";
-import {
-  safeJsonParse,
-  validateAuction,
-  validateAuctionsList,
-} from "../utils/json";
+
 import { sanitizeObject } from "../utils/sanitization";
 import { Prisma } from "../types";
 
-// Тип для аукциона в списке (без детальных ставок, с количеством ставок)
-type ListAuction = Prisma.AuctionGetPayload<{
-  include: {
-    seller: {
-      select: {
-        id: true;
-        email: true;
-        name: true;
-      };
-    };
-    winner: {
-      select: {
-        id: true;
-        email: true;
-        name: true;
-      };
-    };
-    _count: {
-      select: {
-        bids: true;
-      };
-    };
-  };
-}>;
+// Stub functions for auction completion (removed Bull queue)
+async function scheduleAuctionCompletion(_auctionId: number, _endsAt: Date) {
+  // Очередь удаления — аукционы теперь завершаются вручную
+}
+
+async function removeScheduledAuctionCompletion(_auctionId: number) {
+  // Очередь удаления
+}
+
 
 // Тип для одиночного аукциона (с детальными ставками)
 type SingleAuction = Prisma.AuctionGetPayload<{
@@ -83,91 +59,6 @@ import {
 } from "../errors/factories";
 
 // ========================================
-// Константы кэширования
-// ========================================
-const CACHE_TTL_SECONDS = 60; // 1 минута
-
-// Генерация ключа для списка аукционов
-function getAuctionsCacheKey(options: GetAuctionsOptions): string {
-  const { status, sellerId, page, limit } = options;
-  return `auctions:list:${status || "all"}:${sellerId || "all"}:${page}:${limit}`;
-}
-
-// Генерация ключа для конкретного аукциона
-function getAuctionCacheKey(id: number): string {
-  return `auction:${id}`;
-}
-
-function getAuctionsListVersionKey(): string {
-  return "auctions:list:version";
-}
-
-async function getAuctionsListVersion(): Promise<string> {
-  const key = getAuctionsListVersionKey();
-  const current = await safeRedis.get(key);
-  if (current) return current;
-
-  const initial = "1";
-  await safeRedis.set(key, initial);
-  return initial;
-}
-
-function serializeAuctionForCache(auction: ListAuction | SingleAuction) {
-  return {
-    id: auction.id,
-    title: auction.title,
-    description: auction.description ?? null,
-    imageUrl: auction.imageUrl ?? null,
-    startingPrice: typeof auction.startingPrice === 'object' && 'toNumber' in auction.startingPrice 
-      ? auction.startingPrice.toNumber() 
-      : Number(auction.startingPrice),
-    currentPrice: typeof auction.currentPrice === 'object' && 'toNumber' in auction.currentPrice 
-      ? auction.currentPrice.toNumber() 
-      : Number(auction.currentPrice),
-    sellerId: auction.sellerId,
-    seller: auction.seller ? {
-      id: auction.seller.id,
-      email: auction.seller.email,
-      name: auction.seller.name,
-    } : null,
-    winnerId: auction.winnerId,
-    winner: auction.winner ? {
-      id: auction.winner.id,
-      email: auction.winner.email,
-      name: auction.winner.name,
-    } : null,
-    currency: auction.currency,
-    status: auction.status,
-    createdAt: auction.createdAt instanceof Date 
-      ? auction.createdAt.toISOString() 
-      : typeof auction.createdAt === 'string' 
-        ? auction.createdAt 
-        : new Date(auction.createdAt).toISOString(),
-    endsAt: auction.endsAt instanceof Date 
-      ? auction.endsAt.toISOString() 
-      : typeof auction.endsAt === 'string' 
-        ? auction.endsAt 
-        : new Date(auction.endsAt).toISOString(),
-  };
-}
-
-function serializeAuctionsListForCache(result: {
-  auctions: ListAuction[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
-}) {
-  return {
-    auctions: result.auctions.map((auction: any) => serializeAuctionForCache(auction)),
-    pagination: result.pagination,
-  };
-}
-
-// Инвалидация кэша списков аукционов через версионирование ключей
-async function invalidateAuctionsLists() {
-  const versionKey = getAuctionsListVersionKey();
-  await safeRedis.incr(versionKey);
-}
-
-// ========================================
 // Типы
 // ========================================
 
@@ -200,67 +91,21 @@ export interface UpdateAuctionInput {
  * Получение списка аукционов
  */
 export async function getAuctions(options: GetAuctionsOptions) {
-  const version = await getAuctionsListVersion();
-  const cacheKey = `${getAuctionsCacheKey(options)}:v${version}`;
-
-  const cached = await safeRedis.get(cacheKey);
-  if (cached) {
-    const parsed = safeJsonParse(cached);
-    if (parsed && validateAuctionsList(parsed)) {
-      return parsed;
-    }
-    await safeRedis.del(cacheKey);
-  }
-
   const { status, sellerId, page, limit } = options;
   const skip = (page - 1) * limit;
-
   const where: Prisma.AuctionWhereInput = {};
   if (status) where.status = status as "ACTIVE" | "COMPLETED" | "CANCELLED";
   if (sellerId) where.sellerId = sellerId;
-
-  const auctions: ListAuction[] = await getAuctionsRepo(prisma, where, skip, limit);
+  const auctions = await getAuctionsRepo(prisma, where, skip, limit);
   const total = await getAuctionsCount(prisma, where);
-
-  const result = {
-    auctions,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-
-  const serialized = serializeAuctionsListForCache(result);
-  await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(serialized));
-
-  return result;
+  return { auctions, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }
 
 /**
  * Получение конкретного аукциона
  */
 export async function getAuctionById(id: number) {
-  const cacheKey = getAuctionCacheKey(id);
-
-  const cached = await safeRedis.get(cacheKey);
-  if (cached) {
-    const parsed = safeJsonParse(cached);
-    if (parsed && validateAuction(parsed)) {
-      return parsed;
-    }
-    await safeRedis.del(cacheKey);
-  }
-
-  const auction = await getAuctionByIdRepo(prisma, id);
-
-  if (auction) {
-    const serialized = serializeAuctionForCache(auction);
-    await safeRedis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(serialized));
-  }
-
-  return auction;
+  return await getAuctionByIdRepo(prisma, id);
 }
 
 /**
@@ -303,9 +148,6 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 
   // Планирование завершения аукциона по времени
   scheduleAuctionCompletion(auction.id, endsAtDate);
-
-  // Инвалидация кэша списков аукционов
-  await invalidateAuctionsLists();
 
   return auction;
 }
@@ -407,9 +249,6 @@ export async function updateAuction(
   // Уведомление через WebSocket об обновлении аукциона
   getIo().to(`auction:${id}`).emit("auction:updated", auction);
 
-  await safeRedis.del(getAuctionCacheKey(id));
-  await invalidateAuctionsLists();
-
   return auction;
 }
 
@@ -467,7 +306,4 @@ export async function deleteAuction(id: number, userId: number) {
 
   // Уведомление через WebSocket об удалении аукциона
   getIo().to(`auction:${id}`).emit("auction:deleted", { id });
-
-  await safeRedis.del(getAuctionCacheKey(id));
-  await invalidateAuctionsLists();
 }

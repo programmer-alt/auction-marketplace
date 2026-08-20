@@ -91,16 +91,15 @@ export const authController = {
   }), 
 
   logout: asyncHandler<AuthRequest>(async (req, res, next) => {
+    // Извлекаем access токен из заголовка
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    // Извлекаем refresh токен из cookie
-    const refreshToken = req.cookies.refreshToken;
     if (!accessToken) {
       return next(createValidationError("Access токен отсутствует"));
     }
     if (!req.user) {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
-    await authService.logout(req.user.id, accessToken, refreshToken);
+    await authService.logout(req.user.id);
     // Удаляем refresh токен из cookie
     res.clearCookie('refreshToken');
     res.json({ message: "Выход выполнен успешно" });

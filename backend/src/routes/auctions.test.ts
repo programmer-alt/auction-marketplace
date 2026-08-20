@@ -42,51 +42,6 @@ vi.mock("../config/db.js", () => ({
   pool: {},
 }));
 
-// Мокаем auction completion queue
-vi.mock("../queues/auctionCompletionQueue.js", () => ({
-  scheduleAuctionCompletion: vi.fn(),
-  removeScheduledAuctionCompletion: vi.fn(),
-}));
-
-// Мокаем redis
-const {
-  mockRedisGet,
-  mockRedisSetex,
-  mockRedisDel,
-  mockRedisKeys,
-  mockRedisIncr,
-  mockSafeRedisGet,
-  mockSafeRedisSetex,
-  mockSafeRedisDel,
-  mockSafeRedisKeys,
-} = vi.hoisted(() => ({
-  mockRedisGet: vi.fn(),
-  mockRedisSetex: vi.fn(),
-  mockRedisDel: vi.fn(),
-  mockRedisKeys: vi.fn(),
-  mockRedisIncr: vi.fn(),
-  mockSafeRedisGet: vi.fn(),
-  mockSafeRedisSetex: vi.fn(),
-  mockSafeRedisDel: vi.fn(),
-  mockSafeRedisKeys: vi.fn(),
-}));
-
-vi.mock("../config/redis.js", () => ({
-  redis: {
-    get: mockRedisGet,
-    setex: mockRedisSetex,
-    del: mockRedisDel,
-    keys: mockRedisKeys,
-    incr: mockRedisIncr,
-  },
-  safeRedis: {
-    get: mockSafeRedisGet,
-    setex: mockSafeRedisSetex,
-    del: mockSafeRedisDel,
-    keys: mockSafeRedisKeys,
-  },
-}));
-
 // Мокаем socket.io config
 vi.mock("../config/socket.js", () => ({
   getIo: vi.fn(() => mockIo),
@@ -115,11 +70,6 @@ app.use(errorHandler);
 describe("Auctions Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Настраиваем safeRedis моки по умолчанию
-    mockSafeRedisGet.mockResolvedValue(null);
-    mockSafeRedisSetex.mockResolvedValue(undefined);
-    mockSafeRedisDel.mockResolvedValue(undefined);
-    mockSafeRedisKeys.mockResolvedValue([]);
   });
 
   // ========================================
@@ -601,6 +551,7 @@ describe("Auctions Routes", () => {
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
         sellerId: 1,
+        status: "ACTIVE",
       });
       mockPrisma.auction.deleteMany.mockResolvedValue({ count: 1 });
 
@@ -608,9 +559,11 @@ describe("Auctions Routes", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Аукцион успешно удалён");
-      expect(mockPrisma.auction.deleteMany).toHaveBeenCalledWith({
-        where: { id: 1, sellerId: 1 },
-      });
+      expect(mockPrisma.auction.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 1, sellerId: 1 }),
+        }),
+      );
     });
 
     it("должен вернуть 404, если аукцион не найден", async () => {
@@ -649,6 +602,7 @@ describe("Auctions Routes", () => {
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,
         sellerId: 1,
+        status: "ACTIVE",
       });
       mockPrisma.auction.deleteMany.mockResolvedValue({ count: 1 });
 

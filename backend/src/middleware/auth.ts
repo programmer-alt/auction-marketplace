@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from 'express';
 import { getJwtSecret } from "../config/jwt";
-import { safeRedis } from "../config/redis";
+import { prisma } from "../config/db";
 
 export interface AuthContext {
   id: number;
@@ -17,13 +17,6 @@ export type AuthResult =
   | { success: true; user: AuthContext }
   | { success: false; error: string };
 
-// Проверка, находится ли токен в черном списке
-async function isTokenBlacklisted(token: string): Promise<boolean> {
-  const key = `blacklist:${token}`;
-  const exists = await safeRedis.get(key);
-  return exists === "1";
-}
-
 // Функциональная версия проверки токена
 export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
   if (!token || token.trim() === "") {
@@ -32,17 +25,25 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
 
   const cleanToken = token.replace("Bearer ", "");
 
-  // Проверяем, находится ли токен в черном списке
-  const isBlacklisted = await isTokenBlacklisted(cleanToken);
-  if (isBlacklisted) {
-    return { success: false, error: "Token is blacklisted" };
-  }
-
   try {
     const decoded = jwt.verify(
       cleanToken,
       getJwtSecret(),
-    ) as { id: number; email: string; role: string };
+    ) as { id: number; email: string; role: string; tokenVersion?: number };
+
+    // tokenVersion может отсутствовать в старых токенах (issued до миграции).
+    // Treat missing version as 0 — matches the DB default.
+    const tokenVersion = decoded.tokenVersion ?? 0;
+
+    // Проверка tokenVersion — отзывает токены после logout / смены пароля
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { tokenVersion: true },
+    });
+
+    if (!user || tokenVersion !== user.tokenVersion) {
+      return { success: false, error: "Token revoked" };
+    }
 
     return {
       success: true,

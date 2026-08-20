@@ -2,7 +2,6 @@ import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Prisma } from "../types";
 import { prisma } from "../config/db";
-import { safeRedis } from "../config/redis";
 import logger from "../config/logger";
 import {
   getUserByEmail,
@@ -11,7 +10,7 @@ import {
 } from "../repositories/users.repository";
 import { createValidationError, createForbiddenError } from "../errors/factories";
 
-import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, parseDurationToSeconds, maskEmail } from "../config/jwt";
+import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, maskEmail } from "../config/jwt";
 
 // ========================================
 // Типы
@@ -42,16 +41,16 @@ export interface AuthResult {
 /**
  * Генерация пары токенов (access + refresh)
  */
-function generateTokens(userId: number, email: string, role: string) {
+function generateTokens(userId: number, email: string, role: string, tokenVersion: number) {
   const secret = getJwtSecret();
 
   // Общие поля полезной нагрузки
-  const basePayload = { id: userId, email, role };
+  const basePayload = { id: userId, email, role, tokenVersion };
 
   const accessExpiresIn = getJwtAccessExpiresIn();
   const refreshExpiresIn = getJwtRefreshExpiresIn();
 
-  // По умолчанию access-токен живет заметно меньше, чем refresh-токен.
+  // По умолчанию access-токен живет заметнее, чем refresh-токен.
   // Если значения не заданы в конфиге, используем "1h" для access и "7d" для refresh.
   const safeAccessExpiresIn = accessExpiresIn ?? "1h";
   const safeRefreshExpiresIn = refreshExpiresIn ?? "7d";
@@ -70,52 +69,6 @@ function generateTokens(userId: number, email: string, role: string) {
   );
 
   return { accessToken, refreshToken };
-}
-
-
-
-/**
- * Сохранение refresh токена в Redis
- */
-async function saveRefreshToken(userId: number, refreshToken: string) {
-  const key = `refresh:${userId}`;
-
-  // выравниваем TTL в Redis с конфигурацией JWT refresh токена
-  const refreshExpiresIn = getJwtRefreshExpiresIn();
-  const ttl = parseDurationToSeconds(refreshExpiresIn);
-
-  await safeRedis.setex(key, ttl, refreshToken);
-
-  // Диагностика: проверим, что ключ реально записался
-  try {
-    const stored = await safeRedis.get(key);
-    logger.info('[REFRESH_TOKEN_SAVE]', {
-      key,
-      stored: stored ? 'yes' : 'no',
-      ttl,
-      refreshExpiresIn,
-    });
-  } catch (e) {
-    logger.warn('[REFRESH_TOKEN_SAVE] failed to verify stored token in redis:', e);
-  }
-}
-
-
-/**
- * Проверка, находится ли токен в черном списке
- */
-async function isTokenBlacklisted(token: string): Promise<boolean> {
-  const key = `blacklist:${token}`;
-  const exists = await safeRedis.get(key);
-  return exists === "1";
-}
-
-/**
- * Добавление токена в черный список
- */
-async function blacklistToken(token: string, expiresInSeconds: number) {
-  const key = `blacklist:${token}`;
-  await safeRedis.setex(key, expiresInSeconds, '1');
 }
 
 /**
@@ -147,8 +100,12 @@ export async function register(email: string, password: string, name?: string) {
   logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: maskEmail(user.email) });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
-  await saveRefreshToken(user.id, refreshToken);
+  const { accessToken, refreshToken } = generateTokens(
+    user.id,
+    user.email,
+    user.role,
+    user.tokenVersion ?? 0,
+  );
 
   return {
     user: {
@@ -189,8 +146,12 @@ export async function login(email: string, password: string) {
   logger.info('[LOGIN] Успешный вход', { userId: user.id, email: maskedEmail });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
-  await saveRefreshToken(user.id, refreshToken);
+  const { accessToken, refreshToken } = generateTokens(
+    user.id,
+    user.email,
+    user.role,
+    user.tokenVersion ?? 0,
+  );
 
   return {
     user: {
@@ -208,91 +169,39 @@ export async function login(email: string, password: string) {
  * Обновление access токена с помощью refresh токена
  */
 export async function refresh(refreshToken: string) {
-  // Проверка черного списка
-  if (await isTokenBlacklisted(refreshToken)) {
-    throw createForbiddenError("Токен недействителен");
-  }
-
-  // Верификация refresh токена
   let payload;
   try {
-    payload = jwt.verify(refreshToken, getJwtSecret()) as jwt.JwtPayload;
+    payload = jwt.verify(refreshToken, getJwtSecret()) as jwt.JwtPayload & { tokenVersion?: number };
   } catch (err) {
     throw createForbiddenError("Неверный refresh токен");
   }
-
   if (payload.type !== 'refresh') {
     throw createForbiddenError("Токен не является refresh токеном");
   }
-
   const userId = payload.id;
-  const {email, role} = payload;
+  const {email, role, tokenVersion = 0} = payload;
 
-  // Проверка, что refresh токен сохранен в Redis
-  const key = `refresh:${userId}`;
-  const storedToken = await safeRedis.get(key);
-
-  const safeTail = (t: string | null | undefined) => {
-    if (!t) return 'null';
-    const head = t.slice(0, 6);
-    const tail = t.slice(-6);
-    return `${head}...${tail}(len=${t.length})`;
-  };
-
-  logger.info(
-    `[REFRESH_TOKEN_CHECK] key=${key} stored=${storedToken ? 'yes' : 'no'} ` +
-    `stored=${safeTail(storedToken)} refresh=${safeTail(refreshToken)}`
-  );
-
-  if (!storedToken || storedToken !== refreshToken) {
-    throw createForbiddenError("Refresh токен не найден или устарел");
+  // Проверка: если пользователь логался/менял пароль после выпуска токена — отозвать
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tokenVersion: true },
+  });
+  if (!user || tokenVersion !== user.tokenVersion) {
+    throw createForbiddenError("Refresh token revoked");
   }
 
-
-
-  // Генерация новой пары токенов
-  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(userId, email, role);
-
-  // Замена старого refresh токена на новый
-  await saveRefreshToken(userId, newRefreshToken);
-
-  // Добавление старого refresh токена в черный список
-  const expiresIn = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : 7 * 24 * 60 * 60;
-  if (expiresIn > 0) {
-    await blacklistToken(refreshToken, expiresIn);
-  }
-
-  return {
-    accessToken: newAccessToken,
-    refreshToken: newRefreshToken,
-  };
+  const {accessToken: newAccessToken, refreshToken: newRefreshToken} = generateTokens(userId, email, role, tokenVersion);
+  return {accessToken: newAccessToken, refreshToken: newRefreshToken};
 }
 
 /**
- * Выход пользователя (инвалидация токенов)
+ * Выход пользователя — инвалидирует все active токены через инкремент tokenVersion
  */
-export async function logout(userId: number, accessToken: string, refreshToken?: string) {
-  // Добавление access токена в черный список (оставшееся время жизни)
-  const accessPayload = jwt.decode(accessToken) as jwt.JwtPayload;
-  if (accessPayload?.exp) {
-    const expiresIn = accessPayload.exp - Math.floor(Date.now() / 1000);
-    if (expiresIn > 0) {
-      await blacklistToken(accessToken, expiresIn);
-    }
-  }
-
-  // Добавление refresh токена в черный список
-  if (refreshToken) {
-    const refreshPayload = jwt.decode(refreshToken) as jwt.JwtPayload;
-    if (refreshPayload?.exp) {
-      const expiresIn = refreshPayload.exp - Math.floor(Date.now() / 1000);
-      if (expiresIn > 0) {
-        await blacklistToken(refreshToken, expiresIn);
-      }
-    }
-    // Удаление refresh токена из Redis
-    await safeRedis.del(`refresh:${userId}`);
-  }
+export async function logout(userId: number) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
+  });
 }
 
 /**

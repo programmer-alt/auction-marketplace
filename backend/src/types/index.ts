@@ -116,7 +116,7 @@ export type PaymentWithAuctionSeller = Prisma.PaymentGetPayload<{
 }>;
 
 // ========================================
-// Типы для Redis cache
+// Типы для кэширования
 // ========================================
 
 export interface CacheAuction {

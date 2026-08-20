@@ -16,6 +16,7 @@ export function initSocket(server: import("http").Server, corsOriginHandler: Fun
       origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS (socket.io)"),
       credentials: true,
     },
+    // Используем default in-memory adapter (без Redis)
   });
   return io;
 }
