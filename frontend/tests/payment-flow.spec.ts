@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Payment Flow (Mocked Stripe)", () => {
   test.use({ storageState: "tests/.auth/test-user.json" });

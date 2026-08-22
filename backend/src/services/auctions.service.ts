@@ -89,8 +89,19 @@ export async function getAuctions(options: GetAuctionsOptions) {
   const { status, sellerId, page, limit } = options;
   const skip = (page - 1) * limit;
   const where: Prisma.AuctionWhereInput = {};
-  if (status) where.status = status as "ACTIVE" | "COMPLETED" | "CANCELLED";
+
+  // Валидация status - принимаем только валидные enum значения
+  if (status) {
+    const validStatuses = ["ACTIVE", "COMPLETED", "CANCELLED"];
+    const statusUpper = status.toUpperCase();
+    if (validStatuses.includes(statusUpper)) {
+      where.status = statusUpper as "ACTIVE" | "COMPLETED" | "CANCELLED";
+    }
+    // Если статус невалидный, просто игнорируем фильтр
+  }
+
   if (sellerId) where.sellerId = sellerId;
+
   const auctions = await getAuctionsRepo(prisma, where, skip, limit);
   const total = await getAuctionsCount(prisma, where);
   return { auctions, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };

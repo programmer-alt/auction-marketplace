@@ -31,15 +31,30 @@ const updateAuctionSchema = z.object({
 // ========================================
 
 export const auctionsController = {
-  getAuctions: asyncHandler<AuthRequest>(async (req, res) => {
-    const { status, sellerId, page = "1", limit = "20" } = req.query;
-    const result = await auctionsService.getAuctions({
-      status: status as string,
-      sellerId: sellerId ? Number.parseInt(sellerId as string, 10) : undefined,
-      page: Number.parseInt(page as string, 10),
-      limit: Number.parseInt(limit as string, 10),
-    });
-    res.json(result);
+  getAuctions: asyncHandler<AuthRequest>(async (req, res, next) => {
+    try {
+      const { status, sellerId, page = "1", limit = "20" } = req.query;
+
+      const parsedPage = Number.parseInt(page as string, 10);
+      const parsedLimit = Number.parseInt(limit as string, 10);
+
+      if (Number.isNaN(parsedPage) || parsedPage < 1) {
+        return next(createValidationError("Некорректный параметр page"));
+      }
+      if (Number.isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+        return next(createValidationError("Некорректный параметр limit"));
+      }
+
+      const result = await auctionsService.getAuctions({
+        status: status as string,
+        sellerId: sellerId ? Number.parseInt(sellerId as string, 10) : undefined,
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
   }),
 
   getAuctionById: asyncHandler<AuthRequest>(async (req, res, next) => {

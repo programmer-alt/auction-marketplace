@@ -9,79 +9,83 @@ generator client {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  email        String       @unique
-  password     String
-  name         String?
-  role            UserRole     @default(USER)
-  balance         Decimal      @default(0) @db.Decimal(10, 2)
-  stripeAccountId String?
-  tokenVersion  Int          @default(0)
-  auctions        Auction[]    @relation("SellerAuctions")
+  id           Int          @id @default(autoincrement()) @map("id")
+  email        String       @unique @map("email")
+  password     String       @map("password")
+  name         String?      @map("name")
+  role         UserRole     @default(USER) @map("role")
+  balance      Decimal      @default(0) @db.Decimal(10, 2) @map("balance")
+  stripeAccountId String?    @map("stripe_account_id")
+  tokenVersion Int          @default(0) @map("token_version")
+  auctions     Auction[]    @relation("SellerAuctions")
   wonAuctions  Auction[]    @relation("WinnerAuctions")
   bids         Bid[]
   payments     Payment[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
   @@index([email])
+  @@map("users")
 }
 
 model Auction {
-  id           Int        @id @default(autoincrement())
-  title        String
-  description  String?
-  imageUrl     String?
-  startingPrice Decimal    @db.Decimal(10, 2)
-  currentPrice Decimal    @db.Decimal(10, 2)
-  currency     String     @default("usd")
-  sellerId     Int
-  seller       User       @relation("SellerAuctions", fields: [sellerId], references: [id])
-  winnerId     Int?
-  winner       User?      @relation("WinnerAuctions", fields: [winnerId], references: [id])
-  status       AuctionStatus @default(ACTIVE)
-  endsAt       DateTime
-  paidAt       DateTime?
-  bids         Bid[]
-  payments     Payment[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id             Int        @id @default(autoincrement()) @map("id")
+  title          String     @map("title")
+  description    String?    @map("description")
+  imageUrl       String?    @map("image_url")
+  startingPrice  Decimal    @db.Decimal(10, 2) @map("starting_price")
+  currentPrice   Decimal    @db.Decimal(10, 2) @map("current_price")
+  currency       String     @default("usd") @map("currency")
+  sellerId       Int        @map("seller_id")
+  seller         User       @relation("SellerAuctions", fields: [sellerId], references: [id])
+  winnerId       Int?       @map("winner_id")
+  winner         User?      @relation("WinnerAuctions", fields: [winnerId], references: [id])
+  status         AuctionStatus @default(ACTIVE) @map("status")
+  endsAt         DateTime   @map("ends_at")
+  paidAt         DateTime?  @map("paid_at")
+  bids           Bid[]
+  payments       Payment[]
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
   @@index([sellerId])
   @@index([status])
   @@index([endsAt])
+  @@map("auctions")
 }
 
 model Bid {
-  id        Int      @id @default(autoincrement())
-  auctionId Int
+  id        Int      @id @default(autoincrement()) @map("id")
+  auctionId Int      @map("auction_id")
   auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  userId    Int
+  userId    Int      @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount    Decimal  @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
+  amount    Decimal  @db.Decimal(10, 2) @map("amount")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([auctionId])
   @@index([userId])
+  @@map("bids")
 }
 
 model Payment {
-  id              Int            @id @default(autoincrement())
-  userId          Int
+  id              Int            @id @default(autoincrement()) @map("id")
+  userId          Int            @map("user_id")
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  auctionId       Int
+  auctionId       Int            @map("auction_id")
   auction         Auction        @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  amount          Decimal        @db.Decimal(10, 2)
-  currency        String         @default("usd")
-  stripePaymentId String?
-  status          PaymentStatus  @default(PENDING)
-  refundReason    String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  amount          Decimal        @db.Decimal(10, 2) @map("amount")
+  currency        String         @default("usd") @map("currency")
+  stripePaymentId String?        @map("stripe_payment_id")
+  status          PaymentStatus  @default(PENDING) @map("status")
+  refundReason    String?        @map("refund_reason")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([auctionId])
   @@index([stripePaymentId])
+  @@map("payments")
 }
 
 enum AuctionStatus {
