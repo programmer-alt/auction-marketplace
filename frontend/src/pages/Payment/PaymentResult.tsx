@@ -1,75 +1,75 @@
-import { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { useStripe } from '@stripe/react-stripe-js'
-import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react'
-import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { useStripe } from "@stripe/react-stripe-js";
+import { ArrowLeft, CheckCircle, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function PaymentResult() {
-  const [searchParams] = useSearchParams()
-  const stripe = useStripe()
+  const [searchParams] = useSearchParams();
+  const stripe = useStripe();
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading')
-  const [message, setMessage] = useState<string>('')
+  const [status, setStatus] = useState<"loading" | "success" | "failed">("loading");
+  const [message, setMessage] = useState<string>("");
 
-  const paymentIntentId = searchParams.get('payment_intent')
-  const redirectStatus = searchParams.get('redirect_status')
+  const paymentIntentId = searchParams.get("payment_intent");
+  const redirectStatus = searchParams.get("redirect_status");
 
   useEffect(() => {
-    if (!stripe) return
+    if (!stripe) return;
 
-    if (redirectStatus === 'succeeded') {
-      setStatus('success')
-      setMessage('Платёж успешно подтверждён!')
-      return
+    if (redirectStatus === "succeeded") {
+      setStatus("success");
+      setMessage("Платёж успешно подтверждён!");
+      return;
     }
 
-    if (redirectStatus === 'failed') {
-      setStatus('failed')
-      setMessage('Платёж не прошёл. Попробуйте ещё раз.')
-      return
+    if (redirectStatus === "failed") {
+      setStatus("failed");
+      setMessage("Платёж не прошёл. Попробуйте ещё раз.");
+      return;
     }
 
     // Если redirect_status нет — проверяем PI вручную
     if (!paymentIntentId) {
-      setStatus('failed')
-      setMessage('Отсутствует информация о платеже.')
-      return
+      setStatus("failed");
+      setMessage("Отсутствует информация о платеже.");
+      return;
     }
 
     stripe
       .retrievePaymentIntent(paymentIntentId)
       .then(({ paymentIntent }) => {
         if (!paymentIntent) {
-          setStatus('failed')
-          setMessage('Не удалось получить информацию о платеже.')
-          return
+          setStatus("failed");
+          setMessage("Не удалось получить информацию о платеже.");
+          return;
         }
 
         switch (paymentIntent.status) {
-          case 'succeeded':
-            setStatus('success')
-            setMessage('Платёж успешно подтверждён!')
-            break
-          case 'processing':
-            setMessage('Платёж обрабатывается. Мы уведомим вас о результате.')
-            setStatus('success')
-            break
-          case 'requires_payment_method':
-            setStatus('failed')
-            setMessage('Платёж не прошёл. Попробуйте ещё раз.')
-            break
+          case "succeeded":
+            setStatus("success");
+            setMessage("Платёж успешно подтверждён!");
+            break;
+          case "processing":
+            setMessage("Платёж обрабатывается. Мы уведомим вас о результате.");
+            setStatus("success");
+            break;
+          case "requires_payment_method":
+            setStatus("failed");
+            setMessage("Платёж не прошёл. Попробуйте ещё раз.");
+            break;
           default:
-            setStatus('failed')
-            setMessage(`Статус платежа: ${paymentIntent.status}`)
+            setStatus("failed");
+            setMessage(`Статус платежа: ${paymentIntent.status}`);
         }
       })
       .catch(() => {
-        setStatus('failed')
-        setMessage('Ошибка при проверке статуса платежа.')
-      })
-  }, [stripe, redirectStatus, paymentIntentId])
+        setStatus("failed");
+        setMessage("Ошибка при проверке статуса платежа.");
+      });
+  }, [stripe, redirectStatus, paymentIntentId]);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="max-w-lg mx-auto">
         <div data-testid="payment-result-loading" className="card flex flex-col items-center py-12">
@@ -77,10 +77,10 @@ export default function PaymentResult() {
           <p className="mt-4 text-gray-600">Проверяем статус платежа...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (status === 'success') {
+  if (status === "success") {
     return (
       <div className="max-w-lg mx-auto">
         <div data-testid="payment-result-success" className="card text-center">
@@ -99,7 +99,7 @@ export default function PaymentResult() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -116,5 +116,5 @@ export default function PaymentResult() {
         </Link>
       </div>
     </div>
-  )
+  );
 }

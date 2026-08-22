@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import request from "supertest";
 import express from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Мокаем модули ДО импорта роутеров
 vi.mock("../controllers/bids.controller", () => ({
@@ -43,13 +43,11 @@ describe("Bids Routes", () => {
         bid: { id: 1, amount: 150, userId: 1 },
         auction: { id: 1, currentPrice: 150 },
       };
-      mockBidsController.createBid.mockImplementation((req: any, res: any) => {
+      mockBidsController.createBid.mockImplementation((_req: any, res: any) => {
         res.status(201).json(mockResponse);
       });
 
-      const response = await request(app)
-        .post("/api/auctions/1/bids")
-        .send({ amount: 150 });
+      const response = await request(app).post("/api/auctions/1/bids").send({ amount: 150 });
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe("Ставка успешно размещена");
@@ -58,25 +56,21 @@ describe("Bids Routes", () => {
     });
 
     it("должен вернуть 400 при отрицательной сумме ставки", async () => {
-      mockBidsController.createBid.mockImplementation((req: any, res: any) => {
+      mockBidsController.createBid.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Сумма ставки должна быть положительной" });
       });
 
-      const response = await request(app)
-        .post("/api/auctions/1/bids")
-        .send({ amount: -50 });
+      const response = await request(app).post("/api/auctions/1/bids").send({ amount: -50 });
 
       expect(response.status).toBe(400);
     });
 
     it("должен вернуть 400 при невалидном ID аукциона", async () => {
-      mockBidsController.createBid.mockImplementation((req: any, res: any) => {
+      mockBidsController.createBid.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Некорректный ID аукциона" });
       });
 
-      const response = await request(app)
-        .post("/api/auctions/invalid/bids")
-        .send({ amount: 100 });
+      const response = await request(app).post("/api/auctions/invalid/bids").send({ amount: 100 });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe("Некорректный ID аукциона");
@@ -84,27 +78,21 @@ describe("Bids Routes", () => {
 
     it("должен вернуть 401 без авторизации", async () => {
       const { authMiddleware } = await import("../middleware/auth");
-      vi.mocked(authMiddleware).mockImplementationOnce(
-        async (_req: any, res: any, _next: any) => {
-          res.status(401).json({ error: "Unauthorized" });
-        },
-      );
+      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
 
-      const response = await request(app)
-        .post("/api/auctions/1/bids")
-        .send({ amount: 100 });
+      const response = await request(app).post("/api/auctions/1/bids").send({ amount: 100 });
 
       expect(response.status).toBe(401);
     });
 
     it("должен вернуть 400 если amount не число", async () => {
-      mockBidsController.createBid.mockImplementation((req: any, res: any) => {
+      mockBidsController.createBid.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Сумма ставки должна быть положительной" });
       });
 
-      const response = await request(app)
-        .post("/api/auctions/1/bids")
-        .send({ amount: "not-a-number" });
+      const response = await request(app).post("/api/auctions/1/bids").send({ amount: "not-a-number" });
 
       expect(response.status).toBe(400);
     });
@@ -116,12 +104,10 @@ describe("Bids Routes", () => {
   describe("GET /api/auctions/:auctionId/bids", () => {
     it("должен вернуть историю ставок по аукциону", async () => {
       const mockResponse = {
-        bids: [
-          { id: 1, amount: 150, userId: 2, user: { id: 2, email: "user@test.com", name: "User" } },
-        ],
+        bids: [{ id: 1, amount: 150, userId: 2, user: { id: 2, email: "user@test.com", name: "User" } }],
         pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
       };
-      mockBidsController.getBidsByAuction.mockImplementation((req: any, res: any) => {
+      mockBidsController.getBidsByAuction.mockImplementation((_req: any, res: any) => {
         res.json(mockResponse);
       });
 
@@ -134,7 +120,7 @@ describe("Bids Routes", () => {
     });
 
     it("должен вернуть пустой массив, если ставок нет", async () => {
-      mockBidsController.getBidsByAuction.mockImplementation((req: any, res: any) => {
+      mockBidsController.getBidsByAuction.mockImplementation((_req: any, res: any) => {
         res.json({ bids: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } });
       });
 
@@ -145,7 +131,7 @@ describe("Bids Routes", () => {
     });
 
     it("должен поддерживать пагинацию через query параметры", async () => {
-      mockBidsController.getBidsByAuction.mockImplementation((req: any, res: any) => {
+      mockBidsController.getBidsByAuction.mockImplementation((_req: any, res: any) => {
         res.json({ bids: [], pagination: { page: 2, limit: 10, total: 0, totalPages: 0 } });
       });
 
@@ -157,7 +143,7 @@ describe("Bids Routes", () => {
     });
 
     it("должен вернуть 400 при невалидном ID аукциона", async () => {
-      mockBidsController.getBidsByAuction.mockImplementation((req: any, res: any) => {
+      mockBidsController.getBidsByAuction.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Некорректный ID аукциона" });
       });
 
@@ -167,7 +153,7 @@ describe("Bids Routes", () => {
     });
 
     it("не требует авторизации (публичный эндпоинт)", async () => {
-      mockBidsController.getBidsByAuction.mockImplementation((req: any, res: any) => {
+      mockBidsController.getBidsByAuction.mockImplementation((_req: any, res: any) => {
         res.json({ bids: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } });
       });
 

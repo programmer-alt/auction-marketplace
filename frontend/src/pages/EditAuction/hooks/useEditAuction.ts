@@ -1,17 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm, useFormState } from 'react-hook-form';
-import { auctionsApi } from '@/api/auctions';
-import toast from 'react-hot-toast';
-import type { 
-  AsyncState, 
-  ApiResponse, 
-  AuctionDetail
-} from '@/types/advanced';
-import { isApiSuccess } from '@/types/advanced';
-import { markErrorAsHandled } from '@/utils/errorHandler';
-import type { Auction, CreateAuctionData } from '@/types';
-
+import { auctionsApi } from "@/api/auctions";
+import type { Auction, CreateAuctionData } from "@/types";
+import type { ApiResponse, AsyncState, AuctionDetail } from "@/types/advanced";
+import { isApiSuccess } from "@/types/advanced";
+import { markErrorAsHandled } from "@/utils/errorHandler";
+import { useCallback, useEffect, useState } from "react";
+import { useForm, useFormState } from "react-hook-form";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 type EditAuctionData = {
   title: string;
@@ -26,8 +21,8 @@ export const useEditAuction = (id: string | undefined) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
-  const [auctionState, setAuctionState] = useState<AsyncState<AuctionDetail>>({ status: 'loading' });
-  const [uploadState, setUploadState] = useState<AsyncState<string>>({ status: 'idle' });
+  const [auctionState, setAuctionState] = useState<AsyncState<AuctionDetail>>({ status: "loading" });
+  const [uploadState, setUploadState] = useState<AsyncState<string>>({ status: "idle" });
 
   const form = useForm<EditAuctionData>();
 
@@ -35,49 +30,49 @@ export const useEditAuction = (id: string | undefined) => {
 
   useEffect(() => {
     if (!id) {
-      setAuctionState({ status: 'error', error: 'ID аукциона не указан', retryCount: 0 });
+      setAuctionState({ status: "error", error: "ID аукциона не указан", retryCount: 0 });
       return;
     }
 
     const loadAuction = async () => {
-      setAuctionState({ status: 'loading' });
+      setAuctionState({ status: "loading" });
       try {
-        const result = await auctionsApi.getAuctionById(Number(id)) as ApiResponse<AuctionDetail>;
-        
-        if ('success' in result && result.success && result.data) {
+        const result = (await auctionsApi.getAuctionById(Number(id))) as ApiResponse<AuctionDetail>;
+
+        if ("success" in result && result.success && result.data) {
           const auction = result.data;
           const endsAt = new Date(auction.endsAt);
           const localEndsAt = new Date(endsAt.getTime() - endsAt.getTimezoneOffset() * 60000)
             .toISOString()
             .slice(0, 16);
-          
+
           form.reset({
             title: auction.title,
-            description: auction.description || '',
+            description: auction.description || "",
             startingPrice: String(auction.startingPrice),
             endsAt: localEndsAt,
           });
           setCurrentImageUrl(auction.imageUrl);
-          setAuctionState({ 
-            status: 'success', 
-            data: auction, 
-            updatedAt: new Date() 
+          setAuctionState({
+            status: "success",
+            data: auction,
+            updatedAt: new Date(),
           });
         } else {
-          const errorMessage = 'error' in result ? result.error : 'Аукцион не найден';
+          const errorMessage = "error" in result ? result.error : "Аукцион не найден";
           throw new Error(errorMessage);
         }
       } catch (error: any) {
-        const errorMsg = error.message || 'Аукцион не найден';
-        setAuctionState({ 
-          status: 'error', 
-          error: errorMsg, 
-          retryCount: 0 
+        const errorMsg = error.message || "Аукцион не найден";
+        setAuctionState({
+          status: "error",
+          error: errorMsg,
+          retryCount: 0,
         });
         toast.error(errorMsg);
         // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
         markErrorAsHandled(error);
-        navigate('/');
+        navigate("/");
       }
     };
 
@@ -98,59 +93,61 @@ export const useEditAuction = (id: string | undefined) => {
     setRemoveImage(true);
   }, []);
 
-  const onSubmit = useCallback(async (data: EditAuctionData): Promise<boolean> => {
-    if (!id || !formState.isValid) {
-      toast.error('Форма недействительна или ID отсутствует');
-      return false;
-    }
-
-    setUploadState({ status: 'loading' });
-    
-    try {
-      let imageUrl: string | null | undefined = undefined;
-      if (imageFile) {
-        const imageResult = await auctionsApi.uploadImage(imageFile);
-        if ('success' in imageResult && imageResult.success) {
-          imageUrl = imageResult.data;
-        } else {
-          throw new Error(imageResult.error || 'Ошибка загрузки изображения');
-        }
-      } else if (removeImage) {
-        imageUrl = null;
-      }
-
-      // Prepare the update payload, handling the imageUrl type correctly
-      const updatePayload: Partial<CreateAuctionData> = {
-        title: data.title,
-        description: data.description || undefined,
-        startingPrice: parseFloat(data.startingPrice),
-        endsAt: new Date(data.endsAt).toISOString(),
-      };
-
-      // Only add imageUrl to the payload if it's not undefined (add it if it's a string or null)
-      if (imageUrl !== undefined) {
-        Object.assign(updatePayload, { imageUrl });
-      }
-
-      const result = await auctionsApi.updateAuction(Number(id), updatePayload) as ApiResponse<Auction>;
-
-      if (isApiSuccess(result)) {
-        toast.success('Аукцион успешно обновлен!');
-        navigate(`/auctions/${id}`);
-        return true;
-      } else {
-        toast.error(result.error || 'Не удалось обновить аукцион');
+  const onSubmit = useCallback(
+    async (data: EditAuctionData): Promise<boolean> => {
+      if (!id || !formState.isValid) {
+        toast.error("Форма недействительна или ID отсутствует");
         return false;
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Не удалось обновить аукцион');
-      // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-      markErrorAsHandled(error);
-      return false;
-    } finally {
-      setUploadState({ status: 'idle' });
-    }
-  }, [id, formState.isValid, imageFile, removeImage, navigate]);
+
+      setUploadState({ status: "loading" });
+
+      try {
+        let imageUrl: string | null | undefined = undefined;
+        if (imageFile) {
+          const imageResult = await auctionsApi.uploadImage(imageFile);
+          if ("success" in imageResult && imageResult.success) {
+            imageUrl = imageResult.data;
+          } else {
+            throw new Error(imageResult.error || "Ошибка загрузки изображения");
+          }
+        } else if (removeImage) {
+          imageUrl = null;
+        }
+
+        // Prepare the update payload, handling the imageUrl type correctly
+        const updatePayload: Partial<CreateAuctionData> = {
+          title: data.title,
+          description: data.description || undefined,
+          startingPrice: Number.parseFloat(data.startingPrice),
+          endsAt: new Date(data.endsAt).toISOString(),
+        };
+
+        // Only add imageUrl to the payload if it's not undefined (add it if it's a string or null)
+        if (imageUrl !== undefined) {
+          Object.assign(updatePayload, { imageUrl });
+        }
+
+        const result = (await auctionsApi.updateAuction(Number(id), updatePayload)) as ApiResponse<Auction>;
+
+        if (isApiSuccess(result)) {
+          toast.success("Аукцион успешно обновлен!");
+          navigate(`/auctions/${id}`);
+          return true;
+        }
+        toast.error(result.error || "Не удалось обновить аукцион");
+        return false;
+      } catch (error: any) {
+        toast.error(error.message || "Не удалось обновить аукцион");
+        // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
+        markErrorAsHandled(error);
+        return false;
+      } finally {
+        setUploadState({ status: "idle" });
+      }
+    },
+    [id, formState.isValid, imageFile, removeImage, navigate],
+  );
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -158,15 +155,15 @@ export const useEditAuction = (id: string | undefined) => {
 
   const displayImage = imagePreview || (removeImage ? null : currentImageUrl);
 
-  return { 
-    form, 
+  return {
+    form,
     formState,
     auctionState,
     uploadState,
-    displayImage, 
-    handleImageChange, 
-    handleRemoveImage, 
-    onSubmit, 
-    minDate 
+    displayImage,
+    handleImageChange,
+    handleRemoveImage,
+    onSubmit,
+    minDate,
   };
 };

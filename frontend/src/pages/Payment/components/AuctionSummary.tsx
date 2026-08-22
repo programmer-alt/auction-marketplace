@@ -1,6 +1,6 @@
-import React from 'react';
-import { ShoppingBag, DollarSign } from 'lucide-react';
-import { Auction } from '@/types';
+import type { Auction } from "@/types";
+import { DollarSign, ShoppingBag } from "lucide-react";
+import type React from "react";
 
 interface AuctionSummaryProps {
   auction: Auction;
@@ -12,9 +12,7 @@ const AuctionSummary: React.FC<AuctionSummaryProps> = ({ auction }) => (
       <ShoppingBag className="h-5 w-5 text-gray-400 mt-0.5" />
       <div className="flex-1">
         <h3 className="font-semibold text-gray-900">{auction.title}</h3>
-        <p className="text-sm text-gray-500">
-          Продавец: {auction.seller.name || auction.seller.email}
-        </p>
+        <p className="text-sm text-gray-500">Продавец: {auction.seller.name || auction.seller.email}</p>
       </div>
     </div>
     <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">

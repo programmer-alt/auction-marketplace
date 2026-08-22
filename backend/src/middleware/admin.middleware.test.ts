@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Response, NextFunction } from "express";
+import type { NextFunction, Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { adminMiddleware } from "./admin";
 
 describe("Admin Middleware", () => {

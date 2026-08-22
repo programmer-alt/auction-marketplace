@@ -6,7 +6,7 @@
 export interface CursorPaginationOptions {
   cursor?: string;
   limit?: number;
-  direction?: 'next' | 'prev';
+  direction?: "next" | "prev";
 }
 
 export interface CursorPaginationResult<T> {
@@ -33,7 +33,7 @@ export type CursorValue = string | number | boolean | Date | Record<string, unkn
  * Кодирование курсора в base64
  */
 export function encodeCursor<T>(value: T): string {
-  return Buffer.from(JSON.stringify(value)).toString('base64');
+  return Buffer.from(JSON.stringify(value)).toString("base64");
 }
 
 /**
@@ -41,7 +41,7 @@ export function encodeCursor<T>(value: T): string {
  */
 export function decodeCursor<T = unknown>(cursor: string): T | null {
   try {
-    return JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8')) as T;
+    return JSON.parse(Buffer.from(cursor, "base64").toString("utf-8")) as T;
   } catch {
     return null;
   }
@@ -50,25 +50,18 @@ export function decodeCursor<T = unknown>(cursor: string): T | null {
 /**
  * Создание курсора на основе значения и поля сортировки
  */
-export function createCursor<T extends Record<string, unknown>>(
-  value: T,
-): string {
+export function createCursor<T extends Record<string, unknown>>(value: T): string {
   return encodeCursor(value);
 }
 
-export function createCursorByField<T extends CursorValue>(
-  value: T,
-  field: string = 'id',
-): string {
+export function createCursorByField<T extends CursorValue>(value: T, field = "id"): string {
   return encodeCursor({ [field]: value });
 }
 
 /**
  * Создание составного курсора по нескольким полям
  */
-export function createCompositeCursor<T extends Record<string, CursorValue>>(
-  values: T,
-): string {
+export function createCompositeCursor<T extends Record<string, CursorValue>>(values: T): string {
   return encodeCursor(values);
 }
 
@@ -78,10 +71,10 @@ export function createCompositeCursor<T extends Record<string, CursorValue>>(
 export function parsePaginationOptions(options: CursorPaginationOptions): {
   cursor: unknown;
   limit: number;
-  direction: 'next' | 'prev';
+  direction: "next" | "prev";
 } {
   const limit = Math.min(Math.max(options.limit || 10, 1), 100); // Ограничиваем limit от 1 до 100
-  const direction = options.direction || 'next';
+  const direction = options.direction || "next";
   const cursor = options.cursor ? decodeCursor<unknown>(options.cursor) : null;
 
   return { cursor, limit, direction };
@@ -90,20 +83,18 @@ export function parsePaginationOptions(options: CursorPaginationOptions): {
 /**
  * Парсинг опций для составных курсоров
  */
-export function parseCompositePaginationOptions(
-  options: CompositeCursorPaginationOptions,
-): {
+export function parseCompositePaginationOptions(options: CompositeCursorPaginationOptions): {
   cursor: Record<string, CursorValue> | null;
   limit: number;
-  direction: 'next' | 'prev';
+  direction: "next" | "prev";
   cursorFields: string[];
 } {
   const { cursor, limit, direction } = parsePaginationOptions(options);
-  const cursorFields = options.cursorFields || ['id'];
+  const cursorFields = options.cursorFields || ["id"];
 
   // Если курсор существует и является объектом, приводим к Record<string, CursorValue>
   let parsedCursor: Record<string, CursorValue> | null = null;
-  if (cursor && typeof cursor === 'object' && !Array.isArray(cursor)) {
+  if (cursor && typeof cursor === "object" && !Array.isArray(cursor)) {
     parsedCursor = cursor as Record<string, CursorValue>;
   } else if (cursor !== null && cursorFields.length > 0) {
     parsedCursor = { [cursorFields[0]]: cursor as CursorValue };
@@ -112,26 +103,20 @@ export function parseCompositePaginationOptions(
   return { cursor: parsedCursor, limit, direction, cursorFields };
 }
 
-
-
-
 /**
  * Валидация типа значения курсора
  * Проверяет, что значение соответствует ожидаемому типу (строка, число, Date)
  */
-export function validateCursorValue(
-  value: unknown,
-  expectedType: 'string' | 'number' | 'date' = 'string',
-): boolean {
+export function validateCursorValue(value: unknown, expectedType: "string" | "number" | "date" = "string"): boolean {
   if (value === null || value === undefined) return false;
 
   switch (expectedType) {
-    case 'string':
-      return typeof value === 'string';
-    case 'number':
-      return typeof value === 'number' && !isNaN(value);
-    case 'date':
-      return value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)));
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number" && !Number.isNaN(value);
+    case "date":
+      return value instanceof Date || (typeof value === "string" && !Number.isNaN(Date.parse(value)));
     default:
       return false;
   }
@@ -143,8 +128,8 @@ export function validateCursorValue(
 export function createPaginationResult<T extends Record<string, any>>(
   data: T[],
   limit: number,
-  cursorField: string = 'id',
-  direction: 'next' | 'prev' = 'next'
+  cursorField = "id",
+  direction: "next" | "prev" = "next",
 ): CursorPaginationResult<T> {
   const hasMore = data.length > limit;
   const paginatedData = hasMore ? data.slice(0, limit) : data;
@@ -156,10 +141,8 @@ export function createPaginationResult<T extends Record<string, any>>(
     const lastItem = paginatedData[paginatedData.length - 1];
     const cursorValue = lastItem[cursorField];
 
-    if (direction === 'next') {
-      nextCursor = hasMore
-        ? createCursorByField(cursorValue, cursorField)
-        : undefined;
+    if (direction === "next") {
+      nextCursor = hasMore ? createCursorByField(cursorValue, cursorField) : undefined;
       // Предыдущий курсор рассчитываем только если входной курсор был задан
       // (в этой функции он не передаётся, поэтому оставляем undefined)
       prevCursor = undefined;
@@ -167,9 +150,7 @@ export function createPaginationResult<T extends Record<string, any>>(
       // Следующий курсор вычисляем только для режима prev.
       // Входной cursor параметр здесь не доступен, поэтому оставляем undefined.
       nextCursor = undefined;
-      prevCursor = hasMore
-        ? createCursorByField(cursorValue, cursorField)
-        : undefined;
+      prevCursor = hasMore ? createCursorByField(cursorValue, cursorField) : undefined;
     }
   }
 
@@ -187,8 +168,8 @@ export function createPaginationResult<T extends Record<string, any>>(
 export function createCompositePaginationResult<T extends Record<string, any>>(
   data: T[],
   limit: number,
-  cursorFields: string[] = ['id'],
-  direction: 'next' | 'prev' = 'next'
+  cursorFields: string[] = ["id"],
+  direction: "next" | "prev" = "next",
 ): CursorPaginationResult<T> {
   const hasMore = data.length > limit;
   const paginatedData = hasMore ? data.slice(0, limit) : data;
@@ -206,7 +187,7 @@ export function createCompositePaginationResult<T extends Record<string, any>>(
     }
 
     if (Object.keys(cursorValues).length > 0) {
-      if (direction === 'next') {
+      if (direction === "next") {
         nextCursor = hasMore ? createCompositeCursor(cursorValues) : undefined;
         prevCursor = undefined;
       } else {
@@ -229,10 +210,10 @@ export function createCompositePaginationResult<T extends Record<string, any>>(
  */
 export function createCursorWhereClause(
   cursor: unknown,
-  cursorField: string = 'id',
-  direction: 'next' | 'prev' = 'next'
+  cursorField = "id",
+  direction: "next" | "prev" = "next",
 ): Record<string, unknown> {
-  if (!cursor || typeof cursor !== 'object') {
+  if (!cursor || typeof cursor !== "object") {
     return {};
   }
 
@@ -243,19 +224,18 @@ export function createCursorWhereClause(
   }
 
   // Простая валидация типа
-  if (typeof cursorValue !== 'string' && typeof cursorValue !== 'number' && !(cursorValue instanceof Date)) {
+  if (typeof cursorValue !== "string" && typeof cursorValue !== "number" && !(cursorValue instanceof Date)) {
     return {};
   }
 
-  if (direction === 'next') {
+  if (direction === "next") {
     return {
       [cursorField]: { gt: cursorValue },
     };
-  } else {
-    return {
-      [cursorField]: { lt: cursorValue },
-    };
   }
+  return {
+    [cursorField]: { lt: cursorValue },
+  };
 }
 
 /**
@@ -264,8 +244,8 @@ export function createCursorWhereClause(
  */
 export function createCompositeCursorWhereClause(
   cursor: Record<string, CursorValue> | null,
-  cursorFields: string[] = ['id'],
-  direction: 'next' | 'prev' = 'next'
+  cursorFields: string[] = ["id"],
+  direction: "next" | "prev" = "next",
 ): Record<string, unknown> {
   if (!cursor || cursorFields.length === 0) {
     return {};
@@ -278,7 +258,7 @@ export function createCompositeCursorWhereClause(
     }
   }
 
-  const operator = direction === 'next' ? 'gt' : 'lt';
+  const operator = direction === "next" ? "gt" : "lt";
 
   // Для одного поля простое условие
   if (cursorFields.length === 1) {
@@ -312,11 +292,11 @@ export function createCompositeCursorWhereClause(
  * Создание порядка сортировки для Prisma
  */
 export function createOrderBy(
-  cursorFields: string[] = ['id'],
-  direction: 'next' | 'prev' = 'next'
-): Record<string, 'asc' | 'desc'>[] {
-  const order = direction === 'next' ? 'asc' : 'desc';
-  return cursorFields.map(field => ({ [field]: order }));
+  cursorFields: string[] = ["id"],
+  direction: "next" | "prev" = "next",
+): Record<string, "asc" | "desc">[] {
+  const order = direction === "next" ? "asc" : "desc";
+  return cursorFields.map((field) => ({ [field]: order }));
 }
 
 /**
@@ -327,11 +307,11 @@ export async function paginateWithTransaction<T extends Record<string, unknown>>
   prisma: unknown,
   findManyArgs: {
     where?: Record<string, unknown>;
-    orderBy?: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
+    orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
     include?: unknown;
     select?: unknown;
   },
-  options: CompositeCursorPaginationOptions
+  options: CompositeCursorPaginationOptions,
 ): Promise<CursorPaginationResult<T>> {
   const { cursor, limit, direction, cursorFields } = parseCompositePaginationOptions(options);
   const whereClause = createCompositeCursorWhereClause(cursor, cursorFields, direction);
@@ -350,7 +330,7 @@ export async function paginateWithTransaction<T extends Record<string, unknown>>
   });
 
   // Если направление назад, переворачиваем результат
-  const sortedData = direction === 'prev' ? data.reverse() : data;
+  const sortedData = direction === "prev" ? data.reverse() : data;
 
   return createCompositePaginationResult(sortedData, limit, cursorFields, direction);
 }

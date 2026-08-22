@@ -1,17 +1,12 @@
-import { Request, Response, NextFunction } from "express";
-import { AppError, ZodError, PrismaError } from "./error.types";
-import { ApiError } from "../types";
+import type { NextFunction, Request, Response } from "express";
+import type { ApiError } from "../types";
+import type { AppError, PrismaError, ZodError } from "./error.types";
 
 // Тип для всех возможных ошибок
 type ErrorHandlerError = Error | AppError | ZodError | PrismaError;
 
 // Централизованный обработчик ошибок
-export const errorHandler = (
-  err: ErrorHandlerError,
-  _req: Request,
-  res: Response<ApiError>,
-  _next: NextFunction
-) => {
+export const errorHandler = (err: ErrorHandlerError, _req: Request, res: Response<ApiError>, _next: NextFunction) => {
   console.error("Ошибка:", err);
 
   // Обработка наших кастомных ошибок

@@ -1,15 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
-import * as paymentsService from "./payments.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as paymentsRepo from "../repositories/payments.repository";
+import * as paymentsService from "./payments.service";
 
 // Мокаем Stripe через vi.hoisted
-const { mockPaymentIntentsCreate, mockWebhooksConstructEvent } = vi.hoisted(
-  () => ({
-    mockPaymentIntentsCreate: vi.fn(),
-    mockWebhooksConstructEvent: vi.fn(),
-  }),
-);
+const { mockPaymentIntentsCreate, mockWebhooksConstructEvent } = vi.hoisted(() => ({
+  mockPaymentIntentsCreate: vi.fn(),
+  mockWebhooksConstructEvent: vi.fn(),
+}));
 
 vi.mock("stripe", () => {
   return {
@@ -75,9 +73,7 @@ const mockCreatePayment = vi.mocked(paymentsRepo.createPayment);
 const mockGetPaymentByStripeId = vi.mocked(paymentsRepo.getPaymentByStripeId);
 const mockUpdatePayment = vi.mocked(paymentsRepo.updatePayment);
 const mockGetPaymentsByUserId = vi.mocked(paymentsRepo.getPaymentsByUserId);
-const mockGetPaymentsCountByUserId = vi.mocked(
-  paymentsRepo.getPaymentsCountByUserId,
-);
+const mockGetPaymentsCountByUserId = vi.mocked(paymentsRepo.getPaymentsCountByUserId);
 
 describe("Payments Service", () => {
   beforeEach(() => {
@@ -130,10 +126,7 @@ describe("Payments Service", () => {
         },
       });
 
-      const result = await paymentsService.createPaymentIntent(
-        auctionId,
-        userId,
-      );
+      const result = await paymentsService.createPaymentIntent(auctionId, userId);
 
       expect(mockPrisma.auction.findUnique).toHaveBeenCalledWith({
         where: { id: auctionId },
@@ -152,9 +145,7 @@ describe("Payments Service", () => {
     it("должен выбросить 404, если аукцион не найден", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue(null);
 
-      await expect(
-        paymentsService.createPaymentIntent(auctionId, userId),
-      ).rejects.toThrow("Аукцион не найден");
+      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Аукцион не найден");
     });
 
     it("должен выбросить 400, если аукцион ещё не завершён", async () => {
@@ -163,9 +154,7 @@ describe("Payments Service", () => {
         status: "ACTIVE",
       });
 
-      await expect(
-        paymentsService.createPaymentIntent(auctionId, userId),
-      ).rejects.toThrow("Аукцион ещё не завершён");
+      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Аукцион ещё не завершён");
     });
 
     it("должен выбросить 403, если пользователь не победитель", async () => {
@@ -174,9 +163,9 @@ describe("Payments Service", () => {
         winnerId: 99, // другой пользователь
       });
 
-      await expect(
-        paymentsService.createPaymentIntent(auctionId, userId),
-      ).rejects.toThrow("Вы не являетесь победителем этого аукциона");
+      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow(
+        "Вы не являетесь победителем этого аукциона",
+      );
     });
 
     it("должен выбросить 400, если аукцион уже оплачен", async () => {
@@ -188,9 +177,7 @@ describe("Payments Service", () => {
         auctionId,
       } as any);
 
-      await expect(
-        paymentsService.createPaymentIntent(auctionId, userId),
-      ).rejects.toThrow("Этот аукцион уже оплачен");
+      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Этот аукцион уже оплачен");
     });
   });
 
@@ -215,15 +202,8 @@ describe("Payments Service", () => {
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(mockWebhooksConstructEvent).toHaveBeenCalledWith(
-        Buffer.from("{}"),
-        "sig_test",
-        "whsec_test_secret",
-      );
-      expect(mockGetPaymentByStripeId).toHaveBeenCalledWith(
-        mockPrisma,
-        "pi_test123",
-      );
+      expect(mockWebhooksConstructEvent).toHaveBeenCalledWith(Buffer.from("{}"), "sig_test", "whsec_test_secret");
+      expect(mockGetPaymentByStripeId).toHaveBeenCalledWith(mockPrisma, "pi_test123");
       expect(mockUpdatePayment).toHaveBeenCalledWith(mockPrisma, 1, {
         status: "COMPLETED",
       });
@@ -252,9 +232,7 @@ describe("Payments Service", () => {
     });
 
     it("должен залогировать предупреждение, если платёж не найден (succeeded)", async () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mockEvent = {
         type: "payment_intent.succeeded",
         data: {
@@ -267,17 +245,13 @@ describe("Payments Service", () => {
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "Платёж с stripePaymentId pi_unknown не найден",
-        ),
+        expect.stringContaining("Платёж с stripePaymentId pi_unknown не найден"),
       );
       consoleWarnSpy.mockRestore();
     });
 
     it("должен залогировать предупреждение, если платёж не найден (failed)", async () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mockEvent = {
         type: "payment_intent.payment_failed",
         data: {
@@ -290,17 +264,13 @@ describe("Payments Service", () => {
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "Платёж с stripePaymentId pi_unknown2 не найден",
-        ),
+        expect.stringContaining("Платёж с stripePaymentId pi_unknown2 не найден"),
       );
       consoleWarnSpy.mockRestore();
     });
 
     it("должен залогировать необработанное событие", async () => {
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const mockEvent = {
         type: "charge.refunded",
         data: { object: { id: "ch_test" } },
@@ -309,9 +279,7 @@ describe("Payments Service", () => {
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        "Необработанное событие типа charge.refunded",
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith("Необработанное событие типа charge.refunded");
       consoleLogSpy.mockRestore();
     });
 
@@ -320,9 +288,9 @@ describe("Payments Service", () => {
         throw new Error("No signatures found matching the expected signature");
       });
 
-      await expect(
-        paymentsService.handleWebhook(Buffer.from("{}"), "bad_sig"),
-      ).rejects.toThrow("No signatures found matching the expected signature");
+      await expect(paymentsService.handleWebhook(Buffer.from("{}"), "bad_sig")).rejects.toThrow(
+        "No signatures found matching the expected signature",
+      );
     });
   });
 
@@ -356,12 +324,7 @@ describe("Payments Service", () => {
         limit: 20,
       });
 
-      expect(mockGetPaymentsByUserId).toHaveBeenCalledWith(
-        mockPrisma,
-        userId,
-        0,
-        20,
-      );
+      expect(mockGetPaymentsByUserId).toHaveBeenCalledWith(mockPrisma, userId, 0, 20);
       expect(result.payments).toHaveLength(1);
       expect(result.pagination.total).toBe(1);
       expect(result.pagination.totalPages).toBe(1);
@@ -381,15 +344,15 @@ describe("Payments Service", () => {
     });
 
     it("должен выбросить ошибку при невалидном limit", async () => {
-      await expect(
-        paymentsService.getPaymentHistory(userId, { page: 1, limit: -5 }),
-      ).rejects.toThrow("Limit must be a positive integer");
+      await expect(paymentsService.getPaymentHistory(userId, { page: 1, limit: -5 })).rejects.toThrow(
+        "Limit must be a positive integer",
+      );
     });
 
     it("должен выбросить ошибку при невалидном page", async () => {
-      await expect(
-        paymentsService.getPaymentHistory(userId, { page: 0, limit: 10 }),
-      ).rejects.toThrow("Page must be a positive integer");
+      await expect(paymentsService.getPaymentHistory(userId, { page: 0, limit: 10 })).rejects.toThrow(
+        "Page must be a positive integer",
+      );
     });
 
     it("должен корректно рассчитать skip для третьей страницы", async () => {
@@ -398,12 +361,7 @@ describe("Payments Service", () => {
 
       await paymentsService.getPaymentHistory(userId, { page: 3, limit: 10 });
 
-      expect(mockGetPaymentsByUserId).toHaveBeenCalledWith(
-        mockPrisma,
-        userId,
-        20,
-        10,
-      );
+      expect(mockGetPaymentsByUserId).toHaveBeenCalledWith(mockPrisma, userId, 20, 10);
     });
   });
 });

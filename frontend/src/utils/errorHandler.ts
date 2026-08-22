@@ -1,5 +1,5 @@
-import { AxiosError } from 'axios';
-import { DetailedError, HandledError, isAxiosError } from '../types/advanced';
+import type { AxiosError } from "axios";
+import { type DetailedError, type HandledError, isAxiosError } from "../types/advanced";
 
 /**
  * Упрощенная функция для пометки ошибки как обработанной
@@ -11,7 +11,7 @@ export const markErrorAsHandled = (error: Error | AxiosError | DetailedError | u
   // Для AxiosError проверяем наличие config
   if (isAxiosError(error)) {
     if (!error.config) {
-      error.config = { headers: {} } as AxiosError['config'];
+      error.config = { headers: {} } as AxiosError["config"];
     }
     if (error.config) {
       const config = error.config as unknown as Record<string, unknown>;
@@ -22,7 +22,7 @@ export const markErrorAsHandled = (error: Error | AxiosError | DetailedError | u
 
   // Для других типов ошибок добавляем свойство handled
   const handledError = error as HandledError;
-  if (handledError && typeof handledError === 'object') {
+  if (handledError && typeof handledError === "object") {
     if (!handledError.config) {
       (handledError as HandledError).config = {};
     }

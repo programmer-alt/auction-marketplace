@@ -1,7 +1,7 @@
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { Request, Response, NextFunction } from 'express';
-import { getJwtSecret } from "../config/jwt";
 import { prisma } from "../config/db";
+import { getJwtSecret } from "../config/jwt";
 
 export interface AuthContext {
   id: number;
@@ -13,9 +13,7 @@ export interface AuthRequest extends Request {
   user?: AuthContext;
 }
 
-export type AuthResult =
-  | { success: true; user: AuthContext }
-  | { success: false; error: string };
+export type AuthResult = { success: true; user: AuthContext } | { success: false; error: string };
 
 // Функциональная версия проверки токена
 export async function parseAuthToken(token: string | undefined): Promise<AuthResult> {
@@ -26,10 +24,12 @@ export async function parseAuthToken(token: string | undefined): Promise<AuthRes
   const cleanToken = token.replace("Bearer ", "");
 
   try {
-    const decoded = jwt.verify(
-      cleanToken,
-      getJwtSecret(),
-    ) as { id: number; email: string; role: string; tokenVersion?: number };
+    const decoded = jwt.verify(cleanToken, getJwtSecret()) as {
+      id: number;
+      email: string;
+      role: string;
+      tokenVersion?: number;
+    };
 
     // tokenVersion может отсутствовать в старых токенах (issued до миграции).
     // Treat missing version as 0 — matches the DB default.
@@ -79,7 +79,6 @@ export function createAuthMiddleware() {
   };
 }
 
-
 export const authMiddleware = createAuthMiddleware();
 
 // Опциональная аутентификация
@@ -104,6 +103,5 @@ export function createOptionalAuthMiddleware() {
     next();
   };
 }
-
 
 export const optionalAuthMiddleware = createOptionalAuthMiddleware();

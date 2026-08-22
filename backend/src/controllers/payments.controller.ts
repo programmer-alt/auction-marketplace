@@ -1,9 +1,9 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
-import * as paymentsService from "../services/payments.service";
-import { AuthRequest } from "../middleware/auth";
-import { asyncHandler } from "../utils/asyncHandler";
 import { createValidationError } from "../errors/factories";
+import type { AuthRequest } from "../middleware/auth";
+import * as paymentsService from "../services/payments.service";
+import { asyncHandler } from "../utils/asyncHandler";
 
 // ========================================
 // Схемы валидации
@@ -36,10 +36,7 @@ export const paymentsController = {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
 
-    const result = await paymentsService.createPaymentIntent(
-      parsed.data.auctionId,
-      req.user.id,
-    );
+    const result = await paymentsService.createPaymentIntent(parsed.data.auctionId, req.user.id);
     res.status(201).json({
       message: "Платёжный интент создан",
       clientSecret: result.clientSecret,
@@ -94,11 +91,7 @@ export const paymentsController = {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
 
-    const result = await paymentsService.refundPayment(
-      paymentId,
-      req.user.id,
-      parsed.data.reason,
-    );
+    const result = await paymentsService.refundPayment(paymentId, req.user.id, parsed.data.reason);
     res.json({
       message: "Возврат успешно создан",
       refundId: result.refundId,

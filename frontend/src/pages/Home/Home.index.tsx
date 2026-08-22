@@ -1,15 +1,16 @@
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '@/store/auth.store';
-import { Search, Plus, Clock, Gavel, Timer } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import ScanLine from '@/components/effects/ScanLine';
-import { useAuctionList } from './hooks/useAuctionList';
-import { useStatusBadge } from '@/hooks/useStatusBadge';
+import ScanLine from "@/components/effects/ScanLine";
+import { useStatusBadge } from "@/hooks/useStatusBadge";
+import { useAuthStore } from "@/store/auth.store";
+import { formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
+import { Clock, Gavel, Plus, Search, Timer } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuctionList } from "./hooks/useAuctionList";
 
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
-  const { auctions, loading, search, setSearch, statusFilter, setStatusFilter, page, setPage, totalPages } = useAuctionList();
+  const { auctions, loading, search, setSearch, statusFilter, setStatusFilter, page, setPage, totalPages } =
+    useAuctionList();
   const { getStatusBadge } = useStatusBadge();
 
   return (
@@ -32,11 +33,7 @@ export default function Home() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="input-field sm:w-48"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
+        <select className="input-field sm:w-48" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">Все статусы</option>
           <option value="ACTIVE">Активные</option>
           <option value="COMPLETED">Завершённые</option>
@@ -78,9 +75,18 @@ export default function Home() {
             {auctions.map((auction) => {
               const statusInfo = getStatusBadge(auction.status);
               return (
-                <Link key={auction.id} to={`/auctions/${auction.id}`} data-testid={`auction-card-${auction.id}`} className="card hover:shadow-md transition-shadow block">
+                <Link
+                  key={auction.id}
+                  to={`/auctions/${auction.id}`}
+                  data-testid={`auction-card-${auction.id}`}
+                  className="card hover:shadow-md transition-shadow block"
+                >
                   {auction.imageUrl ? (
-                    <img src={auction.imageUrl} alt={auction.title} className="w-full h-40 object-cover rounded-lg mb-4" />
+                    <img
+                      src={auction.imageUrl}
+                      alt={auction.title}
+                      className="w-full h-40 object-cover rounded-lg mb-4"
+                    />
                   ) : (
                     <div className="w-full h-40 bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg mb-4 flex items-center justify-center">
                       <Gavel className="h-10 w-10 text-primary-500" />
@@ -89,7 +95,7 @@ export default function Home() {
                   <h3 className="font-semibold text-gray-900 mb-1 truncate">{auction.title}</h3>
                   <div className="flex items-center justify-between mb-2">
                     <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
-                    {auction.status === 'ACTIVE' && (
+                    {auction.status === "ACTIVE" && (
                       <span className="flex items-center gap-1 text-xs text-gray-500">
                         <Timer className="h-3 w-3" />
                         {formatDistanceToNow(new Date(auction.endsAt), { locale: ru, addSuffix: true })}
@@ -97,7 +103,9 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Начальная: <span className="font-medium text-gray-700">${auction.startingPrice}</span></span>
+                    <span className="text-gray-500">
+                      Начальная: <span className="font-medium text-gray-700">${auction.startingPrice}</span>
+                    </span>
                     {auction.currentPrice && auction.currentPrice > auction.startingPrice && (
                       <span className="text-primary-600 font-semibold">${auction.currentPrice}</span>
                     )}
@@ -115,27 +123,19 @@ export default function Home() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
-              <button 
-                className="btn-secondary" 
-                disabled={page <= 1} 
-                onClick={() => setPage(page - 1)}
-              >
+              <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Назад
               </button>
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button
                   key={i + 1}
-                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${page === i + 1 ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border'}`}
+                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${page === i + 1 ? "bg-primary-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 border"}`}
                   onClick={() => setPage(i + 1)}
                 >
                   {i + 1}
                 </button>
               ))}
-              <button 
-                className="btn-secondary" 
-                disabled={page >= totalPages} 
-                onClick={() => setPage(page + 1)}
-              >
+              <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
                 Вперёд
               </button>
             </div>

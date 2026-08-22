@@ -1,4 +1,4 @@
-import { CacheAuction, CacheAuctionsList } from "../types";
+import type { CacheAuction, CacheAuctionsList } from "../types";
 
 /**
  * Безопасно парсит JSON строку с ограничением глубины и обработкой ошибок.
@@ -59,26 +59,26 @@ export function validateAuction(obj: unknown): obj is CacheAuction {
   ) {
     return false;
   }
-  
+
   // Проверяем поля winnerId и winner
   if (auction.winnerId !== null && typeof auction.winnerId !== "number") {
     return false;
   }
-  
+
   if (auction.winner !== null && typeof auction.winner === "object") {
     const winner = auction.winner as Record<string, unknown>;
     if (typeof winner.id !== "number" || typeof winner.email !== "string") {
       return false;
     }
   }
-  
+
   if (auction.seller !== null && typeof auction.seller === "object") {
     const seller = auction.seller as Record<string, unknown>;
     if (typeof seller.id !== "number" || typeof seller.email !== "string") {
       return false;
     }
   }
-  
+
   return true;
 }
 

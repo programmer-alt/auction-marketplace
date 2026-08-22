@@ -1,8 +1,8 @@
 import { z } from "zod";
-import * as authService from "../services/auth.service";
-import { AuthRequest } from "../middleware/auth";
-import { asyncHandler } from "../utils/asyncHandler";
 import { createNotFoundError, createValidationError } from "../errors/factories";
+import type { AuthRequest } from "../middleware/auth";
+import * as authService from "../services/auth.service";
+import { asyncHandler } from "../utils/asyncHandler";
 
 // ========================================
 // Схемы валидации
@@ -19,8 +19,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "Пароль обязателен"),
 });
 
-
-
 // ========================================
 // Контроллер
 // ========================================
@@ -30,17 +28,13 @@ export const authController = {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
 
-    const result = await authService.register(
-      parsed.data.email,
-      parsed.data.password,
-      parsed.data.name,
-    );
+    const result = await authService.register(parsed.data.email, parsed.data.password, parsed.data.name);
     // Устанавливаем refresh токен в HTTP-only cookie
-    res.cookie('refreshToken', result.refreshToken, {
+    res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
-      sameSite: 'strict',
+      sameSite: "strict",
     });
     res.status(201).json({
       message: "Пользователь успешно зарегистрирован",
@@ -55,11 +49,11 @@ export const authController = {
 
     const result = await authService.login(parsed.data.email, parsed.data.password);
     // Устанавливаем refresh токен в HTTP-only cookie
-    res.cookie('refreshToken', result.refreshToken, {
+    res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
-      sameSite: 'strict',
+      sameSite: "strict",
     });
     res.json({
       message: "Вход выполнен успешно",
@@ -69,14 +63,16 @@ export const authController = {
   }),
 
   // POST /api/auth/refresh — обновление access токена с помощью refresh токена из cookie
-  refresh: asyncHandler<AuthRequest>(async (req, res, next) => {
+  refresh: asyncHandler<AuthRequest>(async (req, res) => {
     // Извлекаем refresh токен из cookie, а не из body, как указано в архитектуре
     const refreshToken = req.cookies.refreshToken;
-    
+
     if (!refreshToken) {
-      return next(createValidationError("Refresh токен обязателен"));
+      // Если refresh token отсутствует, просто возвращаем 200 без токена
+      // это предотвращает ошибку при автоматических запросах фронтенда
+      return res.json({ accessToken: null });
     }
-    
+
     const result = await authService.refresh(refreshToken);
     // Обновляем refresh токен в cookie
     res.cookie("refreshToken", result.refreshToken, {
@@ -88,11 +84,11 @@ export const authController = {
 
     // Возвращаем только accessToken
     res.json({ accessToken: result.accessToken });
-  }), 
+  }),
 
   logout: asyncHandler<AuthRequest>(async (req, res, next) => {
     // Извлекаем access токен из заголовка
-    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+    const accessToken = req.headers.authorization?.replace("Bearer ", "");
     if (!accessToken) {
       return next(createValidationError("Access токен отсутствует"));
     }
@@ -101,7 +97,7 @@ export const authController = {
     }
     await authService.logout(req.user.id);
     // Удаляем refresh токен из cookie
-    res.clearCookie('refreshToken');
+    res.clearCookie("refreshToken");
     res.json({ message: "Выход выполнен успешно" });
   }),
 

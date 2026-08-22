@@ -1,6 +1,6 @@
-import { Request, Response } from "express";
-import { asyncHandler } from "../utils/asyncHandler";
+import type { Request, Response } from "express";
 import logger from "../config/logger";
+import { asyncHandler } from "../utils/asyncHandler";
 
 /**
  * Статистика очереди отключена (Bull удалён).

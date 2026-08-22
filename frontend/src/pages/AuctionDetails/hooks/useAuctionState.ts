@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { Auction } from '@/types';
-import { useStatusBadge } from '@/hooks/useStatusBadge';
+import { useStatusBadge } from "@/hooks/useStatusBadge";
+import type { Auction } from "@/types";
+import { useMemo } from "react";
 
 export interface UseAuctionStateResult {
   isOwner: boolean;
@@ -26,36 +26,27 @@ export function useAuctionState(
 
   // Базовые состояния
   const isOwner = useMemo(() => user?.id === auction?.sellerId, [user, auction]);
-  const isActive = useMemo(() => auction?.status === 'ACTIVE', [auction]);
+  const isActive = useMemo(() => auction?.status === "ACTIVE", [auction]);
   const isEnded = useMemo(() => {
     if (!auction?.endsAt) return false;
     return new Date(auction.endsAt) < new Date();
   }, [auction]);
-  const statusInfo = useMemo(() => 
-    auction ? getStatusBadge(auction.status) : { label: '', cls: '' },
-    [auction, getStatusBadge]
+  const statusInfo = useMemo(
+    () => (auction ? getStatusBadge(auction.status) : { label: "", cls: "" }),
+    [auction, getStatusBadge],
   );
 
   // Логика отображения компонентов
-  const showBidForm = useMemo(() => 
-    isAuthenticated && isActive && !isEnded && !isOwner,
-    [isAuthenticated, isActive, isEnded, isOwner]
+  const showBidForm = useMemo(
+    () => isAuthenticated && isActive && !isEnded && !isOwner,
+    [isAuthenticated, isActive, isEnded, isOwner],
   );
 
-  const showLoginPrompt = useMemo(() => 
-    !isAuthenticated && isActive && !isEnded,
-    [isAuthenticated, isActive, isEnded]
-  );
+  const showLoginPrompt = useMemo(() => !isAuthenticated && isActive && !isEnded, [isAuthenticated, isActive, isEnded]);
 
-  const showOwnerMessage = useMemo(() => 
-    isOwner && isActive,
-    [isOwner, isActive]
-  );
+  const showOwnerMessage = useMemo(() => isOwner && isActive, [isOwner, isActive]);
 
-  const showAuctionActions = useMemo(() => 
-    !!auction,
-    [auction]
-  );
+  const showAuctionActions = useMemo(() => !!auction, [auction]);
 
   return {
     isOwner,

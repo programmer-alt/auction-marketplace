@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authService from "./auth.service";
 
 // Mocks created inline and accessed via module imports
@@ -39,16 +39,16 @@ vi.mock("../config/db", () => ({
 // Import mocked modules to access their functions
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, maskEmail } from "../config/jwt";
-import { getUserByEmail, createUser, getUserById } from "../repositories/users.repository";
 import { prisma } from "../config/db";
+import { getJwtAccessExpiresIn, getJwtRefreshExpiresIn, getJwtSecret, maskEmail } from "../config/jwt";
+import { createUser, getUserByEmail, getUserById } from "../repositories/users.repository";
 
 // Cast to proper function types
 const mockBcryptHash = bcrypt.hash as ReturnType<typeof vi.fn>;
 const mockBcryptCompare = bcrypt.compare as ReturnType<typeof vi.fn>;
 const mockJwtSign = jwt.sign as ReturnType<typeof vi.fn>;
 const mockJwtVerify = jwt.verify as ReturnType<typeof vi.fn>;
-const mockJwtDecode = jwt.decode as ReturnType<typeof vi.fn>;
+const _mockJwtDecode = jwt.decode as ReturnType<typeof vi.fn>;
 
 const mockGetUserByEmail = getUserByEmail as ReturnType<typeof vi.fn>;
 const mockCreateUser = createUser as ReturnType<typeof vi.fn>;
@@ -62,19 +62,19 @@ const mockPrismaUserUpdate = vi.mocked((prisma as any).user.update);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrismaUserFindUnique = vi.mocked((prisma as any).user.findUnique);
 
-  // Type for mock user, corresponding to the User model from Prisma
-  interface MockUser {
-    id: number;
-    email: string;
-    name: string | null;
-    password: string;
-    role: string;
-    balance: any;
-    stripeAccountId: string | null;
-    tokenVersion?: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }
+// Type for mock user, corresponding to the User model from Prisma
+interface MockUser {
+  id: number;
+  email: string;
+  name: string | null;
+  password: string;
+  role: string;
+  balance: any;
+  stripeAccountId: string | null;
+  tokenVersion?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // Type for mock user returned from getUserById (limited select)
 interface MockUserSelect {
@@ -91,7 +91,7 @@ describe("Auth Service", () => {
     mockGetJwtSecret.mockReturnValue("test-secret");
     mockGetJwtAccessExpiresIn.mockReturnValue("1h");
     mockGetJwtRefreshExpiresIn.mockReturnValue("7d");
-    mockMaskEmail.mockImplementation((email: string) => `***@${email.split('@')[1]}`);
+    mockMaskEmail.mockImplementation((email: string) => `***@${email.split("@")[1]}`);
     mockBcryptHash.mockResolvedValue("hashed-password");
     mockBcryptCompare.mockResolvedValue(true);
     mockPrismaUserUpdate.mockResolvedValue({ tokenVersion: 1 });
@@ -114,9 +114,7 @@ describe("Auth Service", () => {
         updatedAt: new Date(),
       };
       mockCreateUser.mockResolvedValue(mockNewUser);
-      mockJwtSign
-        .mockImplementationOnce(() => "fake-access-token")
-        .mockImplementationOnce(() => "fake-refresh-token");
+      mockJwtSign.mockImplementationOnce(() => "fake-access-token").mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.register("test@example.com", "password123", "Test User");
 
@@ -149,9 +147,9 @@ describe("Auth Service", () => {
       };
       mockGetUserByEmail.mockResolvedValue(mockExistingUser);
 
-      await expect(
-        authService.register("test@example.com", "password123", "Test User"),
-      ).rejects.toThrow("Пользователь уже существует");
+      await expect(authService.register("test@example.com", "password123", "Test User")).rejects.toThrow(
+        "Пользователь уже существует",
+      );
     });
 
     it("should register without name (optional)", async () => {
@@ -169,9 +167,7 @@ describe("Auth Service", () => {
         updatedAt: new Date(),
       };
       mockCreateUser.mockResolvedValue(mockNewUser);
-      mockJwtSign
-        .mockImplementationOnce(() => "fake-access-token")
-        .mockImplementationOnce(() => "fake-refresh-token");
+      mockJwtSign.mockImplementationOnce(() => "fake-access-token").mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.register("test@example.com", "password123");
 
@@ -196,9 +192,7 @@ describe("Auth Service", () => {
       };
       mockGetUserByEmail.mockResolvedValue(mockUser);
       mockBcryptCompare.mockResolvedValue(true);
-      mockJwtSign
-        .mockImplementationOnce(() => "fake-access-token")
-        .mockImplementationOnce(() => "fake-refresh-token");
+      mockJwtSign.mockImplementationOnce(() => "fake-access-token").mockImplementationOnce(() => "fake-refresh-token");
 
       const result = await authService.login("test@example.com", "password123");
 
@@ -220,9 +214,9 @@ describe("Auth Service", () => {
     it("should throw an error if user is not found", async () => {
       mockGetUserByEmail.mockResolvedValue(null);
 
-      await expect(
-        authService.login("nonexistent@example.com", "password123"),
-      ).rejects.toThrow("Неверные учетные данные");
+      await expect(authService.login("nonexistent@example.com", "password123")).rejects.toThrow(
+        "Неверные учетные данные",
+      );
     });
 
     it("should throw an error if password is invalid", async () => {
@@ -241,15 +235,15 @@ describe("Auth Service", () => {
       mockGetUserByEmail.mockResolvedValue(mockUser);
       mockBcryptCompare.mockResolvedValue(false);
 
-      await expect(
-        authService.login("test@example.com", "wrongpassword"),
-      ).rejects.toThrow("Неверные учетные данные");
+      await expect(authService.login("test@example.com", "wrongpassword")).rejects.toThrow("Неверные учетные данные");
     });
   });
 
   describe("refresh", () => {
     it("should throw an error if refresh token verification fails", async () => {
-      mockJwtVerify.mockImplementation(() => { throw new Error(); });
+      mockJwtVerify.mockImplementation(() => {
+        throw new Error();
+      });
 
       await expect(authService.refresh("invalid-token")).rejects.toThrow("Неверный refresh токен");
     });
@@ -271,9 +265,7 @@ describe("Auth Service", () => {
 
       const mockPayload = { id: userId, email, role, type: "refresh", tokenVersion: 0, exp: 1234567890 };
       mockJwtVerify.mockReturnValue(mockPayload);
-      mockJwtSign
-        .mockImplementationOnce(() => newAccessToken)
-        .mockImplementationOnce(() => newRefreshToken);
+      mockJwtSign.mockImplementationOnce(() => newAccessToken).mockImplementationOnce(() => newRefreshToken);
 
       const result = await authService.refresh(oldRefreshToken);
 
@@ -285,7 +277,14 @@ describe("Auth Service", () => {
     });
 
     it("should throw revoked error if user tokenVersion was incremented (after logout)", async () => {
-      const mockPayload = { id: 1, email: "test@example.com", role: "USER", type: "refresh", tokenVersion: 0, exp: 1234567890 };
+      const mockPayload = {
+        id: 1,
+        email: "test@example.com",
+        role: "USER",
+        type: "refresh",
+        tokenVersion: 0,
+        exp: 1234567890,
+      };
       mockJwtVerify.mockReturnValue(mockPayload);
       mockPrismaUserFindUnique.mockResolvedValue({ tokenVersion: 1 }); // incremented after logout
 
@@ -297,7 +296,14 @@ describe("Auth Service", () => {
     });
 
     it("should throw revoked error if user not found", async () => {
-      const mockPayload = { id: 999, email: "test@example.com", role: "USER", type: "refresh", tokenVersion: 0, exp: 1234567890 };
+      const mockPayload = {
+        id: 999,
+        email: "test@example.com",
+        role: "USER",
+        type: "refresh",
+        tokenVersion: 0,
+        exp: 1234567890,
+      };
       mockJwtVerify.mockReturnValue(mockPayload);
       mockPrismaUserFindUnique.mockResolvedValue(null);
 

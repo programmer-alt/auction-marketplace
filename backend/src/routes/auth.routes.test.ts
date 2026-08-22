@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import request from "supertest";
 import express from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Мокаем модули ДО импорта роутеров
 vi.mock("express-rate-limit", () => ({
-  default: vi.fn(() => (req: any, res: any, next: any) => next()),
+  default: vi.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
 
 vi.mock("../controllers/auth.controller", () => ({
@@ -47,17 +47,15 @@ describe("Auth Routes", () => {
         user: { id: 1, email: "test@example.com", name: "Test User" },
         token: "fake-jwt-token",
       };
-      mockAuthController.register.mockImplementation((req: any, res: any) => {
+      mockAuthController.register.mockImplementation((_req: any, res: any) => {
         res.status(201).json(mockResponse);
       });
 
-      const response = await request(app)
-        .post("/api/auth/register")
-        .send({
-          email: "test@example.com",
-          password: "password123",
-          name: "Test User",
-        });
+      const response = await request(app).post("/api/auth/register").send({
+        email: "test@example.com",
+        password: "password123",
+        name: "Test User",
+      });
 
       expect(response.status).toBe(201);
       expect(response.body).toEqual(mockResponse);
@@ -65,16 +63,14 @@ describe("Auth Routes", () => {
     });
 
     it("должен вернуть 400 при невалидных данных", async () => {
-      mockAuthController.register.mockImplementation((req: any, res: any) => {
+      mockAuthController.register.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Некорректный email" });
       });
 
-      const response = await request(app)
-        .post("/api/auth/register")
-        .send({
-          email: "invalid-email",
-          password: "short",
-        });
+      const response = await request(app).post("/api/auth/register").send({
+        email: "invalid-email",
+        password: "short",
+      });
 
       expect(response.status).toBe(400);
     });
@@ -82,16 +78,14 @@ describe("Auth Routes", () => {
     it("должен применять rate limiting", async () => {
       // Rate limiter уже замокан и просто вызывает next()
       // Проверяем, что запрос проходит
-      mockAuthController.register.mockImplementation((req: any, res: any) => {
+      mockAuthController.register.mockImplementation((_req: any, res: any) => {
         res.status(201).json({});
       });
 
-      const response = await request(app)
-        .post("/api/auth/register")
-        .send({
-          email: "test@example.com",
-          password: "password123",
-        });
+      const response = await request(app).post("/api/auth/register").send({
+        email: "test@example.com",
+        password: "password123",
+      });
 
       expect(response.status).toBe(201);
     });
@@ -104,16 +98,14 @@ describe("Auth Routes", () => {
         user: { id: 1, email: "test@example.com", name: "Test User", balance: 0 },
         token: "fake-jwt-token",
       };
-      mockAuthController.login.mockImplementation((req: any, res: any) => {
+      mockAuthController.login.mockImplementation((_req: any, res: any) => {
         res.json(mockResponse);
       });
 
-      const response = await request(app)
-        .post("/api/auth/login")
-        .send({
-          email: "test@example.com",
-          password: "password123",
-        });
+      const response = await request(app).post("/api/auth/login").send({
+        email: "test@example.com",
+        password: "password123",
+      });
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockResponse);
@@ -121,31 +113,27 @@ describe("Auth Routes", () => {
     });
 
     it("должен вернуть 401 при неверных учетных данных", async () => {
-      mockAuthController.login.mockImplementation((req: any, res: any) => {
+      mockAuthController.login.mockImplementation((_req: any, res: any) => {
         res.status(401).json({ error: "Неверные учетные данные" });
       });
 
-      const response = await request(app)
-        .post("/api/auth/login")
-        .send({
-          email: "test@example.com",
-          password: "wrongpassword",
-        });
+      const response = await request(app).post("/api/auth/login").send({
+        email: "test@example.com",
+        password: "wrongpassword",
+      });
 
       expect(response.status).toBe(401);
     });
 
     it("должен применять rate limiting", async () => {
-      mockAuthController.login.mockImplementation((req: any, res: any) => {
+      mockAuthController.login.mockImplementation((_req: any, res: any) => {
         res.json({});
       });
 
-      const response = await request(app)
-        .post("/api/auth/login")
-        .send({
-          email: "test@example.com",
-          password: "password123",
-        });
+      const response = await request(app).post("/api/auth/login").send({
+        email: "test@example.com",
+        password: "password123",
+      });
 
       expect(response.status).toBe(200);
     });
@@ -159,13 +147,11 @@ describe("Auth Routes", () => {
         name: "Test User",
         balance: 0,
       };
-      mockAuthController.getCurrentUser.mockImplementation((req: any, res: any) => {
+      mockAuthController.getCurrentUser.mockImplementation((_req: any, res: any) => {
         res.json({ user: mockUser });
       });
 
-      const response = await request(app)
-        .get("/api/auth/me")
-        .set("Authorization", "Bearer valid-token");
+      const response = await request(app).get("/api/auth/me").set("Authorization", "Bearer valid-token");
 
       expect(response.status).toBe(200);
       expect(response.body.user).toEqual(mockUser);
@@ -175,11 +161,9 @@ describe("Auth Routes", () => {
     it("должен вернуть 401 без авторизации", async () => {
       // Переопределяем мок authMiddleware чтобы он возвращал 401
       const { authMiddleware } = await import("../middleware/auth");
-      vi.mocked(authMiddleware).mockImplementationOnce(
-        async (_req: any, res: any, _next: any) => {
-          res.status(401).json({ error: "Unauthorized" });
-        },
-      );
+      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
 
       const response = await request(app).get("/api/auth/me");
 

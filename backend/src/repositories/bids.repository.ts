@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { CreateBidData, BidWithRelations } from "../types";
+import type { PrismaClient } from "@prisma/client";
+import type { BidWithRelations, CreateBidData } from "../types";
 
 // Создание ставки
 export const createBid = async (prisma: PrismaClient, data: CreateBidData) => {
@@ -40,10 +40,7 @@ export const getBidsByAuctionId = async (
 };
 
 // Подсчет количества ставок по аукциону
-export const getBidsCountByAuctionId = async (
-  prisma: PrismaClient,
-  auctionId: number,
-) => {
+export const getBidsCountByAuctionId = async (prisma: PrismaClient, auctionId: number) => {
   return await prisma.bid.count({ where: { auctionId } });
 };
 

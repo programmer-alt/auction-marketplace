@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as auctionsRepo from "./auctions.repository";
 
 // Мокаем PrismaClient
@@ -64,12 +64,7 @@ describe("Auctions Repository", () => {
     it("должен применить фильтры", async () => {
       mockAuctionFindMany.mockResolvedValue([]);
 
-      await auctionsRepo.getAuctions(
-        mockPrisma,
-        { status: "ACTIVE", sellerId: 5 },
-        0,
-        10,
-      );
+      await auctionsRepo.getAuctions(mockPrisma, { status: "ACTIVE", sellerId: 5 }, 0, 10);
 
       expect(mockAuctionFindMany).toHaveBeenCalledWith(
         expect.objectContaining({

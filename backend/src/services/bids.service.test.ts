@@ -1,10 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getBidsByAuctionId, getBidsCountByAuctionId } from "../repositories/bids.repository";
 import * as bidsService from "./bids.service";
-import {
-  getBidsByAuctionId,
-  getBidsCountByAuctionId,
-} from "../repositories/bids.repository";
 
 // Мокаем модули
 vi.mock("../config/db", () => ({
@@ -126,9 +123,7 @@ describe("Bids Service", () => {
     it("должен выбросить ошибку, если валюта ставки не совпадает с валютой аукциона", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue({ currency: "eur" });
 
-      await expect(
-        bidsService.createBid(auctionId, userId, amount, "usd"),
-      ).rejects.toThrow();
+      await expect(bidsService.createBid(auctionId, userId, amount, "usd")).rejects.toThrow();
     });
 
     it("должен выбросить ошибку при P2025 (аукцион не найден или не активен)", async () => {
@@ -139,20 +134,14 @@ describe("Bids Service", () => {
       prismaError.code = "P2025";
       mockPrisma.$transaction.mockRejectedValue(prismaError);
 
-      await expect(
-        bidsService.createBid(auctionId, userId, amount),
-      ).rejects.toThrow("Невозможно сделать ставку");
+      await expect(bidsService.createBid(auctionId, userId, amount)).rejects.toThrow("Невозможно сделать ставку");
     });
 
     it("должен пробросить ошибку, если это не P2025", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue({ currency: "usd" });
-      mockPrisma.$transaction.mockRejectedValue(
-        new Error("DB connection failed"),
-      );
+      mockPrisma.$transaction.mockRejectedValue(new Error("DB connection failed"));
 
-      await expect(
-        bidsService.createBid(auctionId, userId, amount),
-      ).rejects.toThrow("DB connection failed");
+      await expect(bidsService.createBid(auctionId, userId, amount)).rejects.toThrow("DB connection failed");
     });
 
     it("не должен проверять валюту, если currency не передан", async () => {
@@ -198,12 +187,7 @@ describe("Bids Service", () => {
         where: { id: auctionId },
         select: { id: true },
       });
-      expect(mockGetBidsByAuctionId).toHaveBeenCalledWith(
-        mockPrisma,
-        auctionId,
-        0,
-        10,
-      );
+      expect(mockGetBidsByAuctionId).toHaveBeenCalledWith(mockPrisma, auctionId, 0, 10);
       expect(result.bids).toHaveLength(1);
       expect(result.pagination.total).toBe(1);
       expect(result.pagination.totalPages).toBe(1);
@@ -226,9 +210,9 @@ describe("Bids Service", () => {
     it("должен выбросить 404, если аукцион не найден", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue(null);
 
-      await expect(
-        bidsService.getBidsByAuction(auctionId, { page: 1, limit: 10 }),
-      ).rejects.toThrow("Аукцион не найден");
+      await expect(bidsService.getBidsByAuction(auctionId, { page: 1, limit: 10 })).rejects.toThrow(
+        "Аукцион не найден",
+      );
     });
 
     it("должен корректно рассчитать skip для второй страницы", async () => {
@@ -238,12 +222,7 @@ describe("Bids Service", () => {
 
       await bidsService.getBidsByAuction(auctionId, { page: 3, limit: 5 });
 
-      expect(mockGetBidsByAuctionId).toHaveBeenCalledWith(
-        mockPrisma,
-        auctionId,
-        10,
-        5,
-      );
+      expect(mockGetBidsByAuctionId).toHaveBeenCalledWith(mockPrisma, auctionId, 10, 5);
     });
   });
 });

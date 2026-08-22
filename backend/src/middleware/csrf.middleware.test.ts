@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateCsrfToken, verifyCsrfToken } from "./csrf";
 
 describe("CSRF Middleware", () => {
@@ -103,7 +103,7 @@ describe("CSRF Middleware", () => {
 
     it("должен пропустить webhook маршруты", () => {
       mockReq.method = "POST";
-      Object.defineProperty(mockReq, 'path', { value: '/api/payments/webhook', writable: true });
+      Object.defineProperty(mockReq, "path", { value: "/api/payments/webhook", writable: true });
 
       verifyCsrfToken(mockReq as Request, mockRes as Response, mockNext);
 

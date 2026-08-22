@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { List, type RowComponentProps } from 'react-window';
-import { User } from 'lucide-react';
-import { Bid } from '@/types';
-import { formatDistanceToNow } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import type { Bid } from "@/types";
+import { formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
+import { User } from "lucide-react";
+import React, { useMemo } from "react";
+import { List, type RowComponentProps } from "react-window";
 
 interface BidHistoryProps {
   bids: Bid[];
@@ -12,7 +12,7 @@ interface BidHistoryProps {
 
 const BidItem: React.FC<{ bid: Bid }> = ({ bid }) => {
   const createdAtFormatted = useMemo(() => {
-    if (!bid.createdAt || isNaN(new Date(bid.createdAt).getTime())) return '—';
+    if (!bid.createdAt || Number.isNaN(new Date(bid.createdAt).getTime())) return "—";
     return formatDistanceToNow(new Date(bid.createdAt), { locale: ru, addSuffix: true });
   }, [bid.createdAt]);
 
@@ -23,17 +23,11 @@ const BidItem: React.FC<{ bid: Bid }> = ({ bid }) => {
           <User className="h-4 w-4 text-primary-600" />
         </div>
         <div>
-          <p className="font-medium text-sm">
-            {bid.user.name || bid.user.email}
-          </p>
-          <p className="text-xs text-gray-500">
-            {createdAtFormatted}
-          </p>
+          <p className="font-medium text-sm">{bid.user.name || bid.user.email}</p>
+          <p className="text-xs text-gray-500">{createdAtFormatted}</p>
         </div>
       </div>
-      <span className="font-bold text-primary-600">
-        ${bid.amount}
-      </span>
+      <span className="font-bold text-primary-600">${bid.amount}</span>
     </div>
   );
 };

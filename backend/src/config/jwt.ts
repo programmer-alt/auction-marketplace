@@ -21,10 +21,10 @@ export function getJwtRefreshExpiresIn(): string {
  * Returns masked string for any input, including short/malformed emails.
  */
 export function maskEmail(email: string): string {
-  const atIndex = email.indexOf('@');
+  const atIndex = email.indexOf("@");
   if (atIndex <= 0) {
     // нет символа @ или он первый — маскируем всё
-    return '***';
+    return "***";
   }
 
   const local = email.slice(0, atIndex);
@@ -37,7 +37,7 @@ export function maskEmail(email: string): string {
   const maskedLength = Math.max(local.length - visibleLength, 1);
 
   const visible = local.slice(0, visibleLength);
-  const masked = '*'.repeat(maskedLength);
+  const masked = "*".repeat(maskedLength);
 
   return `${visible}${masked}${domain}`;
 }
@@ -48,7 +48,7 @@ export function maskEmail(email: string): string {
  * Используется для безопасной обработки email типа unknown перед передачей в maskEmail.
  */
 export function maskEmailInput(email: unknown): string {
-  if (typeof email !== 'string' || !email) return '***';
+  if (typeof email !== "string" || !email) return "***";
   return maskEmail(email);
 }
 
@@ -58,7 +58,7 @@ export function maskEmailInput(email: unknown): string {
  * Возвращает safeDefault (по умолчанию 7 дней) при любом некорректном формате.
  */
 export function parseDurationToSeconds(duration: string, safeDefault: number = 7 * 24 * 60 * 60): number {
-  if (typeof duration !== 'string' || !duration.trim()) {
+  if (typeof duration !== "string" || !duration.trim()) {
     console.warn(`[PARSE_DURATION] Invalid or empty duration, using safeDefault: ${safeDefault}s`);
     return safeDefault;
   }
@@ -67,14 +67,18 @@ export function parseDurationToSeconds(duration: string, safeDefault: number = 7
     console.warn(`[PARSE_DURATION] Unrecognized duration format "${duration}", using safeDefault: ${safeDefault}s`);
     return safeDefault;
   }
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   const unit = match[2];
   switch (unit) {
-    case 'd': return value * 24 * 60 * 60;
-    case 'h': return value * 60 * 60;
-    case 'm': return value * 60;
-    case 's': return value;
-    default: return safeDefault;
+    case "d":
+      return value * 24 * 60 * 60;
+    case "h":
+      return value * 60 * 60;
+    case "m":
+      return value * 60;
+    case "s":
+      return value;
+    default:
+      return safeDefault;
   }
 }
-

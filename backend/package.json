@@ -21,12 +21,7 @@
     "test:direct": "tsx test-connection-direct.ts",
     "test:adapter": "tsx test-adapter.ts"
   },
-  "keywords": [
-    "auction",
-    "api",
-    "express",
-    "prisma"
-  ],
+  "keywords": ["auction", "api", "express", "prisma"],
   "author": "",
   "license": "MIT",
   "dependencies": {

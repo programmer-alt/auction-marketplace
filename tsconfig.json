@@ -28,16 +28,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": [
-    "backend/src/**/*",
-    "frontend/src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build",
-    ".recon",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ]
+  "include": ["backend/src/**/*", "frontend/src/**/*"],
+  "exclude": ["node_modules", "dist", "build", ".recon", "**/*.test.ts", "**/*.spec.ts"]
 }

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { rateLimit } from "./rateLimit";
 
 describe("Rate Limit Middleware", () => {
@@ -31,7 +31,7 @@ describe("Rate Limit Middleware", () => {
 
   it("должен вызвать next() при запросе в пределах лимита", async () => {
     mockReq.socket = { remoteAddress: "192.168.1.2" };
-    
+
     for (let i = 0; i < 10; i++) {
       await rateLimit(mockReq as Request, mockRes as Response, mockNext);
     }
@@ -42,7 +42,7 @@ describe("Rate Limit Middleware", () => {
   it("должен использовать X-Forwarded-For для определения IP", async () => {
     mockReq.socket = { remoteAddress: "127.0.0.1" };
     mockReq.headers = { "x-forwarded-for": "10.0.0.5, 127.0.0.1" };
-    
+
     await rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
     expect(mockNext).toHaveBeenCalled();
@@ -50,7 +50,7 @@ describe("Rate Limit Middleware", () => {
 
   it("должен нормализовать IPv4-mapped IPv6 адрес", async () => {
     mockReq.socket = { remoteAddress: "::ffff:192.168.1.1" };
-    
+
     await rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
     expect(mockNext).toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe("Rate Limit Middleware", () => {
 
   it("должен пропускать запросы к /uploads/*", async () => {
     mockReq.path = "/uploads/file.jpg";
-    
+
     await rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
     expect(mockNext).toHaveBeenCalled();
@@ -67,7 +67,7 @@ describe("Rate Limit Middleware", () => {
 
   it("должен пропускать запросы к /api/auth/me", async () => {
     mockReq.path = "/api/auth/me";
-    
+
     await rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
     expect(mockNext).toHaveBeenCalled();

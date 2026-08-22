@@ -6,8 +6,8 @@ export default function Contacts() {
         <div>
           <h2 className="text-xl font-semibold mb-4">Свяжитесь с нами</h2>
           <p className="mb-4">
-            Мы всегда рады помочь вам с любыми вопросами, касающимися работы платформы,
-            проведения аукционов или технической поддержки.
+            Мы всегда рады помочь вам с любыми вопросами, касающимися работы платформы, проведения аукционов или
+            технической поддержки.
           </p>
           <ul className="space-y-3">
             <li className="flex items-center">
@@ -60,15 +60,12 @@ export default function Contacts() {
                 placeholder="Опишите ваш вопрос или предложение..."
               />
             </div>
-            <button
-              type="submit"
-              className="btn-primary px-6 py-2 rounded-lg font-medium"
-            >
+            <button type="submit" className="btn-primary px-6 py-2 rounded-lg font-medium">
               Отправить
             </button>
           </form>
         </div>
       </div>
     </div>
-  )
+  );
 }

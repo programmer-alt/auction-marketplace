@@ -1,10 +1,4 @@
-const REQUIRED_ENV = [
-  "JWT_SECRET",
-  "CSRF_SECRET",
-  "DATABASE_URL",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-];
+const REQUIRED_ENV = ["JWT_SECRET", "CSRF_SECRET", "DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
 
 export function validateEnv(): void {
   const missing: string[] = [];
@@ -20,10 +14,10 @@ export function validateEnv(): void {
   }
 
   // Проверяем, что если переменные для рейт-лимита заданы, то они являются числовыми значениями
-  const rateLimitVars = ['DEV_RATE_LIMIT', 'PROD_RATE_LIMIT'];
+  const rateLimitVars = ["DEV_RATE_LIMIT", "PROD_RATE_LIMIT"];
   for (const key of rateLimitVars) {
     const value = process.env[key];
-    if (value !== undefined && value.trim() !== '' && isNaN(Number(value))) {
+    if (value !== undefined && value.trim() !== "" && Number.isNaN(Number(value))) {
       console.error(`❌ Переменная окружения ${key} должна быть числом, получено: ${value}`);
       process.exit(1);
     }
