@@ -36,14 +36,23 @@ export default function EditAuction() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
-            <input type="text" className="input-field" {...register("title", { required: "Название обязательно" })} />
+            <label htmlFor="edit-title" className="block text-sm font-medium text-gray-700 mb-1">
+              Название *
+            </label>
+            <input
+              id="edit-title"
+              type="text"
+              className="input-field"
+              {...register("title", { required: "Название обязательно" })}
+            />
             {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-            <textarea className="input-field" rows={4} {...register("description")} />
+            <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700 mb-1">
+              Описание
+            </label>
+            <textarea id="edit-description" className="input-field" rows={4} {...register("description")} />
           </div>
 
           <div>
@@ -53,8 +62,11 @@ export default function EditAuction() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Начальная цена ($) *</label>
+              <label htmlFor="edit-startingPrice" className="block text-sm font-medium text-gray-700 mb-1">
+                Начальная цена ($) *
+              </label>
               <input
+                id="edit-startingPrice"
                 type="number"
                 step="0.01"
                 min="0.01"
@@ -68,10 +80,13 @@ export default function EditAuction() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Дата окончания *</label>
+              <label htmlFor="edit-endsAt" className="block text-sm font-medium text-gray-700 mb-1">
+                Дата окончания *
+              </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
+                  id="edit-endsAt"
                   type="datetime-local"
                   className="input-field pl-10"
                   min={minDate}

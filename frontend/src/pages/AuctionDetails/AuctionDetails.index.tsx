@@ -92,7 +92,7 @@ export default function AuctionDetails() {
           {showLoginPrompt && (
             <div className="card text-center">
               <p className="text-gray-600 mb-4">Войдите, чтобы делать ставки</p>
-              <button onClick={() => navigate("/login")} className="btn-primary w-full">
+              <button type="button" onClick={() => navigate("/login")} className="btn-primary w-full">
                 Войти
               </button>
             </div>

@@ -60,8 +60,11 @@ export default function CreateAuction() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Начальная цена ($) *</label>
+              <label htmlFor="create-startingPrice" className="block text-sm font-medium text-gray-700 mb-1">
+                Начальная цена ($) *
+              </label>
               <input
+                id="create-startingPrice"
                 type="number"
                 step="0.01"
                 min="0.01"
@@ -109,9 +112,4 @@ export default function CreateAuction() {
             <Link to="/" className="btn-secondary">
               Отмена
             </Link>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+          

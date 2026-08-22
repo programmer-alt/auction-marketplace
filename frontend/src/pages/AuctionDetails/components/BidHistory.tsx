@@ -65,8 +65,8 @@ const BidHistory: React.FC<BidHistoryProps> = ({ bids, isLoading }) => {
       <div className="card">
         <h2 className="text-xl font-bold mb-4">Ставки</h2>
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-gray-200 rounded-lg animate-pulse" />
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={`skeleton-bid-${i}`} className="h-16 bg-gray-200 rounded-lg animate-pulse" />
           ))}
         </div>
       </div>

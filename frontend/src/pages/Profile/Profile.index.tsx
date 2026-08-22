@@ -54,8 +54,8 @@ export default function Profile() {
 
       {loading ? (
         <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="card animate-pulse">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={`skeleton-profile-${i}`} className="card animate-pulse">
               <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
               <div className="h-3 bg-gray-200 rounded w-1/4" />
             </div>
