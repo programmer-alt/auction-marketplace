@@ -1,16 +1,17 @@
-import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
+import { PrismaClient } from "@prisma/client";
+import { Pool } from "pg";
 
-// Настройка пула подключений
-const pool = new pg.Pool({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-// Создание адаптера
 const adapter = new PrismaPg(pool);
 
-// Инициализация PrismaClient с адаптером
+// Инициализация PrismaClient с driver adapter для PostgreSQL
 export const prisma = new PrismaClient({ adapter });
 
 export { pool };

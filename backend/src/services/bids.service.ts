@@ -1,12 +1,12 @@
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
+import { createNotFoundError, createValidationError } from "../errors/factories";
 import {
   getBidsByAuctionId as getBidsByAuctionIdRepo,
   getBidsCountByAuctionId as getBidsCountByAuctionIdRepo,
 } from "../repositories/bids.repository";
 import { Prisma } from "../types";
-import { BidWithRelations } from "../types";
-import { createValidationError, createNotFoundError } from "../errors/factories";
+import type { BidWithRelations } from "../types";
 
 // ========================================
 // Типы
@@ -65,9 +65,7 @@ export async function createBid(
       select: { currency: true },
     });
     if (auction && auction.currency !== normalizedCurrency) {
-      throw createValidationError(
-        `Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`,
-      );
+      throw createValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`);
     }
   }
 
@@ -136,10 +134,7 @@ export async function createBid(
 /**
  * Получение истории ставок по аукциону
  */
-export async function getBidsByAuction(
-  auctionId: number,
-  options: GetBidsOptions,
-): Promise<GetBidsResult> {
+export async function getBidsByAuction(auctionId: number, options: GetBidsOptions): Promise<GetBidsResult> {
   const { page, limit } = options;
   const skip = (page - 1) * limit;
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma, UserRole } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as usersRepo from "./users.repository";
 
 // Мокаем PrismaClient
@@ -36,10 +36,7 @@ describe("Users Repository", () => {
       };
       mockUserFindUnique.mockResolvedValue(mockUser);
 
-      const result = await usersRepo.getUserByEmail(
-        mockPrisma,
-        "test@example.com",
-      );
+      const result = await usersRepo.getUserByEmail(mockPrisma, "test@example.com");
 
       expect(mockUserFindUnique).toHaveBeenCalledWith({
         where: { email: "test@example.com" },
@@ -50,10 +47,7 @@ describe("Users Repository", () => {
     it("должен вернуть null, если пользователь не найден", async () => {
       mockUserFindUnique.mockResolvedValue(null);
 
-      const result = await usersRepo.getUserByEmail(
-        mockPrisma,
-        "nonexistent@example.com",
-      );
+      const result = await usersRepo.getUserByEmail(mockPrisma, "nonexistent@example.com");
 
       expect(result).toBeNull();
     });

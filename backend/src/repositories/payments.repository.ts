@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { CreatePaymentData, UpdatePaymentData } from "../types";
+import type { PrismaClient } from "@prisma/client";
+import type { CreatePaymentData, UpdatePaymentData } from "../types";
 
 // Создание платежа
 export const createPayment = async (prisma: PrismaClient, data: CreatePaymentData) => {
@@ -17,21 +17,14 @@ export const createPayment = async (prisma: PrismaClient, data: CreatePaymentDat
 };
 
 // Поиск платежа по stripePaymentId
-export const getPaymentByStripeId = async (
-  prisma: PrismaClient,
-  stripePaymentId: string,
-) => {
+export const getPaymentByStripeId = async (prisma: PrismaClient, stripePaymentId: string) => {
   return await prisma.payment.findFirst({
     where: { stripePaymentId },
   });
 };
 
 // Обновление платежа
-export const updatePayment = async (
-  prisma: PrismaClient,
-  id: number,
-  data: UpdatePaymentData,
-) => {
+export const updatePayment = async (prisma: PrismaClient, id: number, data: UpdatePaymentData) => {
   return await prisma.payment.update({
     where: { id },
     data,
@@ -39,12 +32,7 @@ export const updatePayment = async (
 };
 
 // Получение списка платежей пользователя
-export const getPaymentsByUserId = async (
-  prisma: PrismaClient,
-  userId: number,
-  skip: number,
-  take: number,
-) => {
+export const getPaymentsByUserId = async (prisma: PrismaClient, userId: number, skip: number, take: number) => {
   return await prisma.payment.findMany({
     where: { userId },
     include: {
@@ -64,10 +52,7 @@ export const getPaymentsByUserId = async (
 };
 
 // Подсчет количества платежей пользователя
-export const getPaymentsCountByUserId = async (
-  prisma: PrismaClient,
-  userId: number,
-) => {
+export const getPaymentsCountByUserId = async (prisma: PrismaClient, userId: number) => {
   return await prisma.payment.count({ where: { userId } });
 };
 
@@ -87,11 +72,7 @@ export const getPaymentById = async (prisma: PrismaClient, id: number) => {
 };
 
 // Поиск PENDING-платежа по аукциону и пользователю (для лимита повторных PI)
-export const getPendingPaymentByAuctionAndUser = async (
-  prisma: PrismaClient,
-  auctionId: number,
-  userId: number,
-) => {
+export const getPendingPaymentByAuctionAndUser = async (prisma: PrismaClient, auctionId: number, userId: number) => {
   return await prisma.payment.findFirst({
     where: {
       auctionId,
@@ -110,10 +91,7 @@ export const getPendingPaymentByAuctionAndUser = async (
 };
 
 // Получение платежа по ID с данными аукциона (для refund)
-export const getPaymentByIdWithAuction = async (
-  prisma: PrismaClient,
-  id: number,
-) => {
+export const getPaymentByIdWithAuction = async (prisma: PrismaClient, id: number) => {
   return await prisma.payment.findUnique({
     where: { id },
     include: {
@@ -128,10 +106,7 @@ export const getPaymentByIdWithAuction = async (
 };
 
 // Обновление paidAt у аукциона при успешной оплате
-export const updateAuctionPaidAt = async (
-  prisma: PrismaClient,
-  auctionId: number,
-) => {
+export const updateAuctionPaidAt = async (prisma: PrismaClient, auctionId: number) => {
   return await prisma.auction.update({
     where: { id: auctionId },
     data: { paidAt: new Date() },

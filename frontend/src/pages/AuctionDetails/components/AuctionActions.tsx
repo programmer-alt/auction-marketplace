@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Trash2, Pencil, CreditCard } from 'lucide-react';
-import { Auction, User } from '@/types';
-import { Modal } from './Modal';
+import type { Auction, User } from "@/types";
+import { CreditCard, Pencil, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { Modal } from "./Modal";
 
 interface AuctionActionsProps {
   auction: Auction;
@@ -63,18 +63,12 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
             </button>
           </>
         )}
-        {isAuthenticated &&
-          auction.status === 'COMPLETED' &&
-          user?.id === auction.winnerId && (
-            <Link
-              to={`/payment/${auction.id}`}
-              className="btn-primary flex items-center gap-2"
-              onClick={onPayment}
-            >
-              <CreditCard className="h-4 w-4" />
-              Оплатить
-            </Link>
-          )}
+        {isAuthenticated && auction.status === "COMPLETED" && user?.id === auction.winnerId && (
+          <Link to={`/payment/${auction.id}`} className="btn-primary flex items-center gap-2" onClick={onPayment}>
+            <CreditCard className="h-4 w-4" />
+            Оплатить
+          </Link>
+        )}
       </div>
       <Modal
         isOpen={isModalOpen}

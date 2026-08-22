@@ -1,15 +1,15 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/store/auth.store'
-import { ShoppingBag, User, LogOut, LogIn, UserPlus } from 'lucide-react'
+import { useAuthStore } from "@/store/auth.store";
+import { LogIn, LogOut, ShoppingBag, User, UserPlus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Header() {
-  const { isAuthenticated, user, logout } = useAuthStore()
-  const navigate = useNavigate()
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+    logout();
+    navigate("/login");
+  };
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -20,7 +20,7 @@ export default function Header() {
               <ShoppingBag className="h-8 w-8" />
               <span>Auction Marketplace</span>
             </Link>
-            
+
             <nav className="hidden md:flex space-x-6">
               <Link to="/" className="text-gray-700 hover:text-primary-600 font-medium">
                 Аукционы
@@ -45,27 +45,18 @@ export default function Header() {
                   <User className="h-5 w-5 text-gray-500" />
                   <span className="font-medium">{user?.name || user?.email}</span>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-red-600"
-                >
+                <button onClick={handleLogout} className="flex items-center space-x-2 text-gray-700 hover:text-red-600">
                   <LogOut className="h-5 w-5" />
                   <span className="hidden sm:inline">Выйти</span>
                 </button>
               </>
             ) : (
               <>
-                <Link
-                  to="/login"
-                  className="flex items-center space-x-2 text-gray-700 hover:text-primary-600"
-                >
+                <Link to="/login" className="flex items-center space-x-2 text-gray-700 hover:text-primary-600">
                   <LogIn className="h-5 w-5" />
                   <span className="hidden sm:inline">Войти</span>
                 </Link>
-                <Link
-                  to="/register"
-                  className="btn-primary flex items-center space-x-2"
-                >
+                <Link to="/register" className="btn-primary flex items-center space-x-2">
                   <UserPlus className="h-5 w-5" />
                   <span>Регистрация</span>
                 </Link>
@@ -75,5 +66,5 @@ export default function Header() {
         </div>
       </div>
     </header>
-  )
+  );
 }

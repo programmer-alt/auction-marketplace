@@ -1,5 +1,5 @@
-import React from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload, X } from "lucide-react";
+import type React from "react";
 
 interface ImageUploaderProps {
   preview: string | null;

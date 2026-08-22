@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '@/store/auth.store';
-import { Auction } from '@/types';
-import { User, ShoppingBag, Gavel, Clock, ExternalLink } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { useProfileData } from './hooks/useProfileData';
-import { useStatusBadge } from '@/hooks/useStatusBadge';
+import { useStatusBadge } from "@/hooks/useStatusBadge";
+import { useAuthStore } from "@/store/auth.store";
+import type { Auction } from "@/types";
+import { formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
+import { Clock, ExternalLink, Gavel, ShoppingBag, User } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useProfileData } from "./hooks/useProfileData";
 
 export default function Profile() {
   const { user } = useAuthStore();
   const { myAuctions, wonAuctions, loading } = useProfileData(user);
   const { getStatusBadge } = useStatusBadge();
-  const [activeTab, setActiveTab] = useState<'my' | 'won'>('my');
+  const [activeTab, setActiveTab] = useState<"my" | "won">("my");
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -24,28 +24,28 @@ export default function Profile() {
             <User className="h-8 w-8 text-primary-600" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">{user?.name || 'Пользователь'}</h2>
+            <h2 className="text-xl font-bold">{user?.name || "Пользователь"}</h2>
             <p className="text-gray-600">{user?.email}</p>
             <p className="text-sm text-gray-500">
-              На платформе с{' '}
+              На платформе с{" "}
               {user?.createdAt
                 ? formatDistanceToNow(new Date(user.createdAt), { locale: ru, addSuffix: true })
-                : 'недавно'}
+                : "недавно"}
             </p>
           </div>
         </div>
       </div>
 
       <div className="flex gap-2 mb-6 border-b">
-        {(['my', 'won'] as const).map((tab) => (
+        {(["my", "won"] as const).map((tab) => (
           <button
             key={tab}
-            className={`px-4 py-3 font-medium transition-colors relative ${activeTab === tab ? 'text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 py-3 font-medium transition-colors relative ${activeTab === tab ? "text-primary-600" : "text-gray-500 hover:text-gray-700"}`}
             onClick={() => setActiveTab(tab)}
           >
             <span className="flex items-center gap-2">
-              {tab === 'my' ? <ShoppingBag className="h-4 w-4" /> : <Gavel className="h-4 w-4" />}
-              {tab === 'my' ? `Мои аукционы (${myAuctions.length})` : `Выигранные (${wonAuctions.length})`}
+              {tab === "my" ? <ShoppingBag className="h-4 w-4" /> : <Gavel className="h-4 w-4" />}
+              {tab === "my" ? `Мои аукционы (${myAuctions.length})` : `Выигранные (${wonAuctions.length})`}
             </span>
             {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600" />}
           </button>
@@ -61,26 +61,34 @@ export default function Profile() {
             </div>
           ))}
         </div>
-      ) : activeTab === 'my' ? (
+      ) : activeTab === "my" ? (
         myAuctions.length === 0 ? (
           <div className="text-center py-12">
             <ShoppingBag className="h-12 w-12 mx-auto text-gray-300 mb-3" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">У вас пока нет аукционов</h3>
             <p className="text-gray-500 mb-4">Создайте свой первый аукцион</p>
-            <Link to="/auctions/new" className="btn-primary inline-flex items-center gap-2">Создать</Link>
+            <Link to="/auctions/new" className="btn-primary inline-flex items-center gap-2">
+              Создать
+            </Link>
           </div>
         ) : (
           <div className="space-y-4">
             {myAuctions.map((auction) => {
               const statusInfo = getStatusBadge(auction.status);
               return (
-                <Link key={auction.id} to={`/auctions/${auction.id}`} className="card hover:shadow-md transition-shadow flex items-center justify-between">
+                <Link
+                  key={auction.id}
+                  to={`/auctions/${auction.id}`}
+                  className="card hover:shadow-md transition-shadow flex items-center justify-between"
+                >
                   <div>
                     <h3 className="font-semibold text-gray-900">{auction.title}</h3>
                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                       <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
-                      <span className="flex items-center gap-1"><Gavel className="h-3 w-3" />${auction.currentPrice}</span>
-                      {auction.status === 'ACTIVE' && (
+                      <span className="flex items-center gap-1">
+                        <Gavel className="h-3 w-3" />${auction.currentPrice}
+                      </span>
+                      {auction.status === "ACTIVE" && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatDistanceToNow(new Date(auction.endsAt), { locale: ru, addSuffix: true })}
@@ -103,7 +111,11 @@ export default function Profile() {
       ) : (
         <div className="space-y-4">
           {wonAuctions.map((auction: Auction) => (
-            <Link key={auction.id} to={`/auctions/${auction.id}`} className="card hover:shadow-md transition-shadow flex items-center justify-between">
+            <Link
+              key={auction.id}
+              to={`/auctions/${auction.id}`}
+              className="card hover:shadow-md transition-shadow flex items-center justify-between"
+            >
               <div>
                 <h3 className="font-semibold text-gray-900">{auction.title}</h3>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
@@ -112,7 +124,9 @@ export default function Profile() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Link to={`/payment/${auction.id}`} className="btn-primary text-sm py-1 px-3">Оплатить</Link>
+                <Link to={`/payment/${auction.id}`} className="btn-primary text-sm py-1 px-3">
+                  Оплатить
+                </Link>
                 <ExternalLink className="h-5 w-5 text-gray-400" />
               </div>
             </Link>

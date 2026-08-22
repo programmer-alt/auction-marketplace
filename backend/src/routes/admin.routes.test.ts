@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import request from "supertest";
 import express from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Мокаем контроллер
 vi.mock("../controllers/admin.controller", () => ({
@@ -15,7 +15,7 @@ vi.mock("../middleware/auth", () => ({
 }));
 
 vi.mock("../middleware/admin", () => ({
-  adminMiddleware: vi.fn((req: any, res: any, next: any) => {
+  adminMiddleware: vi.fn((_req: any, _res: any, next: any) => {
     next();
   }),
 }));
@@ -51,7 +51,7 @@ describe("Admin Routes", () => {
         timestamp: "2026-04-05T12:00:00.000Z",
         note: "Queue disabled — Bull removed. Auction completion not yet implemented.",
       };
-      mockGetQueueStats.mockImplementation(async (req: any, res: any) => {
+      mockGetQueueStats.mockImplementation(async (_req: any, res: any) => {
         res.json(mockStats);
       });
 
@@ -65,11 +65,9 @@ describe("Admin Routes", () => {
 
     it("должен вернуть 401 без авторизации", async () => {
       const { authMiddleware } = await import("../middleware/auth");
-      vi.mocked(authMiddleware).mockImplementationOnce(
-        async (_req: any, res: any, _next: any) => {
-          res.status(401).json({ error: "Unauthorized" });
-        },
-      );
+      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
 
       const response = await request(app).get("/api/admin/queue/stats");
 
@@ -78,11 +76,9 @@ describe("Admin Routes", () => {
 
     it("должен вернуть 403 без роли ADMIN", async () => {
       const { adminMiddleware } = await import("../middleware/admin");
-      vi.mocked(adminMiddleware).mockImplementationOnce(
-        (req: any, res: any, _next: any) => {
-          res.status(403).json({ error: "Недостаточно прав" });
-        },
-      );
+      vi.mocked(adminMiddleware).mockImplementationOnce((_req: any, res: any, _next: any) => {
+        res.status(403).json({ error: "Недостаточно прав" });
+      });
 
       const response = await request(app).get("/api/admin/queue/stats");
 

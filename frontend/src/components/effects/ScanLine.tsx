@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface ScanLineProps {
   /** Цвет линии в CSS-формате (например, '#0f0') */
@@ -24,11 +24,11 @@ interface ScanLineProps {
  * Создает эффект подсветки страницы под линией с помощью mix-blend-mode.
  */
 export default function ScanLine({
-  color = '#0f0',
+  color = "#0f0",
   thickness = 3,
   duration = 3,
   delay = 0,
-  className = '',
+  className = "",
   highlightIntensity = 0.4,
   highlightWidth = 200,
 }: ScanLineProps) {
@@ -42,20 +42,21 @@ export default function ScanLine({
   }, [delay]);
 
   // Цвет для подсветки с прозрачностью
-  const highlightColor = color + Math.round(highlightIntensity * 255).toString(16).padStart(2, '0');
-  const lightColor = color + '40'; // Более прозрачный вариант
+  const highlightColor =
+    color +
+    Math.round(highlightIntensity * 255)
+      .toString(16)
+      .padStart(2, "0");
+  const lightColor = `${color}40`; // Более прозрачный вариант
 
   return (
-    <div
-      className={`fixed inset-0 pointer-events-none overflow-hidden ${className}`}
-      style={{ zIndex: 9999 }}
-    >
+    <div className={`fixed inset-0 pointer-events-none overflow-hidden ${className}`} style={{ zIndex: 9999 }}>
       {/* Основная линия с неоновым свечением */}
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
-          width: '100%',
+          width: "100%",
           height: `${thickness}px`,
           backgroundColor: color,
           boxShadow: `
@@ -65,18 +66,18 @@ export default function ScanLine({
             0 0 80px ${color}
           `,
           opacity: isVisible ? 1 : 0,
-          transition: 'opacity 0.5s ease',
-          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : 'none',
+          transition: "opacity 0.5s ease",
+          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : "none",
           zIndex: 3,
         }}
       />
-      
+
       {/* Яркий световой след (mix-blend-mode: screen) */}
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
-          width: '100%',
+          width: "100%",
           height: `${highlightWidth}px`,
           background: `linear-gradient(to bottom, 
             transparent 0%, 
@@ -85,56 +86,56 @@ export default function ScanLine({
             ${highlightColor} 85%, 
             transparent 100%)`,
           opacity: isVisible ? highlightIntensity : 0,
-          transition: 'opacity 0.5s ease',
-          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : 'none',
+          transition: "opacity 0.5s ease",
+          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : "none",
           zIndex: 2,
-          mixBlendMode: 'screen',
-          filter: 'blur(15px)',
-          transform: 'translateY(-50%)',
+          mixBlendMode: "screen",
+          filter: "blur(15px)",
+          transform: "translateY(-50%)",
         }}
       />
-      
+
       {/* Широкий рассеянный свет */}
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
-          width: '100%',
+          width: "100%",
           height: `${highlightWidth * 1.5}px`,
           background: `radial-gradient(ellipse at center, 
             ${lightColor} 0%, 
             ${color}22 30%, 
             transparent 70%)`,
           opacity: isVisible ? highlightIntensity * 0.7 : 0,
-          transition: 'opacity 0.5s ease',
-          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : 'none',
+          transition: "opacity 0.5s ease",
+          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : "none",
           zIndex: 1,
-          filter: 'blur(25px)',
-          transform: 'translateY(-50%)',
+          filter: "blur(25px)",
+          transform: "translateY(-50%)",
         }}
       />
-      
+
       {/* Эффект увеличения яркости элементов под линией (через псевдоэлемент) */}
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
-          width: '100%',
+          width: "100%",
           height: `${highlightWidth}px`,
           background: `linear-gradient(to bottom, 
             ${color}33 0%, 
             ${color}66 50%, 
             ${color}33 100%)`,
           opacity: isVisible ? 0.3 : 0,
-          transition: 'opacity 0.5s ease',
-          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : 'none',
+          transition: "opacity 0.5s ease",
+          animation: isVisible ? `scan-vertical ${duration}s linear infinite` : "none",
           zIndex: 0,
-          mixBlendMode: 'lighten',
-          filter: 'blur(10px)',
-          transform: 'translateY(-50%)',
+          mixBlendMode: "lighten",
+          filter: "blur(10px)",
+          transform: "translateY(-50%)",
         }}
       />
-      
+
       <style>{`
         @keyframes scan-vertical {
           0% {

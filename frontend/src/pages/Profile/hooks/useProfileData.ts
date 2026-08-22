@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { AxiosError } from 'axios';
-import { auctionsApi } from '@/api/auctions';
-import { Auction } from '@/types';
-import type { User } from '@/types/advanced';
-import toast from 'react-hot-toast';
-import { markErrorAsHandled } from '@/utils/errorHandler';
+import { auctionsApi } from "@/api/auctions";
+import type { Auction } from "@/types";
+import type { User } from "@/types/advanced";
+import { markErrorAsHandled } from "@/utils/errorHandler";
+import type { AxiosError } from "axios";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 export const useProfileData = (user: User | null) => {
   const [myAuctions, setMyAuctions] = useState<Auction[]>([]);
@@ -18,18 +18,18 @@ export const useProfileData = (user: User | null) => {
       try {
         const data = await auctionsApi.getAuctions({ page: 1, limit: 50 });
 
-        if ('success' in data && data.success) {
+        if ("success" in data && data.success) {
           const all = data.data?.auctions || [];
           setMyAuctions(all.filter((a: Auction) => a.sellerId === user.id));
-          setWonAuctions(all.filter((a: Auction) => a.winnerId === user.id && a.status === 'COMPLETED'));
+          setWonAuctions(all.filter((a: Auction) => a.winnerId === user.id && a.status === "COMPLETED"));
         } else {
-          throw new Error(data.error || 'Ошибка загрузки аукционов');
+          throw new Error(data.error || "Ошибка загрузки аукционов");
         }
       } catch (error) {
-        toast.error('Не удалось загрузить данные');
+        toast.error("Не удалось загрузить данные");
         // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
         markErrorAsHandled(error as Error | AxiosError);
-        console.error('Failed to fetch auctions:', error);
+        console.error("Failed to fetch auctions:", error);
       } finally {
         setLoading(false);
       }
@@ -37,7 +37,6 @@ export const useProfileData = (user: User | null) => {
 
     fetch();
   }, [user]);
-
 
   return { myAuctions, wonAuctions, loading };
 };

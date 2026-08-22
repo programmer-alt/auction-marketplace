@@ -1,16 +1,12 @@
 import bcrypt from "bcryptjs";
-import jwt, { SignOptions } from "jsonwebtoken";
-import { Prisma } from "../types";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import { prisma } from "../config/db";
 import logger from "../config/logger";
-import {
-  getUserByEmail,
-  createUser,
-  getUserById,
-} from "../repositories/users.repository";
-import { createValidationError, createForbiddenError } from "../errors/factories";
+import { createForbiddenError, createValidationError } from "../errors/factories";
+import { createUser, getUserByEmail, getUserById } from "../repositories/users.repository";
+import type { Prisma } from "../types";
 
-import { getJwtSecret, getJwtAccessExpiresIn, getJwtRefreshExpiresIn, maskEmail } from "../config/jwt";
+import { getJwtAccessExpiresIn, getJwtRefreshExpiresIn, getJwtSecret, maskEmail } from "../config/jwt";
 
 // ========================================
 // Типы
@@ -56,17 +52,13 @@ function generateTokens(userId: number, email: string, role: string, tokenVersio
   const safeRefreshExpiresIn = refreshExpiresIn ?? "7d";
 
   // ВАЖНО: refresh() на сервере ожидает payload.type === 'refresh'
-  const accessToken = jwt.sign(
-    { ...basePayload, type: 'access' },
-    secret,
-    { expiresIn: safeAccessExpiresIn } as SignOptions,
-  );
+  const accessToken = jwt.sign({ ...basePayload, type: "access" }, secret, {
+    expiresIn: safeAccessExpiresIn,
+  } as SignOptions);
 
-  const refreshToken = jwt.sign(
-    { ...basePayload, type: 'refresh' },
-    secret,
-    { expiresIn: safeRefreshExpiresIn } as SignOptions,
-  );
+  const refreshToken = jwt.sign({ ...basePayload, type: "refresh" }, secret, {
+    expiresIn: safeRefreshExpiresIn,
+  } as SignOptions);
 
   return { accessToken, refreshToken };
 }
@@ -76,16 +68,16 @@ function generateTokens(userId: number, email: string, role: string, tokenVersio
  */
 export async function register(email: string, password: string, name?: string) {
   const maskedEmail = maskEmail(email.trim());
-  logger.info('[REGISTER] Попытка регистрации', { email: maskedEmail });
+  logger.info("[REGISTER] Попытка регистрации", { email: maskedEmail });
 
   // Проверка, существует ли пользователь
   const existingUser = await getUserByEmail(prisma, email);
   if (existingUser) {
-    logger.warn('[REGISTER] Пользователь уже существует', { email: maskedEmail });
+    logger.warn("[REGISTER] Пользователь уже существует", { email: maskedEmail });
     throw createValidationError("Пользователь уже существует");
   }
 
-  logger.info('[REGISTER] Пользователь не найден, создаем новый аккаунт', { email: maskedEmail });
+  logger.info("[REGISTER] Пользователь не найден, создаем новый аккаунт", { email: maskedEmail });
 
   // Хеширование пароля
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -97,15 +89,10 @@ export async function register(email: string, password: string, name?: string) {
     name,
   });
 
-  logger.info('[REGISTER] Пользователь создан', { userId: user.id, email: maskEmail(user.email) });
+  logger.info("[REGISTER] Пользователь создан", { userId: user.id, email: maskEmail(user.email) });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(
-    user.id,
-    user.email,
-    user.role,
-    user.tokenVersion ?? 0,
-  );
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role, user.tokenVersion ?? 0);
 
   return {
     user: {
@@ -125,33 +112,28 @@ export async function login(email: string, password: string) {
   // Маскирование email для логов (чтобы не логировать полный адрес)
   const maskedEmail = maskEmail(email);
 
-  logger.info('[LOGIN] Попытка входа', { email: maskedEmail });
+  logger.info("[LOGIN] Попытка входа", { email: maskedEmail });
 
   // Поиск пользователя
   const user = await getUserByEmail(prisma, email);
   if (!user) {
-    logger.warn('[LOGIN] Пользователь не найден', { email: maskedEmail });
+    logger.warn("[LOGIN] Пользователь не найден", { email: maskedEmail });
     throw createForbiddenError("Неверные учетные данные");
   }
 
-  logger.info('[LOGIN] Пользователь найден', { userId: user.id, email: maskedEmail });
+  logger.info("[LOGIN] Пользователь найден", { userId: user.id, email: maskedEmail });
 
   // Проверка пароля
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
-    logger.warn('[LOGIN] Неверный пароль', { email: maskedEmail });
+    logger.warn("[LOGIN] Неверный пароль", { email: maskedEmail });
     throw createForbiddenError("Неверные учетные данные");
   }
 
-  logger.info('[LOGIN] Успешный вход', { userId: user.id, email: maskedEmail });
+  logger.info("[LOGIN] Успешный вход", { userId: user.id, email: maskedEmail });
 
   // Генерация пары токенов
-  const { accessToken, refreshToken } = generateTokens(
-    user.id,
-    user.email,
-    user.role,
-    user.tokenVersion ?? 0,
-  );
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role, user.tokenVersion ?? 0);
 
   return {
     user: {
@@ -169,17 +151,17 @@ export async function login(email: string, password: string) {
  * Обновление access токена с помощью refresh токена
  */
 export async function refresh(refreshToken: string) {
-  let payload;
+  let payload: jwt.JwtPayload & { tokenVersion?: number };
   try {
     payload = jwt.verify(refreshToken, getJwtSecret()) as jwt.JwtPayload & { tokenVersion?: number };
-  } catch (err) {
+  } catch (_err) {
     throw createForbiddenError("Неверный refresh токен");
   }
-  if (payload.type !== 'refresh') {
+  if (payload.type !== "refresh") {
     throw createForbiddenError("Токен не является refresh токеном");
   }
   const userId = payload.id;
-  const {email, role, tokenVersion = 0} = payload;
+  const { email, role, tokenVersion = 0 } = payload;
 
   // Проверка: если пользователь логался/менял пароль после выпуска токена — отозвать
   const user = await prisma.user.findUnique({
@@ -190,8 +172,13 @@ export async function refresh(refreshToken: string) {
     throw createForbiddenError("Refresh token revoked");
   }
 
-  const {accessToken: newAccessToken, refreshToken: newRefreshToken} = generateTokens(userId, email, role, tokenVersion);
-  return {accessToken: newAccessToken, refreshToken: newRefreshToken};
+  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(
+    userId,
+    email,
+    role,
+    tokenVersion,
+  );
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }
 
 /**

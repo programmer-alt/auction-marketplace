@@ -9,22 +9,22 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "test": "npm run test --prefix backend",
-    "test:watch": "npm run test:watch --prefix backend"
+    "test": "concurrently --raw --names \"backend,frontend\" \"npm run test --prefix backend\" \"npm run test --prefix frontend\"",
+    "test:watch": "npm run test:watch --prefix backend",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "validate": "biome check . && tsc --noEmit",
+    "check": "biome check --write . && biome format --write . && tsc --noEmit && biome check ."
   },
-  "keywords": [
-    "auction",
-    "marketplace",
-    "react",
-    "nodejs",
-    "prisma",
-    "stripe"
-  ],
+  "keywords": ["auction", "marketplace", "react", "nodejs", "prisma", "stripe"],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@waldzellai/clear-thought": "^0.0.4",
+    "@biomejs/biome": "^1.9.4",
     "concurrently": "^8.2.2"
   },
   "dependencies": {

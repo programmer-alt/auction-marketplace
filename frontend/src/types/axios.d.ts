@@ -1,7 +1,4 @@
-// Расширяем типы axios для поддержки флага handled
-import { AxiosRequestConfig, AxiosError } from 'axios';
-
-declare module 'axios' {
+declare module "axios" {
   interface AxiosRequestConfig {
     handled?: boolean;
   }
@@ -11,7 +8,7 @@ declare module 'axios' {
       handled?: boolean;
     };
   }
-  
+
   interface InternalAxiosRequestConfig<D = any> {
     handled?: boolean;
   }

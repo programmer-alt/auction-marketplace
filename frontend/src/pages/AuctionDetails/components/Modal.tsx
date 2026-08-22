@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,14 +9,7 @@ interface ModalProps {
   isLoading?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-  onConfirm,
-  isLoading = false,
-}) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, onConfirm, isLoading = false }) => {
   if (!isOpen) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -45,7 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
             disabled={isLoading}
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isLoading ? 'Удаление...' : 'Удалить'}
+            {isLoading ? "Удаление..." : "Удалить"}
           </button>
         </div>
       </div>

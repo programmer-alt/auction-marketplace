@@ -1,21 +1,17 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Calendar } from 'lucide-react';
-import ImageUploader from '@/components/shared/ImageUploader';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { useCreateAuction } from './hooks/useCreateAuction';
+import ImageUploader from "@/components/shared/ImageUploader";
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { ArrowLeft, Calendar, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useCreateAuction } from "./hooks/useCreateAuction";
 
 export default function CreateAuction() {
-  const { 
-    form, 
-    isLoading,
-    imagePreview, 
-    handleImageChange, 
-    removeImage, 
-    onSubmit, 
-    minDate,
-  } = useCreateAuction();
+  const { form, isLoading, imagePreview, handleImageChange, removeImage, onSubmit, minDate } = useCreateAuction();
 
-  const { register, handleSubmit, formState: { errors } } = form;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = form;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -42,14 +38,19 @@ export default function CreateAuction() {
               type="text"
               className="input-field"
               placeholder="Например: iPhone 15 Pro Max 256GB"
-              {...register('title', { required: 'Название обязательно' })}
+              {...register("title", { required: "Название обязательно" })}
             />
             {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-            <textarea className="input-field" rows={4} placeholder="Подробное описание товара..." {...register('description')} />
+            <textarea
+              className="input-field"
+              rows={4}
+              placeholder="Подробное описание товара..."
+              {...register("description")}
+            />
           </div>
 
           <div>
@@ -66,9 +67,9 @@ export default function CreateAuction() {
                 min="0.01"
                 className="input-field"
                 placeholder="100"
-                {...register('startingPrice', {
-                  required: 'Начальная цена обязательна',
-                  min: { value: 0.01, message: 'Минимальная цена $0.01' },
+                {...register("startingPrice", {
+                  required: "Начальная цена обязательна",
+                  min: { value: 0.01, message: "Минимальная цена $0.01" },
                 })}
               />
               {errors.startingPrice && <p className="mt-1 text-sm text-red-600">{errors.startingPrice.message}</p>}
@@ -82,7 +83,7 @@ export default function CreateAuction() {
                   type="datetime-local"
                   className="input-field pl-10"
                   min={minDate}
-                  {...register('endsAt', { required: 'Дата окончания обязательна' })}
+                  {...register("endsAt", { required: "Дата окончания обязательна" })}
                 />
               </div>
               {errors.endsAt && <p className="mt-1 text-sm text-red-600">{errors.endsAt.message}</p>}
@@ -90,10 +91,24 @@ export default function CreateAuction() {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button type="submit" disabled={isLoading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-              {isLoading ? <><LoadingSpinner /> Создание...</> : <><Plus className="h-5 w-5" /> Создать аукцион</>}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-primary flex-1 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <LoadingSpinner /> Создание...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-5 w-5" /> Создать аукцион
+                </>
+              )}
             </button>
-            <Link to="/" className="btn-secondary">Отмена</Link>
+            <Link to="/" className="btn-secondary">
+              Отмена
+            </Link>
           </div>
         </form>
       </div>

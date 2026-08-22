@@ -3,12 +3,12 @@
  * Использует условные типы, mapped types, template literal types и другие возможности
  */
 
-import { Auction, Bid, User, Payment } from './index';
-import { AxiosError } from 'axios';
+import type { AxiosError } from "axios";
+import type { Auction, Bid, Payment, User } from "./index";
 
 // Создаем типы статусов на основе существующих интерфейсов
-export type AuctionStatus = Auction['status'];
-export type PaymentStatus = Payment['status'];
+export type AuctionStatus = Auction["status"];
+export type PaymentStatus = Payment["status"];
 
 // ========================================
 // Типы для обработки ошибок
@@ -19,7 +19,7 @@ export type PaymentStatus = Payment['status'];
  */
 export interface ErrorContract {
   message: string;
-  level: 'info' | 'warning' | 'error' | 'critical';
+  level: "info" | "warning" | "error" | "critical";
   context?: Record<string, any>;
   handled?: boolean;
   timestamp?: Date;
@@ -29,13 +29,13 @@ export interface ErrorContract {
  * Категории ошибок для классификации
  */
 export enum ErrorCategory {
-  NETWORK = 'NETWORK',
-  VALIDATION = 'VALIDATION',
-  AUTHENTICATION = 'AUTHENTICATION',
-  AUTHORIZATION = 'AUTHORIZATION',
-  BUSINESS_LOGIC = 'BUSINESS_LOGIC',
-  SERVER_ERROR = 'SERVER_ERROR',
-  UNKNOWN = 'UNKNOWN'
+  NETWORK = "NETWORK",
+  VALIDATION = "VALIDATION",
+  AUTHENTICATION = "AUTHENTICATION",
+  AUTHORIZATION = "AUTHORIZATION",
+  BUSINESS_LOGIC = "BUSINESS_LOGIC",
+  SERVER_ERROR = "SERVER_ERROR",
+  UNKNOWN = "UNKNOWN",
 }
 
 /**
@@ -93,11 +93,7 @@ export type DeepRequired<T> = {
  * Делает все свойства объекта доступными только для чтения (включая вложенные)
  */
 export type DeepReadonly<T> = {
-  readonly [P in keyof T]: T[P] extends object
-    ? T[P] extends Function
-      ? T[P]
-      : DeepReadonly<T[P]>
-    : T[P];
+  readonly [P in keyof T]: T[P] extends object ? (T[P] extends Function ? T[P] : DeepReadonly<T[P]>) : T[P];
 };
 
 /**
@@ -126,7 +122,7 @@ export type OmitByType<T, U> = {
 /**
  * Статусы аукциона как union тип
  */
-export type AuctionStatusUnion = Auction['status'];
+export type AuctionStatusUnion = Auction["status"];
 
 /**
  * Тип для фильтрации аукционов по статусу
@@ -136,24 +132,24 @@ export type AuctionByStatus<S extends AuctionStatusUnion> = Auction & { status: 
 /**
  * Тип для активных аукционов
  */
-export type ActiveAuction = AuctionByStatus<'ACTIVE'>;
+export type ActiveAuction = AuctionByStatus<"ACTIVE">;
 
 /**
  * Тип для завершенных аукционов
  */
-export type CompletedAuction = AuctionByStatus<'COMPLETED'>;
+export type CompletedAuction = AuctionByStatus<"COMPLETED">;
 
 /**
  * Тип для отмененных аукционов
  */
-export type CancelledAuction = AuctionByStatus<'CANCELLED'>;
+export type CancelledAuction = AuctionByStatus<"CANCELLED">;
 
 /**
  * Тип для аукциона с минимальными данными (для списков)
  */
 export type AuctionPreview = Pick<
   Auction,
-  'id' | 'title' | 'imageUrl' | 'currentPrice' | 'status' | 'endsAt' | 'seller'
+  "id" | "title" | "imageUrl" | "currentPrice" | "status" | "endsAt" | "seller"
 >;
 
 /**
@@ -172,7 +168,7 @@ export type AuctionDetail = Auction & {
 /**
  * Тип для создания ставки (без id и временных меток)
  */
-export type BidCreate = Omit<Bid, 'id' | 'createdAt' | 'user'> & {
+export type BidCreate = Omit<Bid, "id" | "createdAt" | "user"> & {
   userId: number;
 };
 
@@ -180,7 +176,7 @@ export type BidCreate = Omit<Bid, 'id' | 'createdAt' | 'user'> & {
  * Тип для ставки с расширенной информацией об аукционе
  */
 export type BidWithAuction = Bid & {
-  auction: Pick<Auction, 'id' | 'title' | 'currentPrice' | 'status'>;
+  auction: Pick<Auction, "id" | "title" | "currentPrice" | "status">;
 };
 
 // ========================================
@@ -190,12 +186,12 @@ export type BidWithAuction = Bid & {
 /**
  * Тип для публичного профиля пользователя (без чувствительных данных)
  */
-export type PublicUser = Pick<User, 'id' | 'name' | 'email' | 'createdAt'>;
+export type PublicUser = Pick<User, "id" | "name" | "email" | "createdAt">;
 
 /**
  * Тип для обновления профиля пользователя
  */
-export type UserUpdate = Partial<Pick<User, 'name' | 'email'>>;
+export type UserUpdate = Partial<Pick<User, "name" | "email">>;
 
 // ========================================
 // Типы для платежей
@@ -204,13 +200,13 @@ export type UserUpdate = Partial<Pick<User, 'name' | 'email'>>;
 /**
  * Статусы платежа как union тип
  */
-export type PaymentStatusUnion = Payment['status'];
+export type PaymentStatusUnion = Payment["status"];
 
 /**
  * Тип для платежа с деталями аукциона
  */
 export type PaymentWithAuction = Payment & {
-  auction: Pick<Auction, 'id' | 'title' | 'imageUrl' | 'sellerId'>;
+  auction: Pick<Auction, "id" | "title" | "imageUrl" | "sellerId">;
 };
 
 // ========================================
@@ -259,7 +255,7 @@ export type PaginationParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 };
 
 // ========================================
@@ -275,9 +271,7 @@ export type ExtractApiData<T> = T extends ApiResponse<infer U> ? U : never;
 /**
  * Извлекает тип элемента из PaginatedApiResponse
  */
-export type ExtractPaginatedItem<T> = T extends PaginatedApiResponse<infer U>
-  ? U
-  : never;
+export type ExtractPaginatedItem<T> = T extends PaginatedApiResponse<infer U> ? U : never;
 
 /**
  * Извлекает тип параметров функции
@@ -327,12 +321,12 @@ export type FormState<T extends Record<string, any>> = {
 /**
  * Создает тип для ключей событий аукциона
  */
-export type AuctionEvent = `auction:${AuctionStatusUnion | 'created' | 'updated' | 'deleted'}`;
+export type AuctionEvent = `auction:${AuctionStatusUnion | "created" | "updated" | "deleted"}`;
 
 /**
  * Создает тип для ключей событий ставок
  */
-export type BidEvent = `bid:${'created' | 'updated' | 'deleted' | 'won'}`;
+export type BidEvent = `bid:${"created" | "updated" | "deleted" | "won"}`;
 
 /**
  * Создает тип для всех событий WebSocket
@@ -355,7 +349,7 @@ export type EventHandlers = {
  * Состояние загрузки данных
  */
 export type LoadingState = {
-  status: 'idle' | 'loading' | 'refreshing';
+  status: "idle" | "loading" | "refreshing";
   error?: string;
 };
 
@@ -363,7 +357,7 @@ export type LoadingState = {
  * Состояние успешной загрузки данных
  */
 export type SuccessState<T> = {
-  status: 'success';
+  status: "success";
   data: T;
   updatedAt: Date;
 };
@@ -372,7 +366,7 @@ export type SuccessState<T> = {
  * Состояние ошибки загрузки данных
  */
 export type ErrorState = {
-  status: 'error';
+  status: "error";
   error: string;
   retryCount: number;
 };
@@ -387,11 +381,11 @@ export type AsyncState<T> = LoadingState | SuccessState<T> | ErrorState;
  * Пример использования: AuctionState в компоненте аукциона
  */
 export type AuctionState =
-  | { type: 'not_found' }
-  | { type: 'loading' }
-  | { type: 'active'; auction: ActiveAuction }
-  | { type: 'completed'; auction: CompletedAuction; winner: User | null }
-  | { type: 'cancelled'; auction: CancelledAuction; reason?: string };
+  | { type: "not_found" }
+  | { type: "loading" }
+  | { type: "active"; auction: ActiveAuction }
+  | { type: "completed"; auction: CompletedAuction; winner: User | null }
+  | { type: "cancelled"; auction: CancelledAuction; reason?: string };
 
 // ========================================
 // Утилиты для работы с датами
@@ -414,7 +408,7 @@ export type TimeRange = {
  * Тип для фильтрации по дате
  */
 export type DateFilter = {
-  field: 'createdAt' | 'endsAt' | 'updatedAt';
+  field: "createdAt" | "endsAt" | "updatedAt";
   range: TimeRange;
 };
 
@@ -441,35 +435,35 @@ export function isApiError<T>(response: ApiResponse<T>): response is ApiError {
  * Type guard для проверки активного аукциона
  */
 export function isActiveAuction(auction: Auction): auction is ActiveAuction {
-  return auction.status === 'ACTIVE';
+  return auction.status === "ACTIVE";
 }
 
 /**
  * Type guard для проверки завершенного аукциона
  */
 export function isCompletedAuction(auction: Auction): auction is CompletedAuction {
-  return auction.status === 'COMPLETED';
+  return auction.status === "COMPLETED";
 }
 
 /**
  * Type guard для проверки успешного состояния
  */
 export function isSuccessState<T>(state: AsyncState<T>): state is SuccessState<T> {
-  return state.status === 'success';
+  return state.status === "success";
 }
 
 /**
  * Type guard для проверки ошибки как HandledError
  */
 export function isHandledError(error: any): error is HandledError {
-  return error && typeof error === 'object' && error.config?.handled === true;
+  return error && typeof error === "object" && error.config?.handled === true;
 }
 
 /**
  * Type guard для проверки ошибки как AxiosError
  */
 export function isAxiosError(error: any): error is AxiosError {
-  return error && typeof error === 'object' && 'isAxiosError' in error;
+  return error && typeof error === "object" && "isAxiosError" in error;
 }
 
 // ========================================
@@ -543,7 +537,7 @@ export type CreateAuctionForm = FormState<{
  * Пример: Создание типа для фильтров аукционов
  */
 export type AuctionFilters = {
-  status?: AuctionStatusUnion | 'ALL';
+  status?: AuctionStatusUnion | "ALL";
   minPrice?: number;
   maxPrice?: number;
   sellerId?: number;
@@ -572,4 +566,4 @@ export type {
   Bid,
   User,
   Payment,
-} from './index';
+} from "./index";

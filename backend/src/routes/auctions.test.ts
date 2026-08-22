@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import request from "supertest";
 import express from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Создаём моки Prisma и Io, которые будут использоваться в обоих моках
 const { mockPrisma, mockIo } = vi.hoisted(() => {
@@ -55,11 +55,8 @@ vi.mock("../middleware/auth.js", () => ({
     next();
   }),
 }));
-
-// Импортируем моканые модули
-import { prisma, io } from "../index";
-import auctionsRouter from "./auctions.routes";
 import { errorHandler } from "../errors/handler";
+import auctionsRouter from "./auctions.routes";
 
 // Создаём тестовое Express приложение
 const app = express();
@@ -282,9 +279,7 @@ describe("Auctions Routes", () => {
 
       mockPrisma.auction.create.mockResolvedValue(mockCreatedAuction);
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(validAuctionData);
+      const response = await request(app).post("/api/auctions").send(validAuctionData);
 
       // Отладка: вывести ошибку валидации
       if (response.status !== 201) {
@@ -295,10 +290,7 @@ describe("Auctions Routes", () => {
       expect(response.body.message).toBe("Аукцион успешно создан");
       expect(response.body.auction.title).toBe("New Auction");
       expect(mockPrisma.auction.create).toHaveBeenCalled();
-      expect(mockIo.emit).toHaveBeenCalledWith(
-        "auction:new",
-        expect.any(Object),
-      );
+      expect(mockIo.emit).toHaveBeenCalledWith("auction:new", expect.any(Object));
     });
 
     it("должен создать аукцион без необязательных полей", async () => {
@@ -310,9 +302,7 @@ describe("Auctions Routes", () => {
 
       mockPrisma.auction.create.mockResolvedValue({ id: 1, ...minimalData });
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(minimalData);
+      const response = await request(app).post("/api/auctions").send(minimalData);
 
       expect(response.status).toBe(201);
       expect(mockPrisma.auction.create).toHaveBeenCalled();
@@ -330,9 +320,7 @@ describe("Auctions Routes", () => {
         endsAt: futureDate,
       };
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(invalidData);
+      const response = await request(app).post("/api/auctions").send(invalidData);
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBeInstanceOf(Array);
@@ -345,9 +333,7 @@ describe("Auctions Routes", () => {
         endsAt: futureDate,
       };
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(invalidData);
+      const response = await request(app).post("/api/auctions").send(invalidData);
 
       expect(response.status).toBe(400);
     });
@@ -359,9 +345,7 @@ describe("Auctions Routes", () => {
         endsAt: "2020-01-01T00:00:00.000Z",
       };
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(invalidData);
+      const response = await request(app).post("/api/auctions").send(invalidData);
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe("Дата окончания должна быть в будущем");
@@ -373,9 +357,7 @@ describe("Auctions Routes", () => {
         imageUrl: "not-a-valid-url",
       };
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(invalidData);
+      const response = await request(app).post("/api/auctions").send(invalidData);
 
       expect(response.status).toBe(400);
     });
@@ -383,15 +365,11 @@ describe("Auctions Routes", () => {
     it("должен вернуть 401 без авторизации", async () => {
       // Переопределяем мок authMiddleware чтобы он не добавлял user
       const { authMiddleware } = await import("../middleware/auth.js");
-      vi.mocked(authMiddleware).mockImplementationOnce(
-        async (_req: any, res: any, _next: any) => {
-          res.status(401).json({ error: "Unauthorized" });
-        },
-      );
+      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+        res.status(401).json({ error: "Unauthorized" });
+      });
 
-      const response = await request(app)
-        .post("/api/auctions")
-        .send(validAuctionData);
+      const response = await request(app).post("/api/auctions").send(validAuctionData);
 
       expect(response.status).toBe(401);
     });
@@ -440,9 +418,7 @@ describe("Auctions Routes", () => {
         seller: { id: 1, email: "test@test.com", name: null },
       });
 
-      const response = await request(app)
-        .put("/api/auctions/1")
-        .send({ title: "Updated Title" });
+      const response = await request(app).put("/api/auctions/1").send({ title: "Updated Title" });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Аукцион успешно обновлён");
@@ -452,9 +428,7 @@ describe("Auctions Routes", () => {
     it("должен вернуть 404, если аукцион не найден", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue(null);
 
-      const response = await request(app)
-        .put("/api/auctions/999")
-        .send({ title: "Updated" });
+      const response = await request(app).put("/api/auctions/999").send({ title: "Updated" });
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe("Аукцион не найден");
@@ -466,14 +440,10 @@ describe("Auctions Routes", () => {
         sellerId: 2, // Другой пользователь
       });
 
-      const response = await request(app)
-        .put("/api/auctions/1")
-        .send({ title: "Updated" });
+      const response = await request(app).put("/api/auctions/1").send({ title: "Updated" });
 
       expect(response.status).toBe(403);
-      expect(response.body.error).toBe(
-        "Недостаточно прав для редактирования этого аукциона",
-      );
+      expect(response.body.error).toBe("Недостаточно прав для редактирования этого аукциона");
     });
 
     it("должен вернуть 400, если аукцион не активен", async () => {
@@ -483,20 +453,14 @@ describe("Auctions Routes", () => {
         status: "COMPLETED",
       });
 
-      const response = await request(app)
-        .put("/api/auctions/1")
-        .send({ title: "Updated" });
+      const response = await request(app).put("/api/auctions/1").send({ title: "Updated" });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe(
-        "Можно редактировать только активные аукционы",
-      );
+      expect(response.body.error).toBe("Можно редактировать только активные аукционы");
     });
 
     it("должен вернуть 400 при невалидном ID", async () => {
-      const response = await request(app)
-        .put("/api/auctions/invalid")
-        .send({ title: "Updated" });
+      const response = await request(app).put("/api/auctions/invalid").send({ title: "Updated" });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe("Некорректный ID аукциона");
@@ -509,9 +473,7 @@ describe("Auctions Routes", () => {
         status: "ACTIVE",
       });
 
-      const response = await request(app)
-        .put("/api/auctions/1")
-        .send({ endsAt: "2020-01-01T00:00:00.000Z" });
+      const response = await request(app).put("/api/auctions/1").send({ endsAt: "2020-01-01T00:00:00.000Z" });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe("Дата окончания должна быть в будущем");
@@ -536,10 +498,7 @@ describe("Auctions Routes", () => {
       await request(app).put("/api/auctions/1").send({ title: "Updated" });
 
       expect(mockIo.to).toHaveBeenCalledWith("auction:1");
-      expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith(
-        "auction:updated",
-        expect.any(Object),
-      );
+      expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith("auction:updated", expect.any(Object));
     });
   });
 
@@ -586,9 +545,7 @@ describe("Auctions Routes", () => {
       const response = await request(app).delete("/api/auctions/1");
 
       expect(response.status).toBe(403);
-      expect(response.body.error).toBe(
-        "Недостаточно прав для удаления этого аукциона",
-      );
+      expect(response.body.error).toBe("Недостаточно прав для удаления этого аукциона");
     });
 
     it("должен вернуть 400 при невалидном ID", async () => {
@@ -609,10 +566,7 @@ describe("Auctions Routes", () => {
       await request(app).delete("/api/auctions/1");
 
       expect(mockIo.to).toHaveBeenCalledWith("auction:1");
-      expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith(
-        "auction:deleted",
-        { id: 1 },
-      );
+      expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith("auction:deleted", { id: 1 });
     });
   });
 });

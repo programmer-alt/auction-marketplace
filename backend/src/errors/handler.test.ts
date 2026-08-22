@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createForbiddenError, createNotFoundError, createValidationError } from "./factories";
 import { errorHandler } from "./handler";
-import { createNotFoundError, createForbiddenError, createValidationError } from "./factories";
 
 describe("Error Handler", () => {
   let mockRes: any;

@@ -1,18 +1,19 @@
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 
 const WINDOW_SIZE_IN_SECONDS = 60;
-const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'development' 
-  ? parseInt(process.env.DEV_RATE_LIMIT || '1000', 10)
-  : parseInt(process.env.PROD_RATE_LIMIT || '100', 10);
+const MAX_REQUESTS_PER_WINDOW =
+  process.env.NODE_ENV === "development"
+    ? Number.parseInt(process.env.DEV_RATE_LIMIT || "1000", 10)
+    : Number.parseInt(process.env.PROD_RATE_LIMIT || "100", 10);
 
 // ponytail: увеличиваем TTL для fallback, чтобы записи не терялись при кратковременных отключениях
 // включаем автоочистку (ttlAutopurge: true), чтобы записи не накапливались
 const memoryLimitStore = new LRUCache<string, { count: number; resetAt: number }>({
-  max: 10_000,           // максимум 10k уникальных IP
+  max: 10_000, // максимум 10k уникальных IP
   ttl: WINDOW_SIZE_IN_SECONDS * 1000,
-  ttlAutopurge: true,    // ponytail: включаем автоочистку
+  ttlAutopurge: true, // ponytail: включаем автоочистку
 });
 
 // Список доверенных прокси-подсетей (локальная сеть, Docker, CDN)
@@ -35,13 +36,8 @@ function isTrustedProxy(ip: string): boolean {
       const subnetAddr = ipaddr.parse(subnet);
 
       if (addr.kind() === subnetAddr.kind()) {
-        const prefix = parseInt(prefixStr, 10);
-        if (
-          (addr as ipaddr.IPv4 | ipaddr.IPv6).match(
-            subnetAddr as ipaddr.IPv4 | ipaddr.IPv6,
-            prefix,
-          )
-        ) {
+        const prefix = Number.parseInt(prefixStr, 10);
+        if ((addr as ipaddr.IPv4 | ipaddr.IPv6).match(subnetAddr as ipaddr.IPv4 | ipaddr.IPv6, prefix)) {
           return true;
         }
       }
@@ -95,28 +91,22 @@ function shouldLogRequestCount(requestCount: number): boolean {
   return logPoints.includes(requestCount);
 }
 
-export async function rateLimit(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  // ponytail: Исключаем /api/csrf-token, /api/auth/me и /uploads/* из rate limiting 
+export async function rateLimit(req: Request, res: Response, next: NextFunction) {
+  // ponytail: Исключаем /api/csrf-token, /api/auth/me и /uploads/* из rate limiting
   // - это GET-запросы для генерации токена, проверки аутентификации и статических ресурсов
   if (
-    req.path === '/api/csrf-token' || 
-    req.path === '/api/auth/me' ||
-    req.path === '/api/upload' ||
-    req.path === '/uploads' ||
-    req.path.startsWith('/uploads/')
-  ) return next();
+    req.path === "/api/csrf-token" ||
+    req.path === "/api/auth/me" ||
+    req.path === "/api/upload" ||
+    req.path === "/uploads" ||
+    req.path.startsWith("/uploads/")
+  )
+    return next();
 
   // Добавляем условные исключения для разработки
-  if (process.env.NODE_ENV !== 'production') {
-    if (
-      req.path === '/api/auth/login' ||
-      req.path === '/api/auth/refresh' ||
-      req.path.startsWith('/api/auctions')
-    ) return next();
+  if (process.env.NODE_ENV !== "production") {
+    if (req.path === "/api/auth/login" || req.path === "/api/auth/refresh" || req.path.startsWith("/api/auctions"))
+      return next();
   }
 
   const rawIp = getClientIp(req);
@@ -125,7 +115,7 @@ export async function rateLimit(
 
   // ponytail: логирование для диагностики - какие запросы приходят к /api
   // логируем только для /api/auctions, /api/auth.me, /api/csrf-token, чтобы не заспамить консоль
-  if (req.path === '/api/auctions' || req.path === '/api/auth/me' || req.path === '/api/csrf-token') {
+  if (req.path === "/api/auctions" || req.path === "/api/auth/me" || req.path === "/api/csrf-token") {
     console.log(`[RateLimit] Request: ${req.method} ${req.originalUrl} - IP: ${ip}`);
   }
 
@@ -135,11 +125,11 @@ export async function rateLimit(
     if (currentEntry.count >= MAX_REQUESTS_PER_WINDOW) {
       if (shouldLogRequestCount(currentEntry.count)) {
         console.log(
-          `[RateLimit] Request count for ${req.method} ${req.path} - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}`
+          `[RateLimit] Request count for ${req.method} ${req.path} - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}`,
         );
       }
       console.log(
-        `[RateLimit] Memory block - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}, Path: ${req.path}, Method: ${req.method}`
+        `[RateLimit] Memory block - IP: ${ip}, RequestCount: ${currentEntry.count}, Max: ${MAX_REQUESTS_PER_WINDOW}, Path: ${req.path}, Method: ${req.method}`,
       );
       return res.status(429).json({
         error: "Слишком много запросов от этого IP-адреса.",

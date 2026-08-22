@@ -1,8 +1,8 @@
-import toast from 'react-hot-toast';
-import { AxiosError } from 'axios';
-import { markErrorAsHandled } from './errorHandler';
-import { PossibleError } from '../types/errorTypes';
-import { ErrorContract, ErrorCategory, DetailedError, isHandledError, isAxiosError } from '../types/advanced';
+import type { AxiosError } from "axios";
+import toast from "react-hot-toast";
+import { type DetailedError, ErrorCategory, type ErrorContract, isAxiosError, isHandledError } from "../types/advanced";
+import type { PossibleError } from "../types/errorTypes";
+import { markErrorAsHandled } from "./errorHandler";
 
 /**
  * Универсальный обработчик ошибок
@@ -11,20 +11,16 @@ import { ErrorContract, ErrorCategory, DetailedError, isHandledError, isAxiosErr
  * @param category - Категория ошибки
  * @returns Детализированная ошибка
  */
-export const handleError = (
-  error: PossibleError,
-  customMessage?: string,
-  category?: ErrorCategory
-): DetailedError => {
+export const handleError = (error: PossibleError, customMessage?: string, category?: ErrorCategory): DetailedError => {
   // Если ошибка уже отмечена как обработанная, просто возвращаем её
   if (isHandledError(error)) {
-    const errorMessage = error.message || 'Unknown error';
+    const errorMessage = error.message || "Unknown error";
     return {
       message: errorMessage,
-      level: 'error',
+      level: "error",
       handled: true,
       category: category || ErrorCategory.UNKNOWN,
-      originalError: error
+      originalError: error,
     };
   }
 
@@ -38,20 +34,24 @@ export const handleError = (
     // Проверяем различные источники сообщений об ошибке
     if (isAxiosError(error)) {
       // Используем явное приведение к типу для доступа к свойствам
-      const axiosErr = error as import('axios').AxiosError;
-      if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'error' in axiosErr.response.data) {
+      const axiosErr = error as import("axios").AxiosError;
+      if (axiosErr.response?.data && typeof axiosErr.response.data === "object" && "error" in axiosErr.response.data) {
         message = (axiosErr.response.data as any).error;
-      } else if (axiosErr.response?.data && typeof axiosErr.response.data === 'object' && 'message' in axiosErr.response.data) {
+      } else if (
+        axiosErr.response?.data &&
+        typeof axiosErr.response.data === "object" &&
+        "message" in axiosErr.response.data
+      ) {
         message = (axiosErr.response.data as any).message;
       } else if (axiosErr.message) {
         message = axiosErr.message;
       }
     } else if ((error as Error)?.message) {
       message = (error as Error).message;
-    } else if (typeof error === 'string') {
+    } else if (typeof error === "string") {
       message = error;
     } else {
-      message = 'Произошла неизвестная ошибка';
+      message = "Произошла неизвестная ошибка";
     }
   }
 
@@ -60,18 +60,24 @@ export const handleError = (
 
   // Создаем объект ошибки с контрактом
   const errorContract: DetailedError = {
-    message: message || 'Произошла неизвестная ошибка', // Убедимся, что сообщение не undefined
+    message: message || "Произошла неизвестная ошибка", // Убедимся, что сообщение не undefined
     level,
     category: determinedCategory,
     originalError: error,
-    timestamp: new Date()
+    timestamp: new Date(),
   };
 
   // Показываем уведомление в зависимости от уровня
   showNotification(errorContract);
 
   // Помечаем ошибку как обработанную
-  if (error && typeof error === 'object' && error.constructor !== String && error.constructor !== Number && error.constructor !== Boolean) {
+  if (
+    error &&
+    typeof error === "object" &&
+    error.constructor !== String &&
+    error.constructor !== Number &&
+    error.constructor !== Boolean
+  ) {
     markErrorAsHandled(error as Error | AxiosError);
   }
 
@@ -84,16 +90,15 @@ export const handleError = (
 const categorizeError = (error: PossibleError): ErrorCategory => {
   // Проверяем, является ли ошибка axios ошибкой
   if (isAxiosError(error)) {
-    const axiosErr = error as import('axios').AxiosError;
-    
+    const axiosErr = error as import("axios").AxiosError;
+
     if (!axiosErr.response) {
       if (axiosErr.request) {
         // Network error (no response received)
         return ErrorCategory.NETWORK;
-      } else {
-        // Request was made but no response received
-        return ErrorCategory.NETWORK;
       }
+      // Request was made but no response received
+      return ErrorCategory.NETWORK;
     }
 
     // Проверяем статус ошибки
@@ -121,17 +126,18 @@ const categorizeError = (error: PossibleError): ErrorCategory => {
       default:
         if (status && status >= 400 && status < 500) {
           return ErrorCategory.BUSINESS_LOGIC;
-        } else if (status && status >= 500) {
+        }
+        if (status && status >= 500) {
           return ErrorCategory.SERVER_ERROR;
         }
         return ErrorCategory.UNKNOWN;
     }
-  } else if (error && typeof error === 'object') {
+  }
+  if (error && typeof error === "object") {
     // Проверяем другие типы ошибок
     return ErrorCategory.UNKNOWN;
-  } else {
-    return ErrorCategory.UNKNOWN;
   }
+  return ErrorCategory.UNKNOWN;
 };
 
 // ... остальная часть файла остается без изменений ...
@@ -139,19 +145,19 @@ const categorizeError = (error: PossibleError): ErrorCategory => {
 /**
  * Определяет уровень логирования на основе категории ошибки
  */
-const determineLogLevel = (category: ErrorCategory): ErrorContract['level'] => {
+const determineLogLevel = (category: ErrorCategory): ErrorContract["level"] => {
   switch (category) {
     case ErrorCategory.NETWORK:
     case ErrorCategory.SERVER_ERROR:
-      return 'error';
+      return "error";
     case ErrorCategory.AUTHENTICATION:
     case ErrorCategory.AUTHORIZATION:
-      return 'warning';
+      return "warning";
     case ErrorCategory.VALIDATION:
     case ErrorCategory.BUSINESS_LOGIC:
-      return 'info';
+      return "info";
     default:
-      return 'error';
+      return "error";
   }
 };
 
@@ -162,16 +168,16 @@ const showNotification = (errorContract: DetailedError) => {
   const { message, level } = errorContract;
 
   switch (level) {
-    case 'info':
+    case "info":
       toast(message);
       break;
-    case 'warning':
+    case "warning":
       toast(message);
       break;
-    case 'error':
+    case "error":
       toast.error(message);
       break;
-    case 'critical':
+    case "critical":
       toast.error(message, { duration: 10000 }); // Показываем критические ошибки дольше
       break;
     default:
@@ -195,10 +201,11 @@ export const handleBusinessLogicError = (error: PossibleError, context?: Record<
  * Вспомогательная функция для обработки сетевых ошибок
  */
 export const handleNetworkError = (error: PossibleError): DetailedError => {
-  const message = isAxiosError(error) && !(error as import('axios').AxiosError).response
-    ? 'Нет соединения с сервером. Проверьте подключение к интернету.' 
-    : 'Ошибка сети при выполнении запроса.';
-  
+  const message =
+    isAxiosError(error) && !(error as import("axios").AxiosError).response
+      ? "Нет соединения с сервером. Проверьте подключение к интернету."
+      : "Ошибка сети при выполнении запроса.";
+
   return handleError(error, message, ErrorCategory.NETWORK);
 };
 

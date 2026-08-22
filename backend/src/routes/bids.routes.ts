@@ -1,6 +1,6 @@
-import { Router } from "express";
 import { bidsController } from "@/controllers/bids.controller";
 import { authMiddleware } from "@/middleware/auth";
+import { Router } from "express";
 
 const router = Router();
 

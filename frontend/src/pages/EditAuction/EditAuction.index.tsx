@@ -1,24 +1,28 @@
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Save, Calendar } from 'lucide-react';
-import ImageUploader from '@/components/shared/ImageUploader';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { useEditAuction } from './hooks/useEditAuction';
+import ImageUploader from "@/components/shared/ImageUploader";
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { ArrowLeft, Calendar, Save } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { useEditAuction } from "./hooks/useEditAuction";
 
 export default function EditAuction() {
   const { id } = useParams<{ id: string }>();
-  const { 
-    form, 
+  const {
+    form,
 
     uploadState,
-    displayImage, 
-    handleImageChange, 
-    handleRemoveImage, 
-    onSubmit, 
-    minDate 
+    displayImage,
+    handleImageChange,
+    handleRemoveImage,
+    onSubmit,
+    minDate,
   } = useEditAuction(id);
-  
-  const isLoading = uploadState.status === 'loading';
-  const { register, handleSubmit, formState: { errors } } = form;
+
+  const isLoading = uploadState.status === "loading";
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = form;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -33,13 +37,13 @@ export default function EditAuction() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
-            <input type="text" className="input-field" {...register('title', { required: 'Название обязательно' })} />
+            <input type="text" className="input-field" {...register("title", { required: "Название обязательно" })} />
             {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-            <textarea className="input-field" rows={4} {...register('description')} />
+            <textarea className="input-field" rows={4} {...register("description")} />
           </div>
 
           <div>
@@ -55,9 +59,9 @@ export default function EditAuction() {
                 step="0.01"
                 min="0.01"
                 className="input-field"
-                {...register('startingPrice', {
-                  required: 'Цена обязательна',
-                  min: { value: 0.01, message: 'Минимум $0.01' },
+                {...register("startingPrice", {
+                  required: "Цена обязательна",
+                  min: { value: 0.01, message: "Минимум $0.01" },
                 })}
               />
               {errors.startingPrice && <p className="mt-1 text-sm text-red-600">{errors.startingPrice.message}</p>}
@@ -71,7 +75,7 @@ export default function EditAuction() {
                   type="datetime-local"
                   className="input-field pl-10"
                   min={minDate}
-                  {...register('endsAt', { required: 'Дата обязательна' })}
+                  {...register("endsAt", { required: "Дата обязательна" })}
                 />
               </div>
               {errors.endsAt && <p className="mt-1 text-sm text-red-600">{errors.endsAt.message}</p>}
@@ -79,10 +83,24 @@ export default function EditAuction() {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button type="submit" disabled={isLoading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-              {isLoading ? <><LoadingSpinner /> Сохранение...</> : <><Save className="h-5 w-5" /> Сохранить</>}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-primary flex-1 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <LoadingSpinner /> Сохранение...
+                </>
+              ) : (
+                <>
+                  <Save className="h-5 w-5" /> Сохранить
+                </>
+              )}
             </button>
-            <Link to={`/auctions/${id}`} className="btn-secondary">Отмена</Link>
+            <Link to={`/auctions/${id}`} className="btn-secondary">
+              Отмена
+            </Link>
           </div>
         </form>
       </div>

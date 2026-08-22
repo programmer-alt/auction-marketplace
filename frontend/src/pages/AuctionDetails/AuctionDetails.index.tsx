@@ -1,19 +1,18 @@
-import React from 'react';
+import React from "react";
 
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/auth.store';
-import { useAuctionData } from './hooks/useAuctionData';
-import { useBidForm } from './hooks/useBidForm';
-import { useAuctionActions } from './hooks/useAuctionActions';
-import { useAuctionState } from './hooks/useAuctionState';
-import AuctionHeader from './components/AuctionHeader';
-import AuctionImage from './components/AuctionImage';
-import AuctionDetailsInfo from './components/AuctionDetailsInfo';
-import BidHistory from './components/BidHistory';
-import BidForm from './components/BidForm';
-import AuctionActions from './components/AuctionActions';
-import { handleBusinessLogicError } from '@/utils/universalErrorHandler';
-
+import { useAuthStore } from "@/store/auth.store";
+import { handleBusinessLogicError } from "@/utils/universalErrorHandler";
+import { useNavigate, useParams } from "react-router-dom";
+import AuctionActions from "./components/AuctionActions";
+import AuctionDetailsInfo from "./components/AuctionDetailsInfo";
+import AuctionHeader from "./components/AuctionHeader";
+import AuctionImage from "./components/AuctionImage";
+import BidForm from "./components/BidForm";
+import BidHistory from "./components/BidHistory";
+import { useAuctionActions } from "./hooks/useAuctionActions";
+import { useAuctionData } from "./hooks/useAuctionData";
+import { useAuctionState } from "./hooks/useAuctionState";
+import { useBidForm } from "./hooks/useBidForm";
 
 const LoadingSkeleton = () => (
   <div className="max-w-4xl mx-auto">
@@ -28,8 +27,8 @@ const LoadingSkeleton = () => (
 const NotFound = () => {
   const navigate = useNavigate();
   React.useEffect(() => {
-    handleBusinessLogicError(new Error('Аукцион не найден'), { context: 'auction-not-found-component' });
-    navigate('/');
+    handleBusinessLogicError(new Error("Аукцион не найден"), { context: "auction-not-found-component" });
+    navigate("/");
   }, [navigate]);
   return null;
 };
@@ -42,24 +41,13 @@ export default function AuctionDetails() {
   const { auction, bids, loading, refresh } = useAuctionData(id);
   const { bidAmount, setBidAmount, isSubmitting, submitBid } = useBidForm(
     auction?.id,
-    auction?.currentPrice ?? undefined
+    auction?.currentPrice ?? undefined,
   );
-  const { handleDelete, handleEdit, handlePayment, handleConfirmDelete } = useAuctionActions(
-    auction?.id,
-    navigate
-  );
+  const { handleDelete, handleEdit, handlePayment, handleConfirmDelete } = useAuctionActions(auction?.id, navigate);
 
   // Используем хук для вычисления производных состояний
-  const {
-    isOwner,
-    isActive,
-    isEnded,
-    statusInfo,
-    showBidForm,
-    showLoginPrompt,
-    showOwnerMessage,
-    showAuctionActions,
-  } = useAuctionState(auction, user, isAuthenticated);
+  const { isOwner, isActive, isEnded, statusInfo, showBidForm, showLoginPrompt, showOwnerMessage, showAuctionActions } =
+    useAuctionState(auction, user, isAuthenticated);
 
   const handleBidSubmit = async (amount: number): Promise<boolean> => {
     const success = await submitBid(amount);
@@ -104,10 +92,7 @@ export default function AuctionDetails() {
           {showLoginPrompt && (
             <div className="card text-center">
               <p className="text-gray-600 mb-4">Войдите, чтобы делать ставки</p>
-              <button
-                onClick={() => navigate('/login')}
-                className="btn-primary w-full"
-              >
+              <button onClick={() => navigate("/login")} className="btn-primary w-full">
                 Войти
               </button>
             </div>
@@ -115,9 +100,7 @@ export default function AuctionDetails() {
           {showOwnerMessage && (
             <div className="card text-center">
               <p className="text-gray-500">Это ваш аукцион</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Ожидайте ставок от участников
-              </p>
+              <p className="text-sm text-gray-400 mt-1">Ожидайте ставок от участников</p>
             </div>
           )}
 

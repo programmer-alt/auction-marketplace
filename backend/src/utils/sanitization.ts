@@ -7,14 +7,14 @@
  * Базовая очистка строки от HTML-тегов и специальных символов
  */
 export function sanitizeString(input: string): string {
-  if (typeof input !== 'string') {
-    return '';
+  if (typeof input !== "string") {
+    return "";
   }
 
   return input
-    .replace(/[<>]/g, '') // Удаление < и >
-    .replace(/javascript:/gi, '') // Удаление javascript: протокола
-    .replace(/on\w+=/gi, '') // Удаление обработчиков событий (onclick= и т.д.)
+    .replace(/[<>]/g, "") // Удаление < и >
+    .replace(/javascript:/gi, "") // Удаление javascript: протокола
+    .replace(/on\w+=/gi, "") // Удаление обработчиков событий (onclick= и т.д.)
     .trim();
 }
 
@@ -22,24 +22,22 @@ export function sanitizeString(input: string): string {
  * Очистка HTML-контента (сохранение разрешенных тегов)
  */
 export function sanitizeHtml(input: string, allowedTags: string[] = []): string {
-  if (typeof input !== 'string') {
-    return '';
+  if (typeof input !== "string") {
+    return "";
   }
 
   // Создаем регулярное выражение для разрешенных тегов
-  const allowedTagsPattern = allowedTags.length > 0
-    ? `(${allowedTags.join('|')})`
-    : '';
+  const allowedTagsPattern = allowedTags.length > 0 ? `(${allowedTags.join("|")})` : "";
 
   // Удаляем все теги, кроме разрешенных
-  let sanitized = input.replace(/<script[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ''); // Удаляем script теги
+  let sanitized = input.replace(/<script[^<]*<\/script>/gi, ""); // Удаляем script теги
 
   if (allowedTagsPattern) {
     // Удаляем все теги, кроме разрешенных
-    sanitized = sanitized.replace(new RegExp(`<(?!${allowedTagsPattern})\/?[\w\s="'-]+>`, 'gi'), '');
+    sanitized = sanitized.replace(new RegExp(`<(?!${allowedTagsPattern})\/?[\w\s="'-]+>`, "gi"), "");
   } else {
     // Удаляем все теги
-    sanitized = sanitized.replace(/<[^>]*>/g, '');
+    sanitized = sanitized.replace(/<[^>]*>/g, "");
   }
 
   return sanitized;
@@ -49,19 +47,19 @@ export function sanitizeHtml(input: string, allowedTags: string[] = []): string 
  * Очистка URL от потенциально опасных протоколов
  */
 export function sanitizeUrl(input: string): string {
-  if (typeof input !== 'string') {
-    return '';
+  if (typeof input !== "string") {
+    return "";
   }
 
   const trimmed = input.trim();
 
   // Проверяем на опасные протоколы
-  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+  const dangerousProtocols = ["javascript:", "data:", "vbscript:", "file:"];
   const lowerInput = trimmed.toLowerCase();
 
   for (const protocol of dangerousProtocols) {
     if (lowerInput.startsWith(protocol)) {
-      return '';
+      return "";
     }
   }
 
@@ -77,7 +75,7 @@ export function sanitizeObject<T extends Record<string, unknown>>(
     skipKeys?: string[];
     sanitizeHtml?: boolean;
     allowedHtmlTags?: string[];
-  } = {}
+  } = {},
 ): T {
   const { skipKeys = [], sanitizeHtml: allowHtml = false, allowedHtmlTags = [] } = options;
 
@@ -90,18 +88,15 @@ export function sanitizeObject<T extends Record<string, unknown>>(
 
     const value = sanitized[key as keyof typeof sanitized];
 
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       sanitized[key as keyof typeof sanitized] = allowHtml
         ? sanitizeHtml(value, allowedHtmlTags)
         : sanitizeString(value);
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (typeof value === "object" && value !== null) {
       // Use Record<string, unknown> for nested objects to avoid forcing
       // incompatible shapes onto the parent generic T.  The final cast
       // to T happens only once at the return statement.
-      const nestedResult = sanitizeObject<Record<string, unknown>>(
-        value as Record<string, unknown>,
-        options,
-      );
+      const nestedResult = sanitizeObject<Record<string, unknown>>(value as Record<string, unknown>, options);
       sanitized[key as keyof typeof sanitized] = nestedResult;
     }
   }
@@ -113,8 +108,8 @@ export function sanitizeObject<T extends Record<string, unknown>>(
  * Валидация и очистка email-адреса
  */
 export function sanitizeEmail(input: string): string {
-  if (typeof input !== 'string') {
-    return '';
+  if (typeof input !== "string") {
+    return "";
   }
 
   const trimmed = input.trim().toLowerCase();
@@ -122,7 +117,7 @@ export function sanitizeEmail(input: string): string {
   // Базовая проверка формата email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(trimmed)) {
-    return '';
+    return "";
   }
 
   return trimmed;
@@ -132,13 +127,13 @@ export function sanitizeEmail(input: string): string {
  * Очистка числового значения
  */
 export function sanitizeNumber(input: unknown): number | null {
-  if (typeof input === 'number') {
-    return isNaN(input) ? null : input;
+  if (typeof input === "number") {
+    return Number.isNaN(input) ? null : input;
   }
 
-  if (typeof input === 'string') {
-    const parsed = parseFloat(input);
-    return isNaN(parsed) ? null : parsed;
+  if (typeof input === "string") {
+    const parsed = Number.parseFloat(input);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   return null;

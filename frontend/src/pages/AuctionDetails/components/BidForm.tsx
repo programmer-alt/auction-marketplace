@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Auction } from '@/types';
+import type { Auction } from "@/types";
+import type React from "react";
+import { useState } from "react";
 
 interface BidFormProps {
   auction: Auction;
@@ -10,23 +11,16 @@ interface BidFormProps {
   error?: string;
 }
 
-const BidForm: React.FC<BidFormProps> = ({ 
-  auction, 
-  onSubmit, 
-  isSubmitting, 
-  bidAmount, 
-  setBidAmount, 
-  error 
-}) => {
+const BidForm: React.FC<BidFormProps> = ({ auction, onSubmit, isSubmitting, bidAmount, setBidAmount, error }) => {
   const [localError, setLocalError] = useState<string | undefined>(undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(undefined);
 
-    const amount = parseFloat(bidAmount);
-    if (isNaN(amount)) {
-      setLocalError('Введите корректную сумму');
+    const amount = Number.parseFloat(bidAmount);
+    if (Number.isNaN(amount)) {
+      setLocalError("Введите корректную сумму");
       return;
     }
 
@@ -38,7 +32,7 @@ const BidForm: React.FC<BidFormProps> = ({
 
     const success = await onSubmit(amount);
     if (success) {
-      setBidAmount(''); // Сбрасываем поле ввода
+      setBidAmount(""); // Сбрасываем поле ввода
     }
   };
 
@@ -62,18 +56,10 @@ const BidForm: React.FC<BidFormProps> = ({
             disabled={isSubmitting}
           />
         </div>
-        <button
-          type="submit"
-          disabled={isSubmitting || !bidAmount}
-          className="btn-primary w-full"
-        >
-          {isSubmitting ? 'Обработка...' : 'Сделать ставку'}
+        <button type="submit" disabled={isSubmitting || !bidAmount} className="btn-primary w-full">
+          {isSubmitting ? "Обработка..." : "Сделать ставку"}
         </button>
-        {(error || localError) && (
-          <div className="text-red-600 text-sm">
-            {error || localError}
-          </div>
-        )}
+        {(error || localError) && <div className="text-red-600 text-sm">{error || localError}</div>}
       </div>
     </form>
   );

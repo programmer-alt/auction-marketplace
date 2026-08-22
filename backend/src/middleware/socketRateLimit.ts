@@ -1,5 +1,5 @@
-import { Socket } from "socket.io";
 import { LRUCache } from "lru-cache";
+import type { Socket } from "socket.io";
 
 interface ErrorWithData extends Error {
   data?: { code: string; event?: string };
@@ -66,7 +66,7 @@ function checkRateLimitMemory(
 
   record.count++;
   wsMemoryStore.set(key, record);
-  
+
   return {
     allowed: true,
     remaining: limit - record.count,
@@ -80,15 +80,17 @@ function checkRateLimitMemory(
 export async function socketConnectionRateLimit(socket: Socket, next: (err?: Error) => void) {
   const ip = getSocketIp(socket);
   const key = `connection:${ip}`;
-  
+
   const result = checkRateLimitMemory(key, WS_CONNECTION_LIMIT, WS_CONNECTION_WINDOW);
-  
+
   if (!result.allowed) {
-    const error = new Error(`Too many connections from this IP. Try again in ${result.resetAfter} seconds.`) as ErrorWithData;
+    const error = new Error(
+      `Too many connections from this IP. Try again in ${result.resetAfter} seconds.`,
+    ) as ErrorWithData;
     error.data = { code: "TOO_MANY_CONNECTIONS" };
     return next(error);
   }
-  
+
   next();
 }
 
@@ -103,16 +105,18 @@ export async function socketBidRateLimit(socket: Socket, next: (err?: Error) => 
     error.data = { code: "UNAUTHORIZED" };
     return next(error);
   }
-  
+
   const key = `bid:${user.id}`;
   const result = checkRateLimitMemory(key, WS_BID_LIMIT, WS_BID_WINDOW);
-  
+
   if (!result.allowed) {
-    const error = new Error(`Too many bids. Please wait ${result.resetAfter} seconds before placing another bid.`) as ErrorWithData;
+    const error = new Error(
+      `Too many bids. Please wait ${result.resetAfter} seconds before placing another bid.`,
+    ) as ErrorWithData;
     error.data = { code: "TOO_MANY_BIDS" };
     return next(error);
   }
-  
+
   next();
 }
 
@@ -123,19 +127,21 @@ export function createSocketEventRateLimit(eventName: string, limit: number, win
   return async (socket: Socket, next: (err?: Error) => void) => {
     const user = socket.data.user;
     const ip = getSocketIp(socket);
-    
+
     // Используем userId если есть, иначе IP
     const identifier = user ? `user:${user.id}` : `ip:${ip}`;
     const key = `event:${eventName}:${identifier}`;
-    
+
     const result = checkRateLimitMemory(key, limit, windowSeconds);
-    
+
     if (!result.allowed) {
-      const error = new Error(`Rate limit exceeded for event "${eventName}". Try again in ${result.resetAfter} seconds.`) as ErrorWithData;
+      const error = new Error(
+        `Rate limit exceeded for event "${eventName}". Try again in ${result.resetAfter} seconds.`,
+      ) as ErrorWithData;
       error.data = { code: "RATE_LIMIT_EXCEEDED", event: eventName };
       return next(error);
     }
-    
+
     next();
   };
 }

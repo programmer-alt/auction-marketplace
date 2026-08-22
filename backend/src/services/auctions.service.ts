@@ -1,15 +1,15 @@
 import { prisma } from "../config/db";
 import { getIo } from "../config/socket";
 import {
-  getAuctions as getAuctionsRepo,
-  getAuctionsCount,
-  getAuctionById as getAuctionByIdRepo,
   createAuction as createAuctionRepo,
+  getAuctionById as getAuctionByIdRepo,
+  getAuctionsCount,
+  getAuctions as getAuctionsRepo,
   updateAuctionById as updateAuctionByIdRepo,
 } from "../repositories/auctions.repository";
 
-import { sanitizeObject } from "../utils/sanitization";
 import { Prisma } from "../types";
+import { sanitizeObject } from "../utils/sanitization";
 
 // Stub functions for auction completion (removed Bull queue)
 async function scheduleAuctionCompletion(_auctionId: number, _endsAt: Date) {
@@ -19,7 +19,6 @@ async function scheduleAuctionCompletion(_auctionId: number, _endsAt: Date) {
 async function removeScheduledAuctionCompletion(_auctionId: number) {
   // Очередь удаления
 }
-
 
 // Тип для одиночного аукциона (с детальными ставками)
 type SingleAuction = Prisma.AuctionGetPayload<{
@@ -52,11 +51,7 @@ type SingleAuction = Prisma.AuctionGetPayload<{
   };
 }>;
 
-import {
-  createValidationError,
-  createForbiddenError,
-  createNotFoundError,
-} from "../errors/factories";
+import { createForbiddenError, createNotFoundError, createValidationError } from "../errors/factories";
 
 // ========================================
 // Типы
@@ -114,14 +109,13 @@ export async function getAuctionById(id: number) {
 export async function createAuction(data: CreateAuctionInput, userId: number) {
   // Очистка входных данных от потенциально опасного контента
   const sanitizedData = sanitizeObject(data as unknown as Record<string, unknown>, {
-    skipKeys: ['endsAt', 'startingPrice'],
+    skipKeys: ["endsAt", "startingPrice"],
   }) as unknown as CreateAuctionInput;
-  
-  const { title, description, imageUrl, startingPrice, currency, endsAt } =
-    sanitizedData;
+
+  const { title, description, imageUrl, startingPrice, currency, endsAt } = sanitizedData;
 
   const endsAtDate = new Date(endsAt);
-  if (isNaN(endsAtDate.getTime())) {
+  if (Number.isNaN(endsAtDate.getTime())) {
     throw createValidationError("Некорректная дата окончания");
   }
   if (endsAtDate <= new Date()) {
@@ -129,7 +123,7 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
   }
 
   // Валюта по умолчанию — usd
-  const auctionCurrency = (currency && typeof currency === 'string') ? currency.toLowerCase() : 'usd';
+  const auctionCurrency = currency && typeof currency === "string" ? currency.toLowerCase() : "usd";
 
   const auction = await createAuctionRepo(prisma, {
     title: title as string,
@@ -155,18 +149,14 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 /**
  * Вспомогательная функция для построения объекта обновления аукциона
  */
-function buildUpdateData(
-  sanitizedData: UpdateAuctionInput,
-): Prisma.AuctionUpdateInput {
+function buildUpdateData(sanitizedData: UpdateAuctionInput): Prisma.AuctionUpdateInput {
   const updateData: Prisma.AuctionUpdateInput = {};
 
   if (sanitizedData.title !== undefined) updateData.title = sanitizedData.title;
   if (sanitizedData.description !== undefined) updateData.description = sanitizedData.description;
   if (sanitizedData.imageUrl !== undefined) updateData.imageUrl = sanitizedData.imageUrl || null;
-  if (sanitizedData.startingPrice !== undefined)
-    updateData.startingPrice = sanitizedData.startingPrice;
-  if (sanitizedData.currency !== undefined)
-    updateData.currency = sanitizedData.currency.toLowerCase();
+  if (sanitizedData.startingPrice !== undefined) updateData.startingPrice = sanitizedData.startingPrice;
+  if (sanitizedData.currency !== undefined) updateData.currency = sanitizedData.currency.toLowerCase();
 
   return updateData;
 }
@@ -184,7 +174,7 @@ async function processEndsAt(
   }
 
   const endsAtDate = new Date(endsAt);
-  if (isNaN(endsAtDate.getTime())) {
+  if (Number.isNaN(endsAtDate.getTime())) {
     throw createValidationError("Некорректная дата окончания");
   }
   if (endsAtDate <= new Date()) {
@@ -201,14 +191,9 @@ async function processEndsAt(
 /**
  * Проверка прав доступа и состояния аукциона
  */
-function validateAuctionForUpdate(
-  existingAuction: SingleAuction,
-  userId: number,
-): void {
+function validateAuctionForUpdate(existingAuction: SingleAuction, userId: number): void {
   if (existingAuction.sellerId !== userId) {
-    throw createForbiddenError(
-      "Недостаточно прав для редактирования этого аукциона",
-    );
+    throw createForbiddenError("Недостаточно прав для редактирования этого аукциона");
   }
   if (existingAuction.status !== "ACTIVE") {
     throw createValidationError("Можно редактировать только активные аукционы");
@@ -218,16 +203,12 @@ function validateAuctionForUpdate(
 /**
  * Обновление аукциона
  */
-export async function updateAuction(
-  id: number,
-  data: UpdateAuctionInput,
-  userId: number,
-) {
+export async function updateAuction(id: number, data: UpdateAuctionInput, userId: number) {
   // Очистка входных данных от потенциально опасного контента
   const sanitizedData = sanitizeObject(data as unknown as Record<string, unknown>, {
-    skipKeys: ['endsAt', 'startingPrice'],
+    skipKeys: ["endsAt", "startingPrice"],
   }) as unknown as UpdateAuctionInput;
-  
+
   // Формируем данные для обновления
   const updateData = buildUpdateData(sanitizedData);
 
@@ -261,19 +242,15 @@ export async function deleteAuction(id: number, userId: number) {
   if (!existingAuction) {
     throw createNotFoundError("Аукцион не найден");
   }
-  
+
   // Проверяем, что пользователь является владельцем аукциона
   if (existingAuction.sellerId !== userId) {
-    throw createForbiddenError(
-      "Недостаточно прав для удаления этого аукциона",
-    );
+    throw createForbiddenError("Недостаточно прав для удаления этого аукциона");
   }
-  
+
   // Проверяем, что аукцион находится в активном состоянии
   if (existingAuction.status !== "ACTIVE") {
-    throw createValidationError(
-      "Можно удалять только активные аукционы",
-    );
+    throw createValidationError("Можно удалять только активные аукционы");
   }
 
   // Удаляем запланированное завершение аукциона
@@ -293,14 +270,12 @@ export async function deleteAuction(id: number, userId: number) {
     const exists = await getAuctionByIdRepo(prisma, id);
     if (!exists) {
       throw createNotFoundError("Аукцион не найден");
-    } else if (exists.sellerId !== userId) {
-      throw createForbiddenError(
-        "Недостаточно прав для удаления этого аукциона",
-      );
-    } else if (exists.status !== "ACTIVE") {
-      throw createValidationError(
-        "Можно удалять только активные аукционы",
-      );
+    }
+    if (exists.sellerId !== userId) {
+      throw createForbiddenError("Недостаточно прав для удаления этого аукциона");
+    }
+    if (exists.status !== "ACTIVE") {
+      throw createValidationError("Можно удалять только активные аукционы");
     }
   }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { asyncHandler } from "./asyncHandler";
 
 describe("asyncHandler", () => {
@@ -28,7 +28,7 @@ describe("asyncHandler", () => {
   });
 
   it("должен обработать async функцию без ошибок", async () => {
-    const handlerFn = vi.fn().mockImplementation(async (req: any, res: any) => {
+    const handlerFn = vi.fn().mockImplementation(async (_req: any, res: any) => {
       res.json({ success: true });
     });
     const req = {} as any;

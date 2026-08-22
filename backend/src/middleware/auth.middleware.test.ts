@@ -1,13 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { Request, Response, NextFunction } from "express";
-import {
-  parseAuthToken,
-  createAuthMiddleware,
-  createOptionalAuthMiddleware,
-} from "./auth";
-import { getJwtSecret } from "../config/jwt";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "../config/db";
+import { getJwtSecret } from "../config/jwt";
+import { createAuthMiddleware, createOptionalAuthMiddleware, parseAuthToken } from "./auth";
 
 vi.mock("jsonwebtoken");
 vi.mock("../config/jwt");

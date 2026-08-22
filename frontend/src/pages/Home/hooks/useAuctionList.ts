@@ -1,18 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { auctionsApi } from '@/api/auctions';
-import type { Auction } from '@/types';
-
+import { auctionsApi } from "@/api/auctions";
+import type { Auction } from "@/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const useAuctionList = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
- 
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -26,14 +25,14 @@ export const useAuctionList = () => {
           search: debouncedSearch || undefined,
         });
 
-        if ('success' in response && response.success) {
+        if ("success" in response && response.success) {
           const { data } = response;
           setAuctions(data.auctions || []);
-          setTotalPages(data.pagination?.totalPages || 1)
+          setTotalPages(data.pagination?.totalPages || 1);
         } else {
-          throw new Error(response.error || 'Ошибка загрузки аукционов');
+          throw new Error(response.error || "Ошибка загрузки аукционов");
         }
-      } catch (e) {
+      } catch (_e) {
         // ignore abort
         setAuctions([]);
       } finally {
@@ -50,14 +49,15 @@ export const useAuctionList = () => {
     };
   }, [page, statusFilter, debouncedSearch]);
 
-
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
     }, 400);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [search]);
 
   const handleStatusFilter = useCallback((value: string) => {
