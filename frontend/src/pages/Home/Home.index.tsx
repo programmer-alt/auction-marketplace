@@ -50,7 +50,7 @@ export default function Home() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="card animate-pulse">
+            <div key={`skeleton-${i}`} className="card animate-pulse">
               <div className="bg-gray-200 rounded-lg h-40 mb-4" />
               <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
               <div className="h-3 bg-gray-200 rounded w-1/2" />
@@ -123,19 +123,20 @@ export default function Home() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
-              <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <button type="button" className="btn-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Назад
               </button>
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button
-                  key={i + 1}
+                  key={`page-${i + 1}`}
+                  type="button"
                   className={`px-3 py-2 rounded-lg font-medium transition-colors ${page === i + 1 ? "bg-primary-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 border"}`}
                   onClick={() => setPage(i + 1)}
                 >
                   {i + 1}
                 </button>
               ))}
-              <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <button type="button" className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
                 Вперёд
               </button>
             </div>

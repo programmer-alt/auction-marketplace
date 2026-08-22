@@ -44,8 +44,12 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onSubmit, isSubmitting, bidA
       <h3 className="font-semibold mb-3">Сделать ставку</h3>
       <div className="space-y-3">
         <div>
-          <label className="block text-sm text-gray-600 mb-1">Текущая ставка: ${currentPrice}</label>
+          <label htmlFor="bid-amount" className="block text-sm text-gray-600 mb-1">
+            Сделайте ставку
+          </label>
+          <div className="text-xs text-gray-500 mb-2">Текущая: ${currentPrice}</div>
           <input
+            id="bid-amount"
             type="number"
             step="0.01"
             min={minBid}

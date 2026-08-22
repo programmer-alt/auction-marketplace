@@ -6,8 +6,25 @@ import type { AppError, PrismaError, ZodError } from "./error.types";
 type ErrorHandlerError = Error | AppError | ZodError | PrismaError;
 
 // Централизованный обработчик ошибок
-export const errorHandler = (err: ErrorHandlerError, _req: Request, res: Response<ApiError>, _next: NextFunction) => {
-  console.error("Ошибка:", err);
+export const errorHandler = (err: ErrorHandlerError, req: Request, res: Response<ApiError>, _next: NextFunction) => {
+  // АГРЕССИВНОЕ логирование — пишем во ВСЕ потоки для отладки
+  const errorInfo = {
+    message: err.message,
+    stack: err.stack,
+    type: err.constructor.name,
+    path: req.path,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    errorProperties: Object.keys(err),
+  };
+
+  // Пишем в stdout и stderr одновременно
+  process.stderr.write(`[ERROR HANDLER] ${JSON.stringify(errorInfo)}\n`);
+  process.stdout.write(`[DEBUG] Error caught: ${err.message}\n`);
+  console.error("❌ Unhandled error:", err);
+  if (err.stack) {
+    console.error("📍 Stack:", err.stack);
+  }
 
   // Обработка наших кастомных ошибок
   if ("errorType" in err && err.errorType === "NOT_FOUND") {
@@ -33,6 +50,22 @@ export const errorHandler = (err: ErrorHandlerError, _req: Request, res: Respons
     return res.status(404).json({ error: "Запрашиваемый объект не найден" });
   }
 
-  // Все остальные ошибки — 500
+  // Обработка ошибок подключения к БД
+  if ("code" in err && err.code === "ECONNREFUSED") {
+    console.error("Ошибка подключения к базе данных:", err.message);
+    return res.status(503).json({ error: "Сервис базы данных недоступен" });
+  }
+
+  // В development — возвращаем полные детали
+  const isDev = process.env.NODE_ENV === "development";
+  if (isDev) {
+    return res.status(500).json({
+      error: "Внутренняя ошибка сервера",
+      message: err.message,
+      stack: err.stack,
+      path: req.path,
+    });
+  }
+
   return res.status(500).json({ error: "Внутренняя ошибка сервера" });
 };

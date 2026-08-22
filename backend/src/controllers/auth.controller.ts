@@ -70,7 +70,8 @@ export const authController = {
     if (!refreshToken) {
       // Если refresh token отсутствует, просто возвращаем 200 без токена
       // это предотвращает ошибку при автоматических запросах фронтенда
-      return res.json({ accessToken: null });
+      res.json({ accessToken: null });
+      return;
     }
 
     const result = await authService.refresh(refreshToken);
@@ -103,12 +104,13 @@ export const authController = {
 
   getCurrentUser: asyncHandler<AuthRequest>(async (req, res, next) => {
     if (!req.user) {
-      return res.status(200).json({ user: null });
+      res.status(200).json({ user: null });
+      return;
     }
 
     const user = await authService.getCurrentUser(req.user.id);
     if (!user) return next(createNotFoundError("Пользователь не найден"));
 
-    return res.status(200).json({ user });
+    res.status(200).json({ user });
   }),
 };

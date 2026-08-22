@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosResponse, type AxiosError } from "axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/auth.store";
 import { handleError, handleNetworkError } from "../utils/universalErrorHandler";
@@ -21,10 +21,10 @@ function fetchCsrfToken(): Promise<void> {
 
   csrfReady = api
     .get<{ csrfToken: string }>("/csrf-token")
-    .then((response) => {
+    .then((response: AxiosResponse<{ csrfToken: string }>) => {
       csrfToken = response.data.csrfToken;
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       console.error("CSRF token fetch failed:", err);
     });
 
@@ -54,7 +54,7 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(error),
+  (error: unknown) => Promise.reject(error),
 );
 
 // Состояние для отслеживания последнего времени показа уведомления о превышении лимита
@@ -83,8 +83,8 @@ function safeRedirectToLogin() {
 
 // Response interceptor для обработки ошибок
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     const url = error?.config?.url;
     const status = error.response?.status;
     const respData = error.response?.data;
@@ -115,7 +115,8 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const messageFromServer = error.response?.data?.error || error.response?.data?.message;
+    const responseData = error.response?.data as { error?: string; message?: string } | undefined;
+    const messageFromServer = responseData?.error || responseData?.message;
 
     const message = messageFromServer || "Ошибка запроса";
 
@@ -130,7 +131,7 @@ api.interceptors.response.use(
         lastRateLimitNotification = currentTime;
         toast.error("Слишком много запросов. Пожалуйста, немного замедлитесь.");
       }
-    } else if (status >= 500) {
+    } else if (status && status >= 500) {
       handleError(error, "Ошибка сервера. Пожалуйста, попробуйте позже.");
     } else {
       handleError(error, message);

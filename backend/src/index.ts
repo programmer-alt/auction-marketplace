@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { compressionOptions } from "@/config/compression";
 import { corsOriginHandler } from "@/config/cors";
-import { prisma } from "@/config/db";
+import { pool, prisma } from "@/config/db";
 import { validateEnv } from "@/config/env";
 import logger from "@/config/logger";
 import { metricsMiddleware, register } from "@/config/metrics";
@@ -306,16 +306,35 @@ httpServer.listen(PORT, async () => {
 
   try {
     await prisma.$connect();
-    // Тестовый запрос — $connect() только создаёт пул, не проверяя реальное подключение
-    await prisma.$queryRaw`SELECT 1`;
-    logger.info("База данных доступна");
+    logger.info("✅ Database connection established");
+
+    // ✅ Auto-reconnect при ошибках pool (сериализация через in-flight lock)
+    let reconnecting: Promise<void> | null = null;
+    pool.on("error", async (err) => {
+      logger.error("❌ Pool error, attempting reconnect...", err.message);
+      // Coalesce concurrent pool errors into a single reconnect sequence
+      if (reconnecting) {
+        logger.warn("⏳ Reconnect already in progress, coalescing...");
+        await reconnecting;
+        return;
+      }
+      reconnecting = (async () => {
+        try {
+          await prisma.$disconnect();
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await prisma.$connect();
+          logger.info("✅ Reconnected to database");
+        } catch (reconnectErr) {
+          logger.error("❌ Reconnect failed:", reconnectErr);
+        } finally {
+          reconnecting = null;
+        }
+      })();
+      await reconnecting;
+    });
   } catch (error) {
-    // Бэкенд запускается даже если БД недоступна — первый запрос покажет ошибку
-    logger.warn(
-      "ВНИМАНИЕ: База данных недоступна. Запустите бэкенд на хосте с доступом к PostgreSQL.",
-      error instanceof Error ? error.message : error,
-    );
-    logger.info("Бэкенд запущен. После решения проблемы с БД всё заработает автоматически.");
+    logger.error("❌ Error connecting to database:", error);
+    process.exit(1);
   }
 });
 

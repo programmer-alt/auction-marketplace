@@ -54,6 +54,7 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
               Редактировать
             </Link>
             <button
+              type="button"
               onClick={handleDeleteClick}
               disabled={isDeleting}
               className="btn-secondary flex items-center gap-2 text-red-600 disabled:opacity-50"

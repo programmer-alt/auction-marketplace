@@ -160,6 +160,9 @@ export interface CacheAuctionsList {
 
 export interface ApiError {
   error: string | unknown[];
+  message?: string;
+  stack?: string;
+  path?: string;
 }
 
 export interface ApiSuccess<T> {

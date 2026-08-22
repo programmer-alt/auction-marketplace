@@ -52,6 +52,16 @@
     }
   },
   "files": {
-    "ignore": ["node_modules/**", "dist/**", "build/**", "coverage/**", ".next/**", "prisma/dev.db", "migrations/**"]
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      "coverage/**",
+      ".next/**",
+      "prisma/dev.db",
+      "migrations/**",
+      ".gigacode_vsc/**",
+      ".gigacode/worktrees/**"
+    ]
   }
 }
