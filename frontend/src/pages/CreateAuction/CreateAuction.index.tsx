@@ -33,8 +33,11 @@ export default function CreateAuction() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
+            <label htmlFor="create-title" className="block text-sm font-medium text-gray-700 mb-1">
+              Название *
+            </label>
             <input
+              id="create-title"
               type="text"
               className="input-field"
               placeholder="Например: iPhone 15 Pro Max 256GB"
@@ -44,8 +47,11 @@ export default function CreateAuction() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+            <label htmlFor="create-description" className="block text-sm font-medium text-gray-700 mb-1">
+              Описание
+            </label>
             <textarea
+              id="create-description"
               className="input-field"
               rows={4}
               placeholder="Подробное описание товара..."
@@ -79,10 +85,13 @@ export default function CreateAuction() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Дата окончания *</label>
+              <label htmlFor="create-endsAt" className="block text-sm font-medium text-gray-700 mb-1">
+                Дата окончания *
+              </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
+                  id="create-endsAt"
                   type="datetime-local"
                   className="input-field pl-10"
                   min={minDate}
@@ -112,4 +121,9 @@ export default function CreateAuction() {
             <Link to="/" className="btn-secondary">
               Отмена
             </Link>
-          
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

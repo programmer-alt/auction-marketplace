@@ -25,6 +25,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
+      tabIndex={-1}
+      autoFocus
       role="dialog"
       aria-modal="true"
       aria-label={title}

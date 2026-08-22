@@ -134,17 +134,6 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Debug endpoint для диагностики подключения к БД
-app.get("/api/debug/db", async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1 AS test`;
-    res.json({ status: "connected", message: "База данных доступна" });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ status: "error", message });
-  }
-});
-
 // Metrics endpoint для Prometheus
 app.get("/metrics", async (_req, res) => {
   try {
@@ -319,17 +308,29 @@ httpServer.listen(PORT, async () => {
     await prisma.$connect();
     logger.info("✅ Database connection established");
 
-    // ✅ Auto-reconnect при ошибках pool
+    // ✅ Auto-reconnect при ошибках pool (сериализация через in-flight lock)
+    let reconnecting: Promise<void> | null = null;
     pool.on("error", async (err) => {
       logger.error("❌ Pool error, attempting reconnect...", err.message);
-      try {
-        await prisma.$disconnect();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await prisma.$connect();
-        logger.info("✅ Reconnected to database");
-      } catch (reconnectErr) {
-        logger.error("❌ Reconnect failed:", reconnectErr);
+      // Coalesce concurrent pool errors into a single reconnect sequence
+      if (reconnecting) {
+        logger.warn("⏳ Reconnect already in progress, coalescing...");
+        await reconnecting;
+        return;
       }
+      reconnecting = (async () => {
+        try {
+          await prisma.$disconnect();
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await prisma.$connect();
+          logger.info("✅ Reconnected to database");
+        } catch (reconnectErr) {
+          logger.error("❌ Reconnect failed:", reconnectErr);
+        } finally {
+          reconnecting = null;
+        }
+      })();
+      await reconnecting;
     });
   } catch (error) {
     logger.error("❌ Error connecting to database:", error);
