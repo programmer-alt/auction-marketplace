@@ -102,3 +102,5 @@ AGENTS.md
 
 .ai-memory/
 .narsil.yaml
+.serena/project.yml
+.serena/.gitignore
