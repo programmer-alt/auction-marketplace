@@ -161,22 +161,23 @@ export async function refresh(refreshToken: string) {
     throw createForbiddenError("Токен не является refresh токеном");
   }
   const userId = payload.id;
-  const { email, role, tokenVersion = 0 } = payload;
+  const { email, role, tokenVersion: tokenVersionFromPayload = 0 } = payload;
 
   // Проверка: если пользователь логался/менял пароль после выпуска токена — отозвать
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { tokenVersion: true },
   });
-  if (!user || tokenVersion !== user.tokenVersion) {
+  if (!user || tokenVersionFromPayload !== user.tokenVersion) {
     throw createForbiddenError("Refresh token revoked");
   }
 
+  // Используем актуальную версию токена из базы данных для генерации новых токенов
   const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(
     userId,
     email,
     role,
-    tokenVersion,
+    user.tokenVersion, // Используем текущую версию из базы данных
   );
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }

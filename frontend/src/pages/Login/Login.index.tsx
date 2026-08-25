@@ -45,16 +45,6 @@ export default function Login() {
     <div className="max-w-md mx-auto relative">
       <ScanLine color="#0f0" thickness={3} duration={8} delay={0} highlightIntensity={0.7} highlightWidth={200} />
       <style>{`
-        @keyframes pulse-slow {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.95;
-            transform: scale(1.005);
-          }
-        }
         @keyframes pulse-glow {
           0%, 100% {
             box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
@@ -68,9 +58,6 @@ export default function Login() {
         }
         .animate-pulse-glow {
           animation: pulse-glow 2s ease-in-out infinite;
-        }
-        .animate-pulse-button {
-          animation: pulse-slow 2.5s ease-in-out infinite;
         }
       `}</style>
       <div className="card animate-pulse-slow">
@@ -118,7 +105,7 @@ export default function Login() {
             data-testid="login-submit"
             type="submit"
             disabled={isLoading}
-            className="w-full btn-primary flex items-center justify-center animate-pulse-button"
+            className="w-full btn-primary flex items-center justify-center"
           >
             {isLoading ? (
               <span className="flex items-center">
