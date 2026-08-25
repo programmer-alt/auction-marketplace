@@ -133,7 +133,12 @@ export default function Home() {
                   {i + 1}
                 </button>
               ))}
-              <button type="button" className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+              >
                 Вперёд
               </button>
             </div>

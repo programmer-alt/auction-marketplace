@@ -24,7 +24,7 @@ const pool = new Pool({
   max: 10,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 10000,
-  maxUses: Infinity,
+  maxUses: Number.POSITIVE_INFINITY,
 });
 
 // Отключаем спам-логирование — только ошибки

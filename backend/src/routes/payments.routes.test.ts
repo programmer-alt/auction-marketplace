@@ -1,16 +1,33 @@
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { errorHandler } from "../errors/handler";
 
-// Мокаем контроллер
-vi.mock("../controllers/payments.controller", () => ({
-  paymentsController: {
-    createPaymentIntent: vi.fn(),
-    handleWebhook: vi.fn(),
-    getPaymentHistory: vi.fn(),
-  },
+// ========================================
+// Mock payments.service — webhook вызывает реальный сервис,
+// поэтому мокаем контроллер бесполезно для webhook-тестов
+// ========================================
+const { mockHandleWebhook, mockCreatePaymentIntent, mockGetPaymentHistory, mockRefundPayment, mockGetMyPayments } =
+  vi.hoisted(() => ({
+    mockHandleWebhook: vi.fn(),
+    mockCreatePaymentIntent: vi.fn(),
+    mockGetPaymentHistory: vi.fn(),
+    mockRefundPayment: vi.fn(),
+    mockGetMyPayments: vi.fn(),
+  }));
+
+vi.mock("../services/payments.service", () => ({
+  createPaymentIntent: mockCreatePaymentIntent,
+  handleWebhook: mockHandleWebhook,
+  getPaymentHistory: mockGetPaymentHistory,
+  refundPayment: mockRefundPayment,
+  getMyPayments: mockGetMyPayments,
 }));
 
+// ========================================
+// Auth middleware — мокаем относительным путём,
+// так как payments.routes.ts импортирует из "../middleware/auth"
+// ========================================
 vi.mock("../middleware/auth", () => ({
   authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
     req.user = { id: 1, email: "test@test.com", role: "USER" };
@@ -18,15 +35,21 @@ vi.mock("../middleware/auth", () => ({
   }),
 }));
 
-import { paymentsController } from "../controllers/payments.controller";
+vi.mock("../middleware/admin", () => ({
+  adminMiddleware: vi.fn(async (_req: any, _res: any, next: any) => next()),
+}));
+
+vi.mock("../config/db", () => ({
+  prisma: {},
+}));
+
+// Импортируем роутер ПОСЛЕ моков
 import paymentsRouter from "./payments.routes";
 
 const app = express();
-// Для webhook нужен raw body parser
 app.use(express.json());
 app.use("/api/payments", paymentsRouter);
-
-const mockPaymentsController = paymentsController as any;
+app.use(errorHandler);
 
 describe("Payments Routes", () => {
   beforeEach(() => {
@@ -43,11 +66,11 @@ describe("Payments Routes", () => {
         clientSecret: "pi_test_secret",
         payment: { id: 1, status: "PENDING" },
       };
-      mockPaymentsController.createPaymentIntent.mockImplementation((_req: any, res: any) => {
-        res.status(201).json(mockResponse);
-      });
+      mockCreatePaymentIntent.mockResolvedValue(mockResponse);
 
-      const response = await request(app).post("/api/payments/create-intent").send({ auctionId: 1 });
+      const response = await request(app)
+        .post("/api/payments/create-intent")
+        .send({ auctionId: 1 });
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe("Платёжный интент создан");
@@ -55,9 +78,7 @@ describe("Payments Routes", () => {
     });
 
     it("должен вернуть 400 при невалидном auctionId", async () => {
-      mockPaymentsController.createPaymentIntent.mockImplementation((_req: any, res: any) => {
-        res.status(400).json({ error: "ID аукциона должен быть положительным" });
-      });
+      mockCreatePaymentIntent.mockRejectedValue(new Error("ID аукциона должен быть положительным"));
 
       const response = await request(app).post("/api/payments/create-intent").send({ auctionId: -1 });
 
@@ -65,6 +86,7 @@ describe("Payments Routes", () => {
     });
 
     it("должен вернуть 401 без авторизации", async () => {
+      // Переопределяем authMiddleware для этого теста
       const { authMiddleware } = await import("../middleware/auth");
       vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
         res.status(401).json({ error: "Unauthorized" });
@@ -81,9 +103,7 @@ describe("Payments Routes", () => {
   // ========================================
   describe("POST /api/payments/webhook", () => {
     it("должен обработать webhook успешно", async () => {
-      mockPaymentsController.handleWebhook.mockImplementation((_req: any, res: any) => {
-        res.json({ received: true });
-      });
+      mockHandleWebhook.mockResolvedValue(undefined);
 
       const response = await request(app)
         .post("/api/payments/webhook")
@@ -96,55 +116,53 @@ describe("Payments Routes", () => {
     });
 
     it("должен вернуть 400 при ошибке обработки webhook", async () => {
-      mockPaymentsController.handleWebhook.mockImplementation((_req: any, res: any) => {
-        res.status(400).send("Webhook Error: Invalid signature");
-      });
+      mockHandleWebhook.mockRejectedValue(new Error("Webhook Error: Invalid signature"));
 
-      const response = await request(app).post("/api/payments/webhook").set("stripe-signature", "bad_sig").send("{}");
+      const response = await request(app)
+        .post("/api/payments/webhook")
+        .set("stripe-signature", "bad_sig")
+        .send("{}");
 
       expect(response.status).toBe(400);
-      expect(response.text).toContain("Webhook Error");
+      expect(response.text).toContain("Webhook processing failed");
     });
 
     it("не требует авторизации (публичный эндпоинт для Stripe)", async () => {
-      mockPaymentsController.handleWebhook.mockImplementation((_req: any, res: any) => {
-        res.json({ received: true });
-      });
+      mockHandleWebhook.mockResolvedValue(undefined);
 
-      const response = await request(app).post("/api/payments/webhook").send("{}");
+      const response = await request(app)
+        .post("/api/payments/webhook")
+        .set("stripe-signature", "sig_test")
+        .send("{}");
 
       expect(response.status).toBe(200);
     });
   });
 
   // ========================================
-  // GET /api/payments/history
+  // GET /api/payments/my
   // ========================================
-  describe("GET /api/payments/history", () => {
+  describe("GET /api/payments/my", () => {
     it("должен вернуть историю платежей", async () => {
       const mockResponse = {
         payments: [{ id: 1, amount: 500, status: "COMPLETED" }],
         pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
       };
-      mockPaymentsController.getPaymentHistory.mockImplementation((_req: any, res: any) => {
-        res.json(mockResponse);
-      });
+      mockGetPaymentHistory.mockResolvedValue(mockResponse);
 
-      const response = await request(app).get("/api/payments/history");
+      const response = await request(app).get("/api/payments/my");
 
       expect(response.status).toBe(200);
       expect(response.body.payments).toHaveLength(1);
     });
 
     it("должен поддерживать пагинацию", async () => {
-      mockPaymentsController.getPaymentHistory.mockImplementation((_req: any, res: any) => {
-        res.json({
-          payments: [],
-          pagination: { page: 2, limit: 10, total: 0, totalPages: 0 },
-        });
+      mockGetPaymentHistory.mockResolvedValue({
+        payments: [],
+        pagination: { page: 2, limit: 10, total: 0, totalPages: 0 },
       });
 
-      const response = await request(app).get("/api/payments/history?page=2&limit=10");
+      const response = await request(app).get("/api/payments/my?page=2&limit=10");
 
       expect(response.status).toBe(200);
       expect(response.body.pagination.page).toBe(2);
@@ -156,7 +174,7 @@ describe("Payments Routes", () => {
         res.status(401).json({ error: "Unauthorized" });
       });
 
-      const response = await request(app).get("/api/payments/history");
+      const response = await request(app).get("/api/payments/my");
 
       expect(response.status).toBe(401);
     });

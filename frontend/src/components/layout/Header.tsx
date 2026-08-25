@@ -45,7 +45,11 @@ export default function Header() {
                   <User className="h-5 w-5 text-gray-500" />
                   <span className="font-medium">{user?.name || user?.email}</span>
                 </div>
-                <button type="button" onClick={handleLogout} className="flex items-center space-x-2 text-gray-700 hover:text-red-600">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-red-600"
+                >
                   <LogOut className="h-5 w-5" />
                   <span className="hidden sm:inline">Выйти</span>
                 </button>
