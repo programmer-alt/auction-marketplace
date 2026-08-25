@@ -2,31 +2,43 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Мокаем модули ДО импорта роутеров
-vi.mock("../controllers/bids.controller", () => ({
-  bidsController: {
+// Создаём моки через vi.hoisted
+const { mockBidsController, mockIo, mockAuthMiddleware } = vi.hoisted(() => ({
+  mockBidsController: {
     createBid: vi.fn(),
     getBidsByAuction: vi.fn(),
   },
-}));
-
-vi.mock("../middleware/auth", () => ({
-  authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
+  mockIo: {
+    emit: vi.fn(),
+    to: vi.fn().mockReturnValue({ emit: vi.fn() }),
+  },
+  mockAuthMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
     req.user = { id: 1, email: "test@test.com", role: "USER" };
     next();
   }),
 }));
 
-// Импортируем моканые модули
-import { bidsController } from "../controllers/bids.controller";
+// Мокаем модули ДО импорта роутеров
+vi.mock("@/controllers/bids.controller", () => ({
+  bidsController: mockBidsController,
+}));
+
+vi.mock("@/index", () => ({
+  prisma: {},
+  io: mockIo,
+}));
+
+vi.mock("@/middleware/auth", () => ({
+  authMiddleware: mockAuthMiddleware,
+}));
+
+// Импортируем роутер ПОСЛЕ моков
 import bidsRouter from "./bids.routes";
 
 // Создаём тестовое Express приложение
 const app = express();
 app.use(express.json());
 app.use("/api/auctions", bidsRouter);
-
-const mockBidsController = bidsController as any;
 
 describe("Bids Routes", () => {
   beforeEach(() => {
@@ -77,8 +89,7 @@ describe("Bids Routes", () => {
     });
 
     it("должен вернуть 401 без авторизации", async () => {
-      const { authMiddleware } = await import("../middleware/auth");
-      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+      mockAuthMiddleware.mockImplementationOnce(async (_req: any, res: any, _next: any) => {
         res.status(401).json({ error: "Unauthorized" });
       });
 

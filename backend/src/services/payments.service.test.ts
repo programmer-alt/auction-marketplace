@@ -4,22 +4,30 @@ import * as paymentsRepo from "../repositories/payments.repository";
 import * as paymentsService from "./payments.service";
 
 // Мокаем Stripe через vi.hoisted
-const { mockPaymentIntentsCreate, mockWebhooksConstructEvent } = vi.hoisted(() => ({
-  mockPaymentIntentsCreate: vi.fn(),
-  mockWebhooksConstructEvent: vi.fn(),
-}));
+const { mockPaymentIntentsCreate, mockWebhooksConstructEvent, mockRefundsCreate, mockPaymentIntentsRetrieve } =
+  vi.hoisted(() => ({
+    mockPaymentIntentsCreate: vi.fn(),
+    mockWebhooksConstructEvent: vi.fn(),
+    mockRefundsCreate: vi.fn(),
+    mockPaymentIntentsRetrieve: vi.fn(),
+  }));
 
 vi.mock("stripe", () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      paymentIntents: {
+  class Stripe {
+    constructor() {
+      this.paymentIntents = {
         create: mockPaymentIntentsCreate,
-      },
-      webhooks: {
+        retrieve: mockPaymentIntentsRetrieve,
+      };
+      this.webhooks = {
         constructEvent: mockWebhooksConstructEvent,
-      },
-    })),
-  };
+      };
+      this.refunds = {
+        create: mockRefundsCreate,
+      };
+    }
+  }
+  return { default: Stripe };
 });
 
 vi.mock("../config/db", () => ({
@@ -31,6 +39,7 @@ vi.mock("../config/db", () => ({
       findFirst: vi.fn(),
     },
   },
+  runWithRetry: (fn: () => Promise<any>) => fn(),
 }));
 
 vi.mock("../repositories/payments.repository");
@@ -189,7 +198,7 @@ describe("Payments Service", () => {
       const mockEvent = {
         type: "payment_intent.succeeded",
         data: {
-          object: { id: "pi_test123" },
+          object: { id: "pi_test123", amount: 50000 },
         },
       };
       mockWebhooksConstructEvent.mockReturnValue(mockEvent);
@@ -197,12 +206,13 @@ describe("Payments Service", () => {
         id: 1,
         stripePaymentId: "pi_test123",
         status: "PENDING",
+        amount: new Prisma.Decimal(500),
       });
       mockUpdatePayment.mockResolvedValue({} as any);
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(mockWebhooksConstructEvent).toHaveBeenCalledWith(Buffer.from("{}"), "sig_test", "whsec_test_secret");
+      expect(mockWebhooksConstructEvent).toHaveBeenCalledWith(Buffer.from("{}"), "sig_test", "whsec_mock_test_secret");
       expect(mockGetPaymentByStripeId).toHaveBeenCalledWith(mockPrisma, "pi_test123");
       expect(mockUpdatePayment).toHaveBeenCalledWith(mockPrisma, 1, {
         status: "COMPLETED",
@@ -272,14 +282,14 @@ describe("Payments Service", () => {
     it("должен залогировать необработанное событие", async () => {
       const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const mockEvent = {
-        type: "charge.refunded",
-        data: { object: { id: "ch_test" } },
+        type: "invoice.payment_failed",
+        data: { object: { id: "in_test" } },
       };
       mockWebhooksConstructEvent.mockReturnValue(mockEvent);
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(consoleLogSpy).toHaveBeenCalledWith("Необработанное событие типа charge.refunded");
+      expect(consoleLogSpy).toHaveBeenCalledWith("Необработанное событие типа invoice.payment_failed");
       consoleLogSpy.mockRestore();
     });
 

@@ -62,7 +62,7 @@ describe("CSRF Middleware", () => {
         expect.any(String),
         expect.objectContaining({
           httpOnly: true,
-          sameSite: "strict",
+          sameSite: "lax",
           maxAge: 7200000,
         }),
       );

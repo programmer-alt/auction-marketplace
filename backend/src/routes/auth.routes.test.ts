@@ -2,29 +2,50 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Создаём моки через vi.hoisted — они доступны в vi.mock
+const { mockAuthController, mockAuthMiddleware, mockOptionalAuthMiddleware, mockIo } = vi.hoisted(() => ({
+  mockAuthController: {
+    register: vi.fn(),
+    login: vi.fn(),
+    getCurrentUser: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  },
+  mockAuthMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
+    req.user = { id: 1, email: "test@test.com" };
+    next();
+  }),
+  mockOptionalAuthMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
+    req.user = { id: 1, email: "test@test.com" };
+    next();
+  }),
+  mockIo: {
+    emit: vi.fn(),
+    to: vi.fn().mockReturnValue({ emit: vi.fn() }),
+  },
+}));
+
 // Мокаем модули ДО импорта роутеров
 vi.mock("express-rate-limit", () => ({
   default: vi.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
 
-vi.mock("../controllers/auth.controller", () => ({
-  authController: {
-    register: vi.fn(),
-    login: vi.fn(),
-    getCurrentUser: vi.fn(),
-  },
+vi.mock("@/controllers/auth.controller", () => ({
+  authController: mockAuthController,
 }));
 
-vi.mock("../middleware/auth", () => ({
-  authMiddleware: vi.fn(async (req: any, _res: any, next: any) => {
-    // Симулируем авторизованного пользователя
-    req.user = { id: 1, email: "test@test.com" };
-    next();
-  }),
+vi.mock("@/index", () => ({
+  prisma: {},
+  io: mockIo,
+}));
+
+vi.mock("@/middleware/auth", () => ({
+  authMiddleware: mockAuthMiddleware,
+  optionalAuthMiddleware: mockOptionalAuthMiddleware,
 }));
 
 // Импортируем моканые модули
-import { authController } from "../controllers/auth.controller";
+import { authController } from "@/controllers/auth.controller";
 import authRouter from "./auth.routes";
 
 // Создаём тестовое Express приложение
@@ -33,7 +54,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 
 // Типы для моков
-const mockAuthController = authController as any;
+const mockAuthControllerTyped = authController as any;
 
 describe("Auth Routes", () => {
   beforeEach(() => {
@@ -47,7 +68,7 @@ describe("Auth Routes", () => {
         user: { id: 1, email: "test@example.com", name: "Test User" },
         token: "fake-jwt-token",
       };
-      mockAuthController.register.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.register.mockImplementation((_req: any, res: any) => {
         res.status(201).json(mockResponse);
       });
 
@@ -59,11 +80,11 @@ describe("Auth Routes", () => {
 
       expect(response.status).toBe(201);
       expect(response.body).toEqual(mockResponse);
-      expect(mockAuthController.register).toHaveBeenCalled();
+      expect(mockAuthControllerTyped.register).toHaveBeenCalled();
     });
 
     it("должен вернуть 400 при невалидных данных", async () => {
-      mockAuthController.register.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.register.mockImplementation((_req: any, res: any) => {
         res.status(400).json({ error: "Некорректный email" });
       });
 
@@ -78,7 +99,7 @@ describe("Auth Routes", () => {
     it("должен применять rate limiting", async () => {
       // Rate limiter уже замокан и просто вызывает next()
       // Проверяем, что запрос проходит
-      mockAuthController.register.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.register.mockImplementation((_req: any, res: any) => {
         res.status(201).json({});
       });
 
@@ -98,7 +119,7 @@ describe("Auth Routes", () => {
         user: { id: 1, email: "test@example.com", name: "Test User", balance: 0 },
         token: "fake-jwt-token",
       };
-      mockAuthController.login.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.login.mockImplementation((_req: any, res: any) => {
         res.json(mockResponse);
       });
 
@@ -109,11 +130,11 @@ describe("Auth Routes", () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockResponse);
-      expect(mockAuthController.login).toHaveBeenCalled();
+      expect(mockAuthControllerTyped.login).toHaveBeenCalled();
     });
 
     it("должен вернуть 401 при неверных учетных данных", async () => {
-      mockAuthController.login.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.login.mockImplementation((_req: any, res: any) => {
         res.status(401).json({ error: "Неверные учетные данные" });
       });
 
@@ -126,7 +147,7 @@ describe("Auth Routes", () => {
     });
 
     it("должен применять rate limiting", async () => {
-      mockAuthController.login.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.login.mockImplementation((_req: any, res: any) => {
         res.json({});
       });
 
@@ -147,7 +168,7 @@ describe("Auth Routes", () => {
         name: "Test User",
         balance: 0,
       };
-      mockAuthController.getCurrentUser.mockImplementation((_req: any, res: any) => {
+      mockAuthControllerTyped.getCurrentUser.mockImplementation((_req: any, res: any) => {
         res.json({ user: mockUser });
       });
 
@@ -155,13 +176,12 @@ describe("Auth Routes", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.user).toEqual(mockUser);
-      expect(mockAuthController.getCurrentUser).toHaveBeenCalled();
+      expect(mockAuthControllerTyped.getCurrentUser).toHaveBeenCalled();
     });
 
     it("должен вернуть 401 без авторизации", async () => {
       // Переопределяем мок authMiddleware чтобы он возвращал 401
-      const { authMiddleware } = await import("../middleware/auth");
-      vi.mocked(authMiddleware).mockImplementationOnce(async (_req: any, res: any, _next: any) => {
+      mockOptionalAuthMiddleware.mockImplementationOnce(async (_req: any, res: any, _next: any) => {
         res.status(401).json({ error: "Unauthorized" });
       });
 

@@ -41,7 +41,20 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-md mx-auto relative">
+      <style>{`
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+          }
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+      `}</style>
       <div className="card">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-primary-100 p-3 rounded-full">

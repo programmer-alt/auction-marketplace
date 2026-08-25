@@ -18,14 +18,7 @@
     "validate": "biome check . && tsc --noEmit",
     "check": "biome check --write . && biome format --write . && tsc --noEmit && biome check ."
   },
-  "keywords": [
-    "auction",
-    "marketplace",
-    "react",
-    "nodejs",
-    "prisma",
-    "stripe"
-  ],
+  "keywords": ["auction", "marketplace", "react", "nodejs", "prisma", "stripe"],
   "author": "",
   "license": "MIT",
   "devDependencies": {

@@ -40,6 +40,7 @@ vi.mock("../index.js", () => ({
 vi.mock("../config/db.js", () => ({
   prisma: mockPrisma,
   pool: {},
+  runWithRetry: (fn: () => Promise<any>) => fn(),
 }));
 
 // Мокаем socket.io config

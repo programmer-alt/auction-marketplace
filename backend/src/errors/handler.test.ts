@@ -89,7 +89,7 @@ describe("Error Handler", () => {
 
     errorHandler(unknownError, {} as any, mockRes, vi.fn());
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith("Ошибка:", unknownError);
+    expect(consoleErrorSpy).toHaveBeenCalledWith("❌ Unhandled error:", unknownError);
     consoleErrorSpy.mockRestore();
   });
 });
