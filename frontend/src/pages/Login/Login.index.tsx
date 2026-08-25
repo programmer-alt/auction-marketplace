@@ -1,5 +1,4 @@
 import { authApi } from "@/api/auth";
-import ScanLine from "@/components/effects/ScanLine";
 import { useAuthStore } from "@/store/auth.store";
 import { type LoginFormData, loginSchema } from "@/utils/validation/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,25 +41,8 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto relative">
-      <ScanLine color="#0f0" thickness={3} duration={8} delay={0} highlightIntensity={0.7} highlightWidth={200} />
-      <style>{`
-        @keyframes pulse-glow {
-          0%, 100% {
-            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
-          }
-          50% {
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
-          }
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 3s ease-in-out infinite;
-        }
-        .animate-pulse-glow {
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-      `}</style>
-      <div className="card animate-pulse-slow">
+    <div className="max-w-md mx-auto">
+      <div className="card">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-primary-100 p-3 rounded-full">
             <LogIn className="h-8 w-8 text-primary-600" />
