@@ -306,7 +306,7 @@ httpServer.listen(PORT, async () => {
 
   try {
     await prisma.$connect();
-    logger.info("✅ Database connection established");
+    logger.info("✅ Подключение к базе данных установлено");
 
     // ✅ Auto-reconnect при ошибках pool (сериализация через in-flight lock)
     let reconnecting: Promise<void> | null = null;
