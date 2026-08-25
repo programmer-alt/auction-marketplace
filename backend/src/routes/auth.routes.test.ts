@@ -53,7 +53,7 @@ describe("Auth Routes", () => {
 
       const response = await request(app).post("/api/auth/register").send({
         email: "test@example.com",
-        password: "password123",
+        password: "mock_test_password",
         name: "Test User",
       });
 
@@ -84,7 +84,7 @@ describe("Auth Routes", () => {
 
       const response = await request(app).post("/api/auth/register").send({
         email: "test@example.com",
-        password: "password123",
+        password: "mock_test_password",
       });
 
       expect(response.status).toBe(201);
@@ -104,7 +104,7 @@ describe("Auth Routes", () => {
 
       const response = await request(app).post("/api/auth/login").send({
         email: "test@example.com",
-        password: "password123",
+        password: "mock_test_password",
       });
 
       expect(response.status).toBe(200);
@@ -132,7 +132,7 @@ describe("Auth Routes", () => {
 
       const response = await request(app).post("/api/auth/login").send({
         email: "test@example.com",
-        password: "password123",
+        password: "mock_test_password",
       });
 
       expect(response.status).toBe(200);

@@ -73,8 +73,10 @@ function logMemoryUsage(): void {
 
 /**
  * Проверка на утечку памяти
+ * Порог повышен с 0.9 до 0.95, чтобы не спамить в development
+ * (Prisma client + pg-pool естественно занимают 70-85% heap в dev)
  */
-export function checkMemoryLeak(threshold = 0.9): boolean {
+export function checkMemoryLeak(threshold = 0.95): boolean {
   const usage = process.memoryUsage();
   const heapUsageRatio = usage.heapUsed / usage.heapTotal;
 

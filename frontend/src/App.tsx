@@ -60,11 +60,11 @@ function AuthInitializer() {
         if (userData) {
           login(accessToken, userData);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Если /me упал из-за невалидного токена (обычно 401/403) — очищаем token,
         // чтобы axios interceptor больше не слал Authorization.
         // Если же проблема временная (сеть/5xx) — не выкидываем пользователя.
-        const status = error?.response?.status;
+        const status = (error as { response?: { status?: number } })?.response?.status;
 
         if (status === 401 || status === 403) {
           const { token } = useAuthStore.getState();

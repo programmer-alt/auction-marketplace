@@ -78,9 +78,9 @@ const mockGetPaymentsCountByUserId = vi.mocked(paymentsRepo.getPaymentsCountByUs
 describe("Payments Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Переопределяем STRIPE_SECRET_KEY для мока
-    process.env.STRIPE_SECRET_KEY = "sk_test_fake_key";
-    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
+    // Переопределяем STRIPE_SECRET_KEY для мока (тестовые значения)
+    process.env.STRIPE_SECRET_KEY = "sk_test_mock_fake_key";
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_mock_test_secret";
   });
 
   // ========================================

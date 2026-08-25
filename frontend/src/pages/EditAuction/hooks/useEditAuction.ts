@@ -62,8 +62,8 @@ export const useEditAuction = (id: string | undefined) => {
           const errorMessage = "error" in result ? result.error : "Аукцион не найден";
           throw new Error(errorMessage);
         }
-      } catch (error: any) {
-        const errorMsg = error.message || "Аукцион не найден";
+      } catch (error: unknown) {
+        const errorMsg = (error as Error).message || "Аукцион не найден";
         setAuctionState({
           status: "error",
           error: errorMsg,
@@ -71,7 +71,7 @@ export const useEditAuction = (id: string | undefined) => {
         });
         toast.error(errorMsg);
         // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-        markErrorAsHandled(error);
+        markErrorAsHandled(error as Error);
         navigate("/");
       }
     };
@@ -137,10 +137,10 @@ export const useEditAuction = (id: string | undefined) => {
         }
         toast.error(result.error || "Не удалось обновить аукцион");
         return false;
-      } catch (error: any) {
-        toast.error(error.message || "Не удалось обновить аукцион");
+      } catch (error: unknown) {
+        toast.error((error as Error).message || "Не удалось обновить аукцион");
         // Помечаем ошибку как обработанную, чтобы избежать дублирования с глобальным interceptor'ом
-        markErrorAsHandled(error);
+        markErrorAsHandled(error as Error);
         return false;
       } finally {
         setUploadState({ status: "idle" });

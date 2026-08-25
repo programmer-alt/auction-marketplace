@@ -36,13 +36,13 @@ export const handleError = (error: PossibleError, customMessage?: string, catego
       // Используем явное приведение к типу для доступа к свойствам
       const axiosErr = error as import("axios").AxiosError;
       if (axiosErr.response?.data && typeof axiosErr.response.data === "object" && "error" in axiosErr.response.data) {
-        message = (axiosErr.response.data as any).error;
+        message = (axiosErr.response.data as { error?: string }).error || axiosErr.message;
       } else if (
         axiosErr.response?.data &&
         typeof axiosErr.response.data === "object" &&
         "message" in axiosErr.response.data
       ) {
-        message = (axiosErr.response.data as any).message;
+        message = (axiosErr.response.data as { message?: string }).message || axiosErr.message;
       } else if (axiosErr.message) {
         message = axiosErr.message;
       }

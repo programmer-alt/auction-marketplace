@@ -7,7 +7,7 @@ import type { Auction, AuctionEvent, Bid, BidEvent, EventHandlers, Payment, WebS
  */
 export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<EventHandlers>): () => void {
   // Сопоставление событий с обработчиками
-  const eventHandlerMap: { [K in WebSocketEvent]?: (data: any) => void } = {};
+  const eventHandlerMap: { [K in WebSocketEvent]?: (data: Record<string, unknown>) => void } = {};
 
   // Регистрация обработчиков на основе предоставленных
   Object.entries(handlers).forEach(([handlerKey, handlerFn]) => {
@@ -25,7 +25,7 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
 
       if (matchingEvent) {
         // Создаем безопасную обертку с обработкой ошибок
-        const safeHandler = (data: any) => {
+        const safeHandler = (data: Record<string, unknown>) => {
           try {
             handlerFn(data);
           } catch (error) {
@@ -35,7 +35,7 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
         // Сохраняем безопасную обертку в карту для последующего удаления
         eventHandlerMap[matchingEvent as WebSocketEvent] = safeHandler;
         // Регистрируем безопасную обертку в WebSocket
-        socket.addEventListener(matchingEvent, safeHandler);
+        socket.addEventListener(matchingEvent as keyof WebSocketEventMap, safeHandler as unknown as EventListener);
       }
     }
   });
@@ -43,7 +43,7 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
   // Возвращаем функцию отписки
   return () => {
     Object.entries(eventHandlerMap).forEach(([event, handler]) => {
-      socket.removeEventListener(event, handler);
+      socket.removeEventListener(event as keyof WebSocketEventMap, handler as unknown as EventListener);
     });
   };
 }
@@ -99,7 +99,7 @@ export interface PaymentEventData {
 /**
  * Универсальный интерфейс WebSocket-сообщения
  */
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = Record<string, unknown>> {
   event: WebSocketEvent;
   data: T;
   timestamp: string;
