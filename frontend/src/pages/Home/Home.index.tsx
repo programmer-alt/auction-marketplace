@@ -1,4 +1,3 @@
-import ScanLine from "@/components/effects/ScanLine";
 import { useStatusBadge } from "@/hooks/useStatusBadge";
 import { useAuthStore } from "@/store/auth.store";
 import { formatDistanceToNow } from "date-fns";
@@ -14,9 +13,7 @@ export default function Home() {
   const { getStatusBadge } = useStatusBadge();
 
   return (
-    <div className="relative">
-      <ScanLine color="#0f0" thickness={3} duration={8} delay={0.5} highlightIntensity={0.7} highlightWidth={250} />
-
+    <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Аукционы</h1>
         <p className="text-gray-600">Находите уникальные товары и делайте ставки в реальном времени</p>

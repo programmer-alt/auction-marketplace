@@ -1,5 +1,4 @@
 import { authApi } from "@/api/auth";
-import ScanLine from "@/components/effects/ScanLine";
 import { useAuthStore } from "@/store/auth.store";
 import { type RegisterFormData, registerSchema } from "@/utils/validation/auth.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,8 +46,7 @@ export default function Register() {
   };
 
   return (
-    <div className="max-w-md mx-auto relative">
-      <ScanLine color="#0f0" thickness={3} duration={8} delay={0} highlightIntensity={0.8} highlightWidth={220} />
+    <div className="max-w-md mx-auto">
       <div className="card">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-primary-100 p-3 rounded-full">
