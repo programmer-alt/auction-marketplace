@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { runWithRetry } from "../config/db";
 import { createNotFoundError, createValidationError } from "../errors/factories";
 import {
   type CompositeCursorPaginationOptions,
@@ -24,63 +25,69 @@ export const getAuctions = async (
   if (skip < 0 || take < 0 || !Number.isInteger(skip) || !Number.isInteger(take)) {
     throw createValidationError("Invalid pagination parameters");
   }
-  return await prisma.auction.findMany({
-    where,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
+  return await runWithRetry(async () =>
+    prisma.auction.findMany({
+      where,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        _count: {
+          select: { bids: true },
+        },
       },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      _count: {
-        select: { bids: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    skip,
-    take,
-  });
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+    }),
+  );
 };
 
 // Подсчет количества аукционов
 export const getAuctionsCount = async (prisma: PrismaClient, where: Prisma.AuctionWhereInput) => {
-  return await prisma.auction.count({ where });
+  return await runWithRetry(() => prisma.auction.count({ where }));
 };
 
 // Получение аукциона по ID
 export const getAuctionById = async (prisma: PrismaClient, id: number) => {
-  return await prisma.auction.findUnique({
-    where: { id },
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
-      },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      bids: {
-        include: {
-          user: {
-            select: { id: true, email: true, name: true },
-          },
+  return await runWithRetry(async () =>
+    prisma.auction.findUnique({
+      where: { id },
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
         },
-        orderBy: { amount: "desc" },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        bids: {
+          include: {
+            user: {
+              select: { id: true, email: true, name: true },
+            },
+          },
+          orderBy: { amount: "desc" },
+        },
       },
-    },
-  });
+    }),
+  );
 };
 
 // Создание нового аукциона (unchecked version supports scalar foreign keys)
 export const createAuction = async (prisma: PrismaClient, data: Prisma.AuctionUncheckedCreateInput) => {
-  return await prisma.auction.create({
-    data,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
+  return await runWithRetry(async () =>
+    prisma.auction.create({
+      data,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
       },
-    },
-  });
+    }),
+  );
 };
 
 // Условное обновление аукциона
@@ -89,24 +96,23 @@ export const updateAuctionMany = async (
   where: Prisma.AuctionWhereInput,
   data: Prisma.AuctionUpdateManyMutationInput,
 ) => {
-  return await prisma.auction.updateMany({
-    where,
-    data,
-  });
+  return await runWithRetry(() => prisma.auction.updateMany({ where, data }));
 };
 
 // Обновление аукциона по ID
 export const updateAuctionById = async (prisma: PrismaClient, id: number, data: Prisma.AuctionUpdateInput) => {
   try {
-    return await prisma.auction.update({
-      where: { id },
-      data,
-      include: {
-        seller: {
-          select: { id: true, email: true, name: true },
+    return await runWithRetry(async () =>
+      prisma.auction.update({
+        where: { id },
+        data,
+        include: {
+          seller: {
+            select: { id: true, email: true, name: true },
+          },
         },
-      },
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof Error && "code" in error && (error as Record<string, unknown>).code === "P2025") {
       throw createNotFoundError(`Auction with id ${id} not found`);
@@ -118,9 +124,7 @@ export const updateAuctionById = async (prisma: PrismaClient, id: number, data: 
 // Удаление аукциона
 export const deleteAuction = async (prisma: PrismaClient, id: number) => {
   try {
-    return await prisma.auction.delete({
-      where: { id },
-    });
+    return await runWithRetry(async () => prisma.auction.delete({ where: { id } }));
   } catch (error) {
     if (error instanceof Error && "code" in error && (error as Record<string, unknown>).code === "P2025") {
       throw createNotFoundError(`Auction with id ${id} not found`);
@@ -175,22 +179,24 @@ export const getAuctionsWithCursor = async (
   const orderBy = direction === "next" ? { [cursorField]: "asc" as const } : { [cursorField]: "desc" as const };
 
   // Получаем данные с запасом для определения hasMore
-  const data = await prisma.auction.findMany({
-    where: combinedWhere,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
+  const data = await runWithRetry(async () =>
+    prisma.auction.findMany({
+      where: combinedWhere,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        _count: {
+          select: { bids: true },
+        },
       },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      _count: {
-        select: { bids: true },
-      },
-    },
-    orderBy,
-    take: limit + 1, // Берем на один больше для определения hasMore
-  });
+      orderBy,
+      take: limit + 1, // Берем на один больше для определения hasMore
+    }),
+  );
 
   // Если направление назад, переворачиваем результат
   const sortedData = direction === "prev" ? data.reverse() : data;
@@ -221,22 +227,24 @@ export const getAuctionsWithCompositeCursor = async (
   const orderBy = createOrderBy(cursorFields, direction);
 
   // Получаем данные с запасом для определения hasMore
-  const data = await prisma.auction.findMany({
-    where: combinedWhere,
-    include: {
-      seller: {
-        select: { id: true, email: true, name: true },
+  const data = await runWithRetry(async () =>
+    prisma.auction.findMany({
+      where: combinedWhere,
+      include: {
+        seller: {
+          select: { id: true, email: true, name: true },
+        },
+        winner: {
+          select: { id: true, email: true, name: true },
+        },
+        _count: {
+          select: { bids: true },
+        },
       },
-      winner: {
-        select: { id: true, email: true, name: true },
-      },
-      _count: {
-        select: { bids: true },
-      },
-    },
-    orderBy,
-    take: limit + 1,
-  });
+      orderBy,
+      take: limit + 1,
+    }),
+  );
 
   // Если направление назад, переворачиваем результат
   const sortedData = direction === "prev" ? data.reverse() : data;

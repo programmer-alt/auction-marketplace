@@ -319,16 +319,25 @@ httpServer.listen(PORT, async () => {
         return;
       }
       reconnecting = (async () => {
-        try {
-          await prisma.$disconnect();
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          await prisma.$connect();
-          logger.info("✅ Reconnected to database");
-        } catch (reconnectErr) {
-          logger.error("❌ Reconnect failed:", reconnectErr);
-        } finally {
-          reconnecting = null;
+        let attempt = 0;
+        const maxAttempts = 5;
+        while (attempt < maxAttempts) {
+          attempt++;
+          try {
+            logger.info(`🔄 Reconnect attempt ${attempt}/${maxAttempts}...`);
+            await prisma.$disconnect();
+            await new Promise((resolve) => setTimeout(resolve, 2000 * attempt)); // exponential backoff
+            await prisma.$connect();
+            logger.info("✅ Reconnected to database successfully");
+            break;
+          } catch (reconnectErr) {
+            logger.error(`❌ Reconnect attempt ${attempt} failed:`, reconnectErr);
+            if (attempt >= maxAttempts) {
+              logger.error("❌ Max reconnect attempts reached. Application may be unstable.");
+            }
+          }
         }
+        reconnecting = null;
       })();
       await reconnecting;
     });

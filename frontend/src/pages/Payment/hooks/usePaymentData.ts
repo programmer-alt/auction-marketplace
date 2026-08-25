@@ -1,10 +1,11 @@
 import { auctionsApi } from "@/api/auctions";
-import { type User, isApiError, isApiSuccess } from "@/types";
+import type { AuctionDetail, User } from "@/types";
+import { isApiError, isApiSuccess } from "@/types";
 import { handleBusinessLogicError, handleError } from "@/utils/universalErrorHandler";
 import { useEffect, useState } from "react";
 
 export const usePaymentData = (id: string | undefined, user: User | null) => {
-  const [auction, setAuction] = useState<any>(null);
+  const [auction, setAuction] = useState<AuctionDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

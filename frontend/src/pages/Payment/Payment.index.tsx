@@ -139,7 +139,7 @@ function PaymentInner() {
           >
             <CardForm
               processing={processing}
-              currentPrice={auction.currentPrice}
+              currentPrice={auction.currentPrice ?? 0}
               onSubmit={handlePayment}
               error={error}
             />

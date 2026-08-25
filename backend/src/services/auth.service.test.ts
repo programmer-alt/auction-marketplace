@@ -256,9 +256,9 @@ describe("Auth Service", () => {
     });
 
     it("should successfully refresh tokens", async () => {
-      const oldRefreshToken = "old-refresh-token";
-      const newRefreshToken = "new-refresh-token";
-      const newAccessToken = "new-access-token";
+      const oldRefreshToken = "mock-old-refresh-token";
+      const newRefreshToken = "mock-new-refresh-token";
+      const newAccessToken = "mock-new-access-token";
       const userId = 1;
       const email = "test@example.com";
       const role = "USER";
