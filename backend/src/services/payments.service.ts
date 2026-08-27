@@ -77,16 +77,17 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     throw createValidationError("Аукцион ещё не завершён");
   }
 
+  // Проверяем авторизацию до обновления статуса — сайд-эффект не должен происходить для неавторизованных пользователей
+  if (auction.winnerId !== userId) {
+    throw createForbiddenError("Вы не являетесь победителем этого аукциона");
+  }
+
   // Если аукцион завершён по времени (но статус ещё ACTIVE) — обновляем статус
   if (!isCompleted && isTimeEnded && hasWinner) {
     await prisma.auction.update({
       where: { id: auctionId },
       data: { status: "COMPLETED" },
     });
-  }
-
-  if (auction.winnerId !== userId) {
-    throw createForbiddenError("Вы не являетесь победителем этого аукциона");
   }
 
   // Проверяем, не оплачен ли уже этот аукцион
