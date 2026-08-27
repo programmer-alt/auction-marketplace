@@ -9,6 +9,7 @@ interface AuctionActionsProps {
   user: User | null;
   isOwner: boolean;
   isActive: boolean;
+  isTimeEnded: boolean;
   onDelete: () => Promise<void>;
   onEdit: () => void;
   onPayment: () => void;
@@ -21,6 +22,7 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
   user,
   isOwner,
   isActive,
+  isTimeEnded,
   onEdit,
   onPayment,
   onComplete,
@@ -74,16 +76,18 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
               <Trash2 className="h-4 w-4" />
               Удалить
             </button>
-            <button
-              type="button"
-              onClick={handleComplete}
-              disabled={isCompleting}
-              className="btn-secondary flex items-center gap-2 text-orange-600 disabled:opacity-50"
-            >
-              <Flag className="h-4 w-4" />
-              {isCompleting ? "Завершение..." : "Завершить аукцион"}
-            </button>
           </>
+        )}
+        {isOwner && (isActive || (isTimeEnded && !!auction.winnerId)) && (
+          <button
+            type="button"
+            onClick={handleComplete}
+            disabled={isCompleting}
+            className="btn-secondary flex items-center gap-2 text-orange-600 disabled:opacity-50"
+          >
+            <Flag className="h-4 w-4" />
+            {isCompleting ? "Завершение..." : "Завершить аукцион"}
+          </button>
         )}
         {isAuthenticated &&
           ((auction.status === "COMPLETED" ||
