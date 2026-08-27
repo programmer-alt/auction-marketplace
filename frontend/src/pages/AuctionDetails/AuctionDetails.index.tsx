@@ -46,7 +46,7 @@ export default function AuctionDetails() {
   const { handleDelete, handleEdit, handlePayment, handleComplete, handleConfirmDelete } = useAuctionActions(auction?.id, navigate);
 
   // Используем хук для вычисления производных состояний
-  const { isOwner, isActive, isEnded, statusInfo, showBidForm, showLoginPrompt, showOwnerMessage, showAuctionActions } =
+  const { isOwner, isActive, isEnded, isTimeEnded, statusInfo, showBidForm, showLoginPrompt, showOwnerMessage, showAuctionActions } =
     useAuctionState(auction, user, isAuthenticated);
 
   const handleBidSubmit = async (amount: number): Promise<boolean> => {
@@ -112,6 +112,7 @@ export default function AuctionDetails() {
                 user={user}
                 isOwner={isOwner}
                 isActive={isActive}
+                isTimeEnded={isTimeEnded}
                 onDelete={handleDelete}
               onEdit={handleEdit}
               onPayment={handlePayment}
