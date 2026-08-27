@@ -1,39 +1,126 @@
 sequenceDiagram
+    autonumber
     participant User as Пользователь
-    participant CreateAuction as Компонент CreateAuction
-    participant useCreateAuction as Хук useCreateAuction
-    participant auctionsApi as API модуль (auctions.ts)
-    participant Axios as Axios клиент
-    participant BackendRoute as Маршрут /auctions (POST)
-    participant AuctionController as Контроллер auctions.controller.ts
-    participant AuctionService as Сервис auctions.service.ts
-    participant AuctionRepository as Репозиторий auctions.repository.ts
-    participant DB as База данных (Prisma)
-    participant Redis as Кэш Redis
-    participant UploadRoute as Маршрут /upload (опционально)
+    participant CreateAuction as Компонент CreateAuction<br/>(CreateAuction.index.tsx)
+    participant Hook as Хук useCreateAuction<br/>(useCreateAuction.ts)
+    participant Form as React Hook Form
+    participant Api as auctionsApi<br/>(auctions.ts)
+    participant Axios as Axios клиент<br/>(axios.ts)
+    participant UploadRoute as POST /api/upload
+    participant UploadCtrl as Контроллер загрузки
+    participant UploadDir as Диск (/uploads)
+    participant AuctionsRoute as POST /api/auctions
+    participant AuthMid as authMiddleware<br/>(auth.ts)
+    participant CsrfMid as CSRF middleware<br/>(csrf.ts)
+    participant AuctionsCtrl as auctionsController<br/>(auctions.controller.ts)
+    participant AuctionsSvc as AuctionsService<br/>(auctions.service.ts)
+    participant AuctionsRepo as AuctionsRepository<br/>(auctions.repository.ts)
+    participant Prisma as Prisma Client
+    participant DB as PostgreSQL<br/>(таблица auctions)
+    participant SocketIO as Socket.IO сервер
+    participant Router as React Router<br/>(navigate)
+    participant Toast as react-hot-toast
 
-    User->>CreateAuction: Заполняет форму, нажимает "Создать"
-    CreateAuction->>useCreateAuction: Вызывает onSubmit
-    useCreateAuction->>auctionsApi: Вызывает uploadImage (если есть файл)
-    auctionsApi->>Axios: POST /upload (multipart/form-data)
-    Axios->>UploadRoute: Запрос загрузки изображения
-    UploadRoute-->>Axios: Возвращает imageUrl
-    Axios-->>auctionsApi: imageUrl
-    auctionsApi-->>useCreateAuction: imageUrl
-    useCreateAuction->>auctionsApi: Вызывает createAuction с данными
-    auctionsApi->>Axios: POST /auctions с данными аукциона
-    Axios->>BackendRoute: Запрос на создание аукциона
-    BackendRoute->>AuctionController: Вызывает метод create
-    AuctionController->>AuctionService: Вызывает createAuction
-    AuctionService->>AuctionRepository: Вызывает createAuction
-    AuctionRepository->>DB: Вставка записи в таблицу Auction
-    DB-->>AuctionRepository: Созданный аукцион
-    AuctionRepository-->>AuctionService: Модель аукциона
-    AuctionService->>Redis: Инвалидирует кэш списков (invalidateAuctionsLists)
-    AuctionService-->>AuctionController: DTO аукциона
-    AuctionController-->>BackendRoute: JSON ответ
-    BackendRoute-->>Axios: 201 Created
-    Axios-->>auctionsApi: Ответ
-    auctionsApi-->>useCreateAuction: Успех
-    useCreateAuction->>CreateAuction: Показывает toast, перенаправляет на /
-    CreateAuction-->>User: Отображает уведомление об успехе
+    User->>CreateAuction: Заходит на страницу /create-auction
+    CreateAuction->>Hook: Инициализирует useCreateAuction()
+    Hook->>Form: Создаёт useForm<CreateAuctionData><br/>с defaultValues
+    Hook-->>CreateAuction: Возвращает form, register,<br/>handleSubmit, errors, imagePreview
+
+    User->>CreateAuction: Заполняет форму (название,<br/>описание, цена, дата окончания)
+    User->>CreateAuction: Выбирает файл изображения<br/>(опционально)
+    CreateAuction->>Hook: Вызывает handleImageChange(file)
+    Hook->>Hook: setImageFile(file),<br/>setImagePreview(objectURL)
+    Hook-->>CreateAuction: imagePreview обновлён
+
+    User->>CreateAuction: Нажимает "Создать аукцион"
+    CreateAuction->>Form: handleSubmit(onSubmit)
+    Form->>Form: Валидация (Zod + React Hook Form)<br/>title required, startingPrice > 0,<br/>endsAt required
+    alt Форма не валидна
+        Form-->>CreateAuction: errors заполнены,<br/>toast.error("Заполните все поля")
+        CreateAuction-->>User: Отображает ошибки валидации
+    else Форма валидна
+        Form->>Hook: onSubmit(data)
+
+        Note over Hook,UploadDir: ЭТАП 1: Загрузка изображения (опционально)
+        Hook->>Hook: isSubmittingRef = true,<br/>setUploadState("loading")
+        alt imageFile существует
+            Hook->>Api: uploadImage(file)
+            Api->>Axios: POST /upload<br/>(FormData, multipart/form-data)
+            Axios->>UploadRoute: Запрос с файлом
+            UploadRoute->>UploadCtrl: Контроллер загрузки
+            UploadCtrl->>UploadDir: Сохраняет файл<br/>(uuid.ext)
+            UploadDir-->>UploadCtrl: Путь к файлу
+            UploadCtrl-->>UploadRoute: { imageUrl: `/uploads/${filename}` }
+            UploadRoute-->>Axios: 200 OK
+            Axios-->>Api: response.data.imageUrl
+            Api-->>Hook: ApiResponse<string> (imageUrl)
+        else imageFile не выбран
+            Hook->>Hook: imageUrl = undefined
+        end
+
+        Note over Hook,AuctionsRoute: ЭТАП 2: Создание аукциона
+        Hook->>Api: createAuction({<br/>  title, description, imageUrl,<br/>  startingPrice, endsAt<br/>)
+        Api->>Axios: POST /auctions<br/>(JSON body)
+        Axios->>AuctionsRoute: POST /api/auctions
+        AuctionsRoute->>CsrfMid: Проверка CSRF токена
+        CsrfMid->>CsrfMid: Валидация csrf_token<br/>(cookie + header/body)
+        alt CSRF не валиден
+            CsrfMid-->>Axios: 403 Forbidden
+            Axios-->>Api: Error 403
+            Api-->>Hook: API Error
+            Hook->>Toast: toast.error("Ошибка CSRF")
+        else CSRF OK
+            CsrfMid->>AuthMid: Проверка JWT токена
+            AuthMid->>AuthMid: Верификация jwt_token<br/>(secret, expiry)
+            alt JWT невалиден / истёк
+                AuthMid-->>Axios: 401 Unauthorized
+                Axios-->>Api: Error 401
+                Api-->>Hook: API Error
+            else JWT валиден
+                AuthMid-->>AuctionsRoute: req.user = { id, ... }
+                AuctionsRoute->>AuctionsCtrl: createAuction(req, res)
+                AuctionsCtrl->>AuctionsCtrl: Zod валидация<br/>(createAuctionSchema.safeParse)
+                alt Валидация не пройдена
+                    AuctionsCtrl-->>AuctionsRoute: 400 Validation Error
+                else Валидация пройдена
+                    AuctionsCtrl->>AuctionsSvc: createAuction(parsedData, userId)
+                    
+                    Note over AuctionsSvc,DB: ЭТАП 3: Бизнес-логика
+                    AuctionsSvc->>AuctionsSvc: sanitizeObject(data)<br/>(skip endsAt, startingPrice)
+                    AuctionsSvc->>AuctionsSvc: Парсинг endsAt<br/>+ валидация даты (future)
+                    AuctionsSvc->>AuctionsSvc: currency.toLowerCase() || "usd"
+                    AuctionsSvc->>AuctionsRepo: createAuctionRepo(prisma, {<br/>  title, description, imageUrl,<br/>  startingPrice, currentPrice,<br/>  currency, sellerId, endsAt,<br/>  status: "ACTIVE"<br/>})
+                    AuctionsRepo->>Prisma: prisma.auction.create({...})
+                    Prisma->>DB: INSERT INTO auctions
+                    DB-->>Prisma: Созданная запись
+                    Prisma-->>AuctionsRepo: Auction model
+                    AuctionsRepo-->>AuctionsSvc: Auction model
+                    
+                    Note over AuctionsSvc,SocketIO: ЭТАП 4: Пост-обработка
+                    AuctionsSvc->>SocketIO: io.emit("auction:new", auction)
+                    SocketIO-->>User: WebSocket: новое событие<br/>(обновление UI в реальном времени)
+                    
+                    AuctionsSvc->>AuctionsSvc: scheduleAuctionCompletion(<br/>  auction.id, endsAtDate<br/>)
+                    Note over AuctionsSvc: ⏰ Таймер на завершение<br/>аукциона в будущем
+                    
+                    AuctionsSvc-->>AuctionsCtrl: Auction model
+                    AuctionsCtrl->>AuctionsCtrl: res.status(201).json({<br/>  message: "Аукцион успешно создан",<br/>  auction: result<br/>})
+                    AuctionsCtrl-->>AuctionsRoute: 201 Created + JSON
+                    AuctionsRoute-->>Axios: 201 Created
+                    Axios-->>Api: response.data
+                    Api-->>Hook: ApiResponse<Auction>
+                    
+                    Note over Hook,Toast: ЭТАП 5: Обработка результата
+                    alt isApiSuccess(result) === true
+                        Hook->>Toast: toast.success("Аукцион создан!")
+                        Hook->>Router: navigate("/")
+                        Router-->>User: Перенаправление на главную
+                        Hook->>Hook: setUploadState("idle"),<br/>isSubmittingRef = false
+                    else isApiSuccess === false
+                        Hook->>Toast: toast.error(result.error)
+                        Hook->>Hook: setUploadState("idle"),<br/>isSubmittingRef = false
+                    end
+                end
+            end
+        end
+    end

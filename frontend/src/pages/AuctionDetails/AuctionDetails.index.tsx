@@ -43,7 +43,7 @@ export default function AuctionDetails() {
     auction?.id,
     auction?.currentPrice ?? undefined,
   );
-  const { handleDelete, handleEdit, handlePayment, handleConfirmDelete } = useAuctionActions(auction?.id, navigate);
+  const { handleDelete, handleEdit, handlePayment, handleComplete, handleConfirmDelete } = useAuctionActions(auction?.id, navigate);
 
   // Используем хук для вычисления производных состояний
   const { isOwner, isActive, isEnded, statusInfo, showBidForm, showLoginPrompt, showOwnerMessage, showAuctionActions } =
@@ -113,9 +113,10 @@ export default function AuctionDetails() {
                 isOwner={isOwner}
                 isActive={isActive}
                 onDelete={handleDelete}
-                onEdit={handleEdit}
-                onPayment={handlePayment}
-                onConfirmDelete={handleConfirmDelete}
+              onEdit={handleEdit}
+              onPayment={handlePayment}
+              onComplete={handleComplete}
+              onConfirmDelete={handleConfirmDelete}
               />
             </div>
           )}

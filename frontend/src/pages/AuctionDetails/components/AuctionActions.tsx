@@ -1,5 +1,5 @@
 import type { Auction, User } from "@/types";
-import { CreditCard, Pencil, Trash2 } from "lucide-react";
+import { CreditCard, Flag, Pencil, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Modal } from "./Modal";
@@ -12,6 +12,7 @@ interface AuctionActionsProps {
   onDelete: () => Promise<void>;
   onEdit: () => void;
   onPayment: () => void;
+  onComplete: () => Promise<void>;
   onConfirmDelete: () => Promise<void>;
 }
 
@@ -22,11 +23,13 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
   isActive,
   onEdit,
   onPayment,
+  onComplete,
   onConfirmDelete,
 }) => {
   const isAuthenticated = !!user;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const handleDeleteClick = () => setIsModalOpen(true);
 
@@ -40,9 +43,18 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
     }
   };
 
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await onComplete();
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   return (
     <>
-      <div className="flex gap-3 mt-6">
+      <div className="flex gap-3 mt-6 flex-wrap">
         {isOwner && isActive && (
           <>
             <Link
@@ -62,14 +74,26 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
               <Trash2 className="h-4 w-4" />
               Удалить
             </button>
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={isCompleting}
+              className="btn-secondary flex items-center gap-2 text-orange-600 disabled:opacity-50"
+            >
+              <Flag className="h-4 w-4" />
+              {isCompleting ? "Завершение..." : "Завершить аукцион"}
+            </button>
           </>
         )}
-        {isAuthenticated && auction.status === "COMPLETED" && user?.id === auction.winnerId && (
-          <Link to={`/payment/${auction.id}`} className="btn-primary flex items-center gap-2" onClick={onPayment}>
-            <CreditCard className="h-4 w-4" />
-            Оплатить
-          </Link>
-        )}
+        {isAuthenticated &&
+          ((auction.status === "COMPLETED" ||
+            (auction.endsAt && new Date(auction.endsAt) < new Date() && auction.winnerId)) &&
+            user?.id === auction.winnerId && (
+            <Link to={`/payment/${auction.id}`} className="btn-primary flex items-center gap-2" onClick={onPayment}>
+              <CreditCard className="h-4 w-4" />
+              Оплатить
+            </Link>
+          ))}
       </div>
       <Modal
         isOpen={isModalOpen}

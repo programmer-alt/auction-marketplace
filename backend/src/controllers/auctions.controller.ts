@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { createNotFoundError, createValidationError } from "../errors/factories";
+import {
+  createNotFoundError,
+  createValidationError,
+} from "../errors/factories";
 import type { AuthRequest } from "../middleware/auth";
 import * as auctionsService from "../services/auctions.service";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -11,18 +14,38 @@ import { asyncHandler } from "../utils/asyncHandler";
 const createAuctionSchema = z.object({
   title: z.string().min(1, "Название обязательно"),
   description: z.string().optional(),
-  imageUrl: z.string().url("Некорректный URL изображения").optional().or(z.literal("")),
-  startingPrice: z.number().positive("Начальная цена должна быть положительной"),
-  currency: z.string().length(3, "Валюта должна быть трёхбуквенным кодом (например, USD, RUB)").optional(),
+  imageUrl: z
+    .string()
+    .url("Некорректный URL изображения")
+    .optional()
+    .or(z.literal("")),
+  startingPrice: z
+    .number()
+    .positive("Начальная цена должна быть положительной"),
+  currency: z
+    .string()
+    .length(3, "Валюта должна быть трёхбуквенным кодом (например, USD, RUB)")
+    .optional(),
   endsAt: z.string().datetime("Некорректная дата окончания"),
 });
 
 const updateAuctionSchema = z.object({
   title: z.string().min(1, "Название обязательно").optional(),
   description: z.string().optional(),
-  imageUrl: z.string().url("Некорректный URL изображения").optional().or(z.literal("")).optional(),
-  startingPrice: z.number().positive("Начальная цена должна быть положительной").optional(),
-  currency: z.string().length(3, "Валюта должна быть трёхбуквенным кодом (например, USD, RUB)").optional(),
+  imageUrl: z
+    .string()
+    .url("Некорректный URL изображения")
+    .optional()
+    .or(z.literal(""))
+    .optional(),
+  startingPrice: z
+    .number()
+    .positive("Начальная цена должна быть положительной")
+    .optional(),
+  currency: z
+    .string()
+    .length(3, "Валюта должна быть трёхбуквенным кодом (например, USD, RUB)")
+    .optional(),
   endsAt: z.string().datetime("Некорректная дата окончания").optional(),
 });
 
@@ -47,7 +70,9 @@ export const auctionsController = {
 
       const result = await auctionsService.getAuctions({
         status: status as string,
-        sellerId: sellerId ? Number.parseInt(sellerId as string, 10) : undefined,
+        sellerId: sellerId
+          ? Number.parseInt(sellerId as string, 10)
+          : undefined,
         page: parsedPage,
         limit: parsedLimit,
       });
@@ -59,7 +84,8 @@ export const auctionsController = {
 
   getAuctionById: asyncHandler<AuthRequest>(async (req, res, next) => {
     const id = Number.parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
+    if (Number.isNaN(id))
+      return next(createValidationError("Некорректный ID аукциона"));
 
     const result = await auctionsService.getAuctionById(id);
     if (!result) return next(createNotFoundError("Аукцион не найден"));
@@ -75,12 +101,15 @@ export const auctionsController = {
     if (!userId) return next(createValidationError("User not authenticated"));
 
     const result = await auctionsService.createAuction(parsed.data, userId);
-    res.status(201).json({ message: "Аукцион успешно создан", auction: result });
+    res
+      .status(201)
+      .json({ message: "Аукцион успешно создан", auction: result });
   }),
 
   updateAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
     const id = Number.parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
+    if (Number.isNaN(id))
+      return next(createValidationError("Некорректный ID аукциона"));
 
     const parsed = updateAuctionSchema.safeParse(req.body);
     if (!parsed.success) return next(parsed.error);
@@ -94,12 +123,26 @@ export const auctionsController = {
 
   deleteAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
     const id = Number.parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return next(createValidationError("Некорректный ID аукциона"));
+    if (Number.isNaN(id))
+      return next(createValidationError("Некорректный ID аукциона"));
 
     const userId = req.user?.id;
     if (!userId) return next(createValidationError("User not authenticated"));
 
     await auctionsService.deleteAuction(id, userId);
     res.json({ message: "Аукцион успешно удалён" });
+  }),
+
+  completeAuction: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (Number.isNaN(id))
+      return next(createValidationError("Некорректный ID аукциона"));
+
+    const userId = req.user?.id;
+    if (!userId)
+      return next(createValidationError("Пользователь не аутентифицирован"));
+
+    const result = await auctionsService.completeAuction(id, userId);
+    res.json({ message: "Аукцион успешно завершён", auction: result });
   }),
 };

@@ -31,10 +31,23 @@ export const useAuctionActions = (auctionId: number | undefined, navigate: Retur
     navigate(`/payment/${auctionId}`);
   }, [auctionId, navigate]);
 
+  const handleComplete = useCallback(async () => {
+    if (!auctionId) return;
+    try {
+      await auctionsApi.completeAuction(auctionId);
+      toast.success("Аукцион успешно завершён");
+      navigate(`/auctions/${auctionId}`);
+    } catch (error) {
+      toast.error("Не удалось завершить аукцион");
+      markErrorAsHandled(error as Error | AxiosError);
+    }
+  }, [auctionId, navigate]);
+
   return {
     handleDelete,
     handleEdit,
     handlePayment,
+    handleComplete,
     handleConfirmDelete,
   };
 };

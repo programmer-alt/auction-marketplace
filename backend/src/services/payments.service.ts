@@ -68,9 +68,21 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     throw createNotFoundError("Аукцион не найден");
   }
 
-  // Проверяем, что аукцион завершён и пользователь — победитель
-  if (auction.status !== "COMPLETED") {
+  // Проверяем, что аукцион завершён (статус COMPLETED ИЛИ время вышло + есть победитель)
+  const isCompleted = auction.status === "COMPLETED";
+  const isTimeEnded = auction.endsAt && new Date(auction.endsAt) <= new Date();
+  const hasWinner = auction.winnerId !== null;
+
+  if (!isCompleted && !(isTimeEnded && hasWinner)) {
     throw createValidationError("Аукцион ещё не завершён");
+  }
+
+  // Если аукцион завершён по времени (но статус ещё ACTIVE) — обновляем статус
+  if (!isCompleted && isTimeEnded && hasWinner) {
+    await prisma.auction.update({
+      where: { id: auctionId },
+      data: { status: "COMPLETED" },
+    });
   }
 
   if (auction.winnerId !== userId) {
