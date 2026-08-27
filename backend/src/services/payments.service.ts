@@ -2,7 +2,6 @@ import Stripe from "stripe";
 import { prisma } from "../config/db";
 import { createForbiddenError, createNotFoundError, createValidationError } from "../errors/factories";
 import {
-  createPayment,
   getPaymentByIdWithAuction,
   getPaymentByStripeId,
   getPaymentsByUserId,
@@ -82,14 +81,6 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     throw createForbiddenError("Вы не являетесь победителем этого аукциона");
   }
 
-  // Если аукцион завершён по времени (но статус ещё ACTIVE) — обновляем статус
-  if (!isCompleted && isTimeEnded && hasWinner) {
-    await prisma.auction.update({
-      where: { id: auctionId },
-      data: { status: "COMPLETED" },
-    });
-  }
-
   // Проверяем, не оплачен ли уже этот аукцион
   const existingPayment = await prisma.payment.findFirst({
     where: {
@@ -131,15 +122,53 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     description: `Оплата аукциона: ${auction.title}`,
   });
 
-  // Создаём запись о платеже в БД
-  const payment = await createPayment(prisma, {
-    userId,
-    auctionId,
-    amount: auction.currentPrice,
-    currency,
-    stripePaymentId: paymentIntent.id,
-    status: "PENDING",
-  });
+  // Атомарное обновление статуса аукциона + создание платежа
+  // Статус больше не меняется отдельным запросом — это устраняет race condition,
+  // о котором предупреждал Sourcery: теперь статус и платёж создаются одновременно
+  // в одной транзакции, и только после проверки winnerId.
+  let payment: PaymentWithRelations;
+  try {
+    const [updatedAuction, createdPayment] = await prisma.$transaction([
+      // Обновляем статус аукциона в COMPLETED (атомарно, вместе с созданием платежа)
+      prisma.auction.update({
+        where: {
+          id: auctionId,
+          status: { in: ["ACTIVE", "COMPLETED"] },
+        },
+        data: { status: "COMPLETED" },
+      }),
+      // Создаём запись о платеже
+      prisma.payment.create({
+        data: {
+          userId,
+          auctionId,
+          amount: auction.currentPrice,
+          currency,
+          stripePaymentId: paymentIntent.id,
+          status: "PENDING",
+        },
+        include: {
+          user: {
+            select: { id: true, email: true, name: true },
+          },
+          auction: {
+            select: { id: true, title: true, currentPrice: true, currency: true },
+          },
+        },
+      }),
+    ]);
+
+    payment = createdPayment;
+  } catch (error) {
+    // Если аукцион больше не в нужном статусе (CANCELLED и т.д.) — race condition
+    // между проверкой и транзакцией. Отклоняем платёж.
+    if (error instanceof Error && "code" in error && error.code === "P2025") {
+      throw createValidationError(
+        "Невозможно создать платёж: аукцион больше не доступен для оплаты",
+      );
+    }
+    throw error;
+  }
 
   return {
     clientSecret: paymentIntent.client_secret,

@@ -1,6 +1,6 @@
 import { useStatusBadge } from "@/hooks/useStatusBadge";
 import type { Auction } from "@/types";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface UseAuctionStateResult {
   isOwner: boolean;
@@ -25,6 +25,20 @@ export function useAuctionState(
 ): UseAuctionStateResult {
   const { getStatusBadge } = useStatusBadge();
 
+  // Состояние для принудительной перерисовки при наступлении endsAt
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!auction?.endsAt) return;
+    const delay = new Date(auction.endsAt).getTime() - Date.now();
+    if (delay <= 0) {
+      setTick((t) => t + 1);
+      return;
+    }
+    const timer = setTimeout(() => setTick((t) => t + 1), delay);
+    return () => clearTimeout(timer);
+  }, [auction?.endsAt]);
+
   // Базовые состояния
   const isOwner = useMemo(() => user?.id === auction?.sellerId, [user, auction]);
 
@@ -32,7 +46,7 @@ export function useAuctionState(
   const isTimeEnded = useMemo(() => {
     if (!auction?.endsAt) return false;
     return new Date(auction.endsAt) < new Date();
-  }, [auction]);
+  }, [auction, tick]);
 
   // Фактическое состояние: неактивен если статус не ACTIVE ИЛИ время вышло
   const isActive = useMemo(
