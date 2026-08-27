@@ -57,19 +57,30 @@ export async function createBid(
   amount: number,
   currency?: string,
 ): Promise<CreateBidResult> {
+  const decimalAmount = new Prisma.Decimal(amount);
+  const now = new Date();
+
+  // Получаем auction для проверки endsAt и валюты
+  const existingAuction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    select: { endsAt: true, currency: true },
+  });
+
+  if (!existingAuction) {
+    throw createNotFoundError("Аукцион не найден");
+  }
+
   // Проверяем валюту ставки относительно валюты аукциона
   if (currency) {
     const normalizedCurrency = currency.toLowerCase();
-    const auction = await prisma.auction.findUnique({
-      where: { id: auctionId },
-      select: { currency: true },
-    });
-    if (auction && auction.currency !== normalizedCurrency) {
-      throw createValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${auction.currency})`);
+    if (existingAuction.currency !== normalizedCurrency) {
+      throw createValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${existingAuction.currency})`);
     }
   }
 
-  const decimalAmount = new Prisma.Decimal(amount);
+  // Определяем, вышло ли время аукциона
+  const auctionTimeEnded = new Date(existingAuction.endsAt) <= now;
+
   try {
     const [updatedAuction, bid] = await prisma.$transaction([
       // Атомарное обновление аукциона с проверкой всех условий
@@ -77,11 +88,15 @@ export async function createBid(
         where: {
           id: auctionId,
           status: "ACTIVE",
-          endsAt: { gt: new Date() },
           currentPrice: { lt: decimalAmount },
           sellerId: { not: userId },
         },
-        data: { currentPrice: decimalAmount, winnerId: userId },
+        data: {
+          currentPrice: decimalAmount,
+          winnerId: userId,
+          // Если время вышло — завершаем аукцион
+          ...(auctionTimeEnded ? { status: "COMPLETED" as const } : {}),
+        },
         include: {
           seller: {
             select: { id: true, email: true, name: true },

@@ -245,6 +245,96 @@ export async function updateAuction(id: number, data: UpdateAuctionInput, userId
 }
 
 /**
+ * Завершение аукциона (ручное)
+ * Устанавливает статус COMPLETED, если аукцион истёк по времени и есть победитель
+ */
+export async function completeAuction(id: number, userId: number) {
+  const existingAuction = await getAuctionByIdRepo(prisma, id);
+  if (!existingAuction) {
+    throw createNotFoundError("Аукцион не найден");
+  }
+
+  // Проверяем, что пользователь является владельцем аукциона
+  if (existingAuction.sellerId !== userId) {
+    throw createForbiddenError("Недостаточно прав для завершения этого аукциона");
+  }
+
+  // Проверяем, что аукцион ещё не завершён
+  if (existingAuction.status !== "ACTIVE") {
+    throw createValidationError("Аукцион уже завершён или отменён");
+  }
+
+  // Проверяем, что время вышло
+  if (new Date(existingAuction.endsAt) > new Date()) {
+    throw createValidationError("Время аукциона ещё не вышло");
+  }
+
+  // Проверяем, что есть победитель
+  if (!existingAuction.winnerId) {
+    throw createValidationError("Нет победителя для завершения");
+  }
+
+  // Обновляем статус на COMPLETED
+  const updatedAuction = await prisma.auction.update({
+    where: { id },
+    data: { status: "COMPLETED" },
+    include: {
+      seller: {
+        select: { id: true, email: true, name: true },
+      },
+      winner: {
+        select: { id: true, email: true, name: true },
+      },
+      bids: {
+        include: {
+          user: {
+            select: { id: true, email: true, name: true },
+          },
+        },
+        orderBy: { amount: "desc" },
+      },
+    },
+  });
+
+  // Уведомление через WebSocket о завершении аукциона
+  getIo().to(`auction:${id}`).emit("auction:completed", { id, status: "COMPLETED" });
+
+  return updatedAuction;
+}
+
+/**
+ * Автоматическое завершение всех истёкших аукционов с победителем
+ */
+export async function autoCompleteExpiredAuctions() {
+  const now = new Date();
+
+  // Находим все активные аукционы, у которых время вышло и есть победитель
+  const expiredAuctions = await prisma.auction.findMany({
+    where: {
+      status: "ACTIVE",
+      endsAt: { lte: now },
+      winnerId: { not: null },
+    },
+    select: { id: true },
+  });
+
+  const updated: number[] = [];
+
+  for (const auction of expiredAuctions) {
+    await prisma.auction.update({
+      where: { id: auction.id },
+      data: { status: "COMPLETED" },
+    });
+    updated.push(auction.id);
+
+    // Уведомление через WebSocket
+    getIo().to(`auction:${auction.id}`).emit("auction:completed", { id: auction.id, status: "COMPLETED" });
+  }
+
+  return updated;
+}
+
+/**
  * Удаление аукциона
  */
 export async function deleteAuction(id: number, userId: number) {

@@ -67,6 +67,14 @@ export const auctionsApi = {
       data: response.data,
     } as ApiResponse<{ message: string }>;
   },
+
+  completeAuction: async (id: number): Promise<ApiResponse<{ message: string; auction: Auction }>> => {
+    const response = await api.post<AuctionMutationResponse>(`/auctions/${id}/complete`);
+    return {
+      success: true,
+      data: response.data,
+    } as ApiResponse<{ message: string; auction: Auction }>;
+  },
 };
 
 // Функция-утилита для извлечения данных из API-ответа

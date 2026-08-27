@@ -19,4 +19,7 @@ router.put("/:id", authMiddleware, auctionsController.updateAuction);
 // DELETE /api/auctions/:id — удаление аукциона
 router.delete("/:id", authMiddleware, auctionsController.deleteAuction);
 
+// POST /api/auctions/:id/complete — завершение аукциона (ручное)
+router.post("/:id/complete", authMiddleware, auctionsController.completeAuction);
+
 export default router;

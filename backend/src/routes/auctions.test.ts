@@ -570,4 +570,144 @@ describe("Auctions Routes", () => {
       expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith("auction:deleted", { id: 1 });
     });
   });
+
+  // ========================================
+  // POST /api/auctions/:id/complete — завершение аукциона
+  // ========================================
+  describe("POST /api/auctions/:id/complete", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("должен завершить аукцион", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+      });
+      mockPrisma.auction.update.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "COMPLETED",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+        title: "Test Auction",
+        currentPrice: 100,
+        seller: { id: 1, email: "test@test.com", name: null },
+        winner: { id: 5, email: "buyer@test.com", name: "Buyer" },
+        bids: [],
+      });
+
+      const response = await request(app).post("/api/auctions/1/complete");
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe("Аукцион успешно завершён");
+      expect(response.body.auction.status).toBe("COMPLETED");
+    });
+
+    it("должен вернуть 404, если аукцион не найден", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue(null);
+
+      const response = await request(app).post("/api/auctions/999/complete");
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe("Аукцион не найден");
+    });
+
+    it("должен вернуть 403, если пользователь не продавец", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 2,
+        status: "ACTIVE",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+      });
+
+      const response = await request(app).post("/api/auctions/1/complete");
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toBe("Недостаточно прав для завершения этого аукциона");
+    });
+
+    it("должен вернуть 400, если аукцион уже завершён", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "COMPLETED",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+      });
+
+      const response = await request(app).post("/api/auctions/1/complete");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Аукцион уже завершён или отменён");
+    });
+
+    it("должен вернуть 400, если время ещё не вышло", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        endsAt: new Date("2099-01-01"),
+        winnerId: 5,
+      });
+
+      const response = await request(app).post("/api/auctions/1/complete");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Время аукциона ещё не вышло");
+    });
+
+    it("должен вернуть 400, если нет победителя", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        endsAt: new Date("2020-01-01"),
+        winnerId: null,
+      });
+
+      const response = await request(app).post("/api/auctions/1/complete");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Нет победителя для завершения");
+    });
+
+    it("должен вернуть 400 при невалидном ID", async () => {
+      const response = await request(app).post("/api/auctions/invalid/complete");
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Некорректный ID аукциона");
+    });
+
+    it("должен отправить WebSocket уведомление при завершении", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "ACTIVE",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+      });
+      mockPrisma.auction.update.mockResolvedValue({
+        id: 1,
+        sellerId: 1,
+        status: "COMPLETED",
+        endsAt: new Date("2020-01-01"),
+        winnerId: 5,
+        title: "Test Auction",
+        currentPrice: 100,
+        seller: { id: 1, email: "test@test.com", name: null },
+        winner: { id: 5, email: "buyer@test.com", name: "Buyer" },
+        bids: [],
+      });
+
+      await request(app).post("/api/auctions/1/complete");
+
+      expect(mockIo.to).toHaveBeenCalledWith("auction:1");
+      expect(mockIo.to("auction:1").emit).toHaveBeenCalledWith("auction:completed", { id: 1, status: "COMPLETED" });
+    });
+  });
 });

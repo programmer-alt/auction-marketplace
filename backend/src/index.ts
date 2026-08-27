@@ -40,6 +40,7 @@ import paymentsRouter from "@/routes/payments.routes";
 
 // Import error handler
 import { errorHandler } from "@/errors/handler";
+import { autoCompleteExpiredAuctions } from "@/services/auctions.service";
 import { securityHeaders } from "@/middleware/securityHeaders";
 
 validateEnv();
@@ -73,6 +74,11 @@ function validatePort(input: string | number): number {
 }
 
 const PORT = validatePort(process.env.PORT ?? 5000);
+
+// ========================================
+// Cron-процесс: автоматическое завершение истёкших аукционов
+// ========================================
+let autoCompleteInterval: NodeJS.Timeout | null = null;
 
 export { prisma };
 
@@ -274,6 +280,11 @@ async function shutdown(signal: string) {
       clearInterval(leakCheckInterval);
     }
 
+    // 3. Останавливаем cron-процесс автоматического завершения
+    if (autoCompleteInterval) {
+      clearInterval(autoCompleteInterval);
+    }
+
     // 3. Закрываем БД
     await timeout(prisma.$disconnect(), 5000, "Таймаут отключения Prisma");
   } catch (error) {
@@ -303,6 +314,23 @@ async function shutdown(signal: string) {
 httpServer.listen(PORT, async () => {
   logger.info(`Сервер запущен на http://localhost:${PORT}`);
   logger.info(`Среда: ${process.env.NODE_ENV}`);
+
+  // ========================================
+  // Cron-процесс: автоматическое завершение истёкших аукционов
+  // Запускается каждые 5 минут
+  // ========================================
+  autoCompleteInterval = setInterval(async () => {
+    try {
+      const updated = await autoCompleteExpiredAuctions();
+      if (updated.length > 0) {
+        logger.info(`Автоматически завершено аукционов: ${updated.length} (IDs: ${updated.join(", ")})`);
+      }
+    } catch (error) {
+      logger.error("Ошибка автоматического завершения аукционов:", error);
+    }
+  }, 5 * 60 * 1000); // каждые 5 минут
+
+  // Очистка интервала при завершении
 
   try {
     await prisma.$connect();
