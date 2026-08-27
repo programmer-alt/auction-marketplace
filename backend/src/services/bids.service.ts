@@ -78,14 +78,16 @@ export async function createBid(
     }
   }
 
-  // Определяем, вышло ли время аукциона
+  // Определяем, вышло ли время аукциона (ранняя проверка для быстрого отказа)
   const auctionTimeEnded = new Date(existingAuction.endsAt) <= now;
 
-  // Отклоняем ставки после истечения времени — аукцион мог ещё не быть обновлён фоновым джобом
+  // Если время вышло — отклоняем сразу, аукцион мог ещё не быть обновлён фоновым джобом
   if (auctionTimeEnded) {
     throw createValidationError("Аукцион завершён — приём ставок невозможен");
   }
 
+  // Повторная проверка внутри транзакции — защита от race condition
+  // между ранней проверкой и моментом записи ставки
   try {
     const [updatedAuction, bid] = await prisma.$transaction([
       // Атомарное обновление аукциона с проверкой всех условий
@@ -93,6 +95,7 @@ export async function createBid(
         where: {
           id: auctionId,
           status: "ACTIVE",
+          endsAt: { gt: now }, // ← атомарная проверка времени
           currentPrice: { lt: decimalAmount },
           sellerId: { not: userId },
         },
