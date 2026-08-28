@@ -1,6 +1,10 @@
 import Stripe from "stripe";
 import { prisma } from "../config/db";
-import { createForbiddenError, createNotFoundError, createValidationError } from "../errors/factories";
+import {
+  createForbiddenError,
+  createNotFoundError,
+  createValidationError,
+} from "../errors/factories";
 import {
   getPaymentByIdWithAuction,
   getPaymentByStripeId,
@@ -53,7 +57,10 @@ export interface RefundPaymentResult {
 // Создание Payment Intent
 // ========================================
 
-export async function createPaymentIntent(auctionId: number, userId: number): Promise<CreatePaymentIntentResult> {
+export async function createPaymentIntent(
+  auctionId: number,
+  userId: number,
+): Promise<CreatePaymentIntentResult> {
   // Проверяем аукцион
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -95,11 +102,17 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
   }
 
   // Проверяем, есть ли PENDING-платёж — возвращаем его clientSecret
-  const existingPendingPayment = await getPendingPaymentByAuctionAndUser(prisma, auctionId, userId);
+  const existingPendingPayment = await getPendingPaymentByAuctionAndUser(
+    prisma,
+    auctionId,
+    userId,
+  );
 
   if (existingPendingPayment?.stripePaymentId) {
     // Возвращаем существующий clientSecret
-    const existingIntent = await stripe.paymentIntents.retrieve(existingPendingPayment.stripePaymentId);
+    const existingIntent = await stripe.paymentIntents.retrieve(
+      existingPendingPayment.stripePaymentId,
+    );
 
     return {
       clientSecret: existingIntent.client_secret,
@@ -152,7 +165,12 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
             select: { id: true, email: true, name: true },
           },
           auction: {
-            select: { id: true, title: true, currentPrice: true, currency: true },
+            select: {
+              id: true,
+              title: true,
+              currentPrice: true,
+              currency: true,
+            },
           },
         },
       }),
@@ -160,6 +178,16 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
 
     payment = createdPayment;
   } catch (error) {
+    // Если транзакция не удалась, отменяем PaymentIntent в Stripe,
+    try {
+      await stripe.paymentIntents.cancel(paymentIntent.id);
+    } catch (stripeError) {
+      console.error(
+        `[WARN] Не удалось отменить PaymentIntent ${paymentIntent.id} после ошибки транзакции:`,
+        stripeError,
+      );
+    }
+
     // Если аукцион больше не в нужном статусе (CANCELLED и т.д.) — race condition
     // между проверкой и транзакцией. Отклоняем платёж.
     if (error instanceof Error && "code" in error && error.code === "P2025") {
@@ -212,7 +240,9 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
 
         console.log(`Платёж ${stripePaymentId} успешно завершён`);
       } else {
-        console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+        console.warn(
+          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
+        );
       }
       break;
     }
@@ -227,7 +257,9 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
         await updatePayment(prisma, payment.id, { status: "FAILED" });
         console.log(`Платёж ${stripePaymentId} не удался`);
       } else {
-        console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+        console.warn(
+          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
+        );
       }
       break;
     }
@@ -242,7 +274,9 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
         await updatePayment(prisma, payment.id, { status: "FAILED" });
         console.log(`Платёж ${stripePaymentId} отменён`);
       } else {
-        console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+        console.warn(
+          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
+        );
       }
       break;
     }
@@ -258,7 +292,9 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
           await updatePayment(prisma, payment.id, { status: "REFUNDED" });
           console.log(`Возврат для платежа ${stripePaymentId} обработан`);
         } else {
-          console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
+          console.warn(
+            `Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`,
+          );
         }
       }
       break;
@@ -308,7 +344,11 @@ export async function getPaymentHistory(
 // Возврат платежа (Refund)
 // ========================================
 
-export async function refundPayment(paymentId: number, adminId: number, reason?: string): Promise<RefundPaymentResult> {
+export async function refundPayment(
+  paymentId: number,
+  adminId: number,
+  reason?: string,
+): Promise<RefundPaymentResult> {
   // Находим платёж с данными аукциона
   const payment = await getPaymentByIdWithAuction(prisma, paymentId);
 
@@ -317,11 +357,15 @@ export async function refundPayment(paymentId: number, adminId: number, reason?:
   }
 
   if (payment.status !== "COMPLETED") {
-    throw createValidationError("Возврат возможен только для завершённых платежей");
+    throw createValidationError(
+      "Возврат возможен только для завершённых платежей",
+    );
   }
 
   if (!payment.stripePaymentId) {
-    throw createValidationError("У платежа отсутствует Stripe ID — возврат невозможен");
+    throw createValidationError(
+      "У платежа отсутствует Stripe ID — возврат невозможен",
+    );
   }
 
   // Создаём возврат в Stripe
@@ -340,7 +384,9 @@ export async function refundPayment(paymentId: number, adminId: number, reason?:
     refundReason: reason ?? "Административный возврат",
   });
 
-  console.log(`Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`);
+  console.log(
+    `Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`,
+  );
 
   // Получаем обновлённый платёж
   const updatedPayment = await getPaymentByIdWithAuction(prisma, paymentId);
