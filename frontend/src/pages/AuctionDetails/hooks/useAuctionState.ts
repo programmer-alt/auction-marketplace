@@ -60,23 +60,22 @@ export function useAuctionState(
     [isTimeEnded, auction?.status],
   );
 
-  // Статус-бейдж: приоритет time-based, затем DB status
+  // Статус-бейдж: приоритет терминальных статусов БД, затем time-based
   const statusInfo = useMemo(() => {
     if (!auction) return { label: "", cls: "" };
 
-    // Если время вышло — показываем "Завершён" независимо от статуса БД
-    if (isTimeEnded) {
-      return { label: "Завершён", cls: "badge-completed" };
-    }
-
-    // Если статус COMPLETED в БД
+    // Терминальные статусы БД имеют высший приоритет
     if (auction.status === "COMPLETED") {
       return { label: "Завершён", cls: "badge-completed" };
     }
 
-    // Если статус CANCELLED в БД
     if (auction.status === "CANCELLED") {
       return { label: "Отменён", cls: "badge-cancelled" };
+    }
+
+    // Если время вышло — показываем "Завершён" как fallback
+    if (isTimeEnded) {
+      return { label: "Завершён", cls: "badge-completed" };
     }
 
     // По умолчанию — ACTIVE

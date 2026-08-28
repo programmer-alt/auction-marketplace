@@ -128,7 +128,7 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
   // в одной транзакции, и только после проверки winnerId.
   let payment: PaymentWithRelations;
   try {
-    const [updatedAuction, createdPayment] = await prisma.$transaction([
+    const [_updatedAuction, createdPayment] = await prisma.$transaction([
       // Обновляем статус аукциона в COMPLETED (атомарно, вместе с созданием платежа)
       prisma.auction.update({
         where: {
