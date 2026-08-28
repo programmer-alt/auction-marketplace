@@ -100,8 +100,7 @@ sequenceDiagram
                     AuctionsSvc->>SocketIO: io.emit("auction:new", auction)
                     SocketIO-->>User: WebSocket: новое событие<br/>(обновление UI в реальном времени)
                     
-                    AuctionsSvc->>AuctionsSvc: scheduleAuctionCompletion(<br/>  auction.id, endsAtDate<br/>)
-                    Note over AuctionsSvc: ⏰ Таймер на завершение<br/>аукциона в будущем
+                    Note over AuctionsSvc: ⏰ Завершение выполняется<br/>фоновым джобом каждые 5 мин<br/>(autoCompleteExpiredAuctions в index.ts)
                     
                     AuctionsSvc-->>AuctionsCtrl: Auction model
                     AuctionsCtrl->>AuctionsCtrl: res.status(201).json({<br/>  message: "Аукцион успешно создан",<br/>  auction: result<br/>})
