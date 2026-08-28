@@ -11,15 +11,6 @@ import {
 import { Prisma } from "../types";
 import { sanitizeObject } from "../utils/sanitization";
 
-// Stub functions for auction completion (removed Bull queue)
-async function scheduleAuctionCompletion(_auctionId: number, _endsAt: Date) {
-  // Очередь удаления — аукционы теперь завершаются вручную
-}
-
-async function removeScheduledAuctionCompletion(_auctionId: number) {
-  // Очередь удаления
-}
-
 // Тип для одиночного аукциона (с детальными ставками)
 type SingleAuction = Prisma.AuctionGetPayload<{
   include: {
@@ -151,9 +142,6 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
   // Уведомление через WebSocket о новом аукционе
   getIo().emit("auction:new", auction);
 
-  // Планирование завершения аукциона по времени
-  scheduleAuctionCompletion(auction.id, endsAtDate);
-
   return auction;
 }
 
@@ -191,10 +179,6 @@ async function processEndsAt(
   if (endsAtDate <= new Date()) {
     throw createValidationError("Дата окончания должна быть в будущем");
   }
-
-  // Обновляем запланированное завершение аукциона
-  await removeScheduledAuctionCompletion(auctionId);
-  scheduleAuctionCompletion(auctionId, endsAtDate);
 
   return { endsAtDate, needsReschedule: true };
 }
@@ -353,9 +337,6 @@ export async function deleteAuction(id: number, userId: number) {
   if (existingAuction.status !== "ACTIVE") {
     throw createValidationError("Можно удалять только активные аукционы");
   }
-
-  // Удаляем запланированное завершение аукциона
-  await removeScheduledAuctionCompletion(id);
 
   // Атомарное удаление с проверкой владельца и статуса
   const deleted = await prisma.auction.deleteMany({

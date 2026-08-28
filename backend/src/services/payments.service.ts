@@ -178,23 +178,35 @@ export async function createPaymentIntent(
 
     payment = createdPayment;
   } catch (error) {
-    // Если транзакция не удалась, отменяем PaymentIntent в Stripe,
-    try {
-      await stripe.paymentIntents.cancel(paymentIntent.id);
-    } catch (stripeError) {
-      console.error(
-        `[WARN] Не удалось отменить PaymentIntent ${paymentIntent.id} после ошибки транзакции:`,
-        stripeError,
-      );
-    }
+    // Отменяем PaymentIntent в Stripe только для ошибок, которые
+    // действительно означают, что платёж больше не нужен.
+    // Для временных ошибок (сеть, БД) — не трогаем Stripe,
+    // чтобы клиент мог повторить попытку тем же PaymentIntent.
+    const isApplicationError =
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "P2025"; // Prisma record not found
 
-    // Если аукцион больше не в нужном статусе (CANCELLED и т.д.) — race condition
-    // между проверкой и транзакцией. Отклоняем платёж.
-    if (error instanceof Error && "code" in error && error.code === "P2025") {
+    if (isApplicationError) {
+      // Аукцион больше не в нужном статусе (CANCELLED и т.д.) —
+      // race condition между проверкой и транзакцией.
+      // Отменяем PaymentIntent, т.к. платёж заведомо не нужен.
+      try {
+        await stripe.paymentIntents.cancel(paymentIntent.id);
+      } catch (stripeError) {
+        console.error(
+          `[WARN] Не удалось отменить PaymentIntent ${paymentIntent.id} после ошибки транзакции:`,
+          stripeError,
+        );
+      }
+
       throw createValidationError(
         "Невозможно создать платёж: аукцион больше не доступен для оплаты",
       );
     }
+
+    // Для всех остальных ошибок (временные сбои БД, сети и т.п.)
+    // не отменяем PaymentIntent — клиент может повторить попытку.
     throw error;
   }
 

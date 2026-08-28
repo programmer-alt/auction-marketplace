@@ -97,11 +97,18 @@ describe("Bids Service", () => {
     };
 
     it("должен успешно создать ставку", async () => {
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        endsAt: futureDate,
+        currency: "usd",
+      });
       mockPrisma.$transaction.mockResolvedValue([mockAuction, mockBid]);
 
       const result = await bidsService.createBid(auctionId, userId, amount);
 
-      // currency не передан, поэтому findUnique для проверки валюты не вызывается
+      expect(mockPrisma.auction.findUnique).toHaveBeenCalledWith({
+        where: { id: auctionId },
+        select: { endsAt: true, currency: true },
+      });
       expect(mockPrisma.$transaction).toHaveBeenCalled();
 
       expect(result.bid).toEqual(mockBid);
@@ -109,7 +116,10 @@ describe("Bids Service", () => {
     });
 
     it("должен отправить WebSocket уведомление при новой ставке", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({ currency: "usd" });
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        endsAt: futureDate,
+        currency: "usd",
+      });
       mockPrisma.$transaction.mockResolvedValue([mockAuction, mockBid]);
 
       await bidsService.createBid(auctionId, userId, amount);
@@ -127,7 +137,10 @@ describe("Bids Service", () => {
     });
 
     it("должен выбросить ошибку при P2025 (аукцион не найден или не активен)", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({ currency: "usd" });
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        endsAt: futureDate,
+        currency: "usd",
+      });
       const prismaError = new Error("Record not found") as Error & {
         code: string;
       };
@@ -138,21 +151,30 @@ describe("Bids Service", () => {
     });
 
     it("должен пробросить ошибку, если это не P2025", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({ currency: "usd" });
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        endsAt: futureDate,
+        currency: "usd",
+      });
       mockPrisma.$transaction.mockRejectedValue(new Error("DB connection failed"));
 
       await expect(bidsService.createBid(auctionId, userId, amount)).rejects.toThrow("DB connection failed");
     });
 
     it("не должен проверять валюту, если currency не передан", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({ currency: "usd" });
+      mockPrisma.auction.findUnique.mockResolvedValue({
+        endsAt: futureDate,
+        currency: "usd",
+      });
       mockPrisma.$transaction.mockResolvedValue([mockAuction, mockBid]);
 
       await bidsService.createBid(auctionId, userId, amount);
 
-      // findUnique вызывается только для проверки валюты при наличии currency параметра
-      // Но в коде он вызывается только если currency передан
-      expect(mockPrisma.auction.findUnique).not.toHaveBeenCalled();
+      // findUnique вызывается всегда (для проверки endsAt),
+      // но проверка currency внутри него пропускается если currency параметр не передан
+      expect(mockPrisma.auction.findUnique).toHaveBeenCalledWith({
+        where: { id: auctionId },
+        select: { endsAt: true, currency: true },
+      });
     });
   });
 
