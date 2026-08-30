@@ -116,9 +116,9 @@ const defaultCspConfig: CspConfig = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
   styleSrc: ["'self'", "https://fonts.googleapis.com"],
-  imgSrc: ["'self'", "data:", "https:", "http://localhost:*"], // Изображения с любых HTTPS источников и локального сервера
+  imgSrc: ["'self'", "data:", "https:"], // Изображения с любых HTTPS источников
   fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
-  connectSrc: ["'self'", "http://localhost:*", "ws://localhost:*"], // WebSocket и API вызовы
+  connectSrc: ["'self'", "wss://"], // WebSocket и API вызовы (HTTPS/WSS)
   mediaSrc: ["'self'"],
   objectSrc: ["'none'"], // Запрещаем <object>, <embed>, <applet>
   frameSrc: ["'none'"], // Запрещаем <iframe>, <frame>
@@ -206,6 +206,49 @@ const defaultSecurityHeadersConfig: SecurityHeadersConfig = {
 };
 
 /**
+ * Устанавливает один security header на response
+ */
+function setHeader(res: Response, name: string, value: string | "DENY" | "SAMEORIGIN" | "ALLOW-FROM" | "nosniff" | string): void {
+  res.removeHeader(name);
+  res.setHeader(name, value);
+}
+
+/**
+ * Генерирует заголовок CSP с учётом production-настроек
+ */
+function buildCspHeader(cspConfig: CspConfig, isProduction: boolean): string {
+  let cspToUse = cspConfig;
+
+  if (isProduction) {
+    cspToUse = { ...cspConfig };
+    cspToUse.upgradeInsecureRequests = true;
+    cspToUse.blockAllMixedContent = true;
+  }
+
+  return generateCspHeader(cspToUse);
+}
+
+/**
+ * Объединяет CSP-конфигурации для development режима
+ */
+function mergeDevCspConfig(configCsp: CspConfig): CspConfig {
+  return {
+    ...devCspConfig,
+    ...configCsp,
+    connectSrc: [...new Set([...(configCsp.connectSrc || []), ...(devCspConfig.connectSrc || [])])],
+    scriptSrc: [...new Set([...(configCsp.scriptSrc || []), ...(devCspConfig.scriptSrc || [])])],
+    styleSrc: [...new Set([...(configCsp.styleSrc || []), ...(devCspConfig.styleSrc || [])])],
+    scriptSrcElem: [...new Set([...(configCsp.scriptSrcElem || []), ...(devCspConfig.scriptSrcElem || [])])],
+    styleSrcElem: [...new Set([...(configCsp.styleSrcElem || []), ...(devCspConfig.styleSrcElem || [])])],
+    scriptSrcAttr: [...new Set([...(configCsp.scriptSrcAttr || []), ...(devCspConfig.scriptSrcAttr || [])])],
+    styleSrcAttr: [...new Set([...(configCsp.styleSrcAttr || []), ...(devCspConfig.styleSrcAttr || [])])],
+    imgSrc: [...new Set([...(configCsp.imgSrc || []), ...(devCspConfig.imgSrc || [])])],
+    fontSrc: [...new Set([...(configCsp.fontSrc || []), ...(devCspConfig.fontSrc || [])])],
+    defaultSrc: [...new Set([...(configCsp.defaultSrc || []), ...(devCspConfig.defaultSrc || [])])],
+  };
+}
+
+/**
  * Middleware для добавления security headers
  * @param config Конфигурация заголовков (опционально)
  */
@@ -217,83 +260,45 @@ export function securityHeaders(config: SecurityHeadersConfig = defaultSecurityH
     if (config.csp) {
       let cspConfig = config.csp;
 
-      // В development используем расширенную конфигурацию для поддержки инструментов разработки
       if (!isProduction) {
-        // Объединяем конфигурацию, при этом сохраняя любые переопределения из config
-        // Но для специфических директив, таких как элементы и атрибуты стилей,
-        // расширяем разрешения из devCspConfig, а не заменяем их
-        cspConfig = {
-          ...devCspConfig,
-          ...config.csp,
-          // Объединяем значения для специфических директив, а не заменяем их
-          connectSrc: [...new Set([...(config.csp.connectSrc || []), ...(devCspConfig.connectSrc || [])])],
-          scriptSrc: [...new Set([...(config.csp.scriptSrc || []), ...(devCspConfig.scriptSrc || [])])],
-          styleSrc: [...new Set([...(config.csp.styleSrc || []), ...(devCspConfig.styleSrc || [])])],
-          scriptSrcElem: [...new Set([...(config.csp.scriptSrcElem || []), ...(devCspConfig.scriptSrcElem || [])])],
-          styleSrcElem: [...new Set([...(config.csp.styleSrcElem || []), ...(devCspConfig.styleSrcElem || [])])],
-          scriptSrcAttr: [...new Set([...(config.csp.scriptSrcAttr || []), ...(devCspConfig.scriptSrcAttr || [])])],
-          styleSrcAttr: [...new Set([...(config.csp.styleSrcAttr || []), ...(devCspConfig.styleSrcAttr || [])])],
-          imgSrc: [...new Set([...(config.csp.imgSrc || []), ...(devCspConfig.imgSrc || [])])],
-          fontSrc: [...new Set([...(config.csp.fontSrc || []), ...(devCspConfig.fontSrc || [])])],
-          defaultSrc: [...new Set([...(config.csp.defaultSrc || []), ...(devCspConfig.defaultSrc || [])])],
-        };
+        cspConfig = mergeDevCspConfig(cspConfig);
       }
 
-      let cspHeader = generateCspHeader(cspConfig);
-
-      // В production добавляем upgrade-insecure-requests и block-all-mixed-content
-      if (isProduction) {
-        const cspWithUpgrade = { ...cspConfig };
-        cspWithUpgrade.upgradeInsecureRequests = true;
-        cspWithUpgrade.blockAllMixedContent = true;
-        cspHeader = generateCspHeader(cspWithUpgrade);
-      }
-      res.removeHeader("Content-Security-Policy");
-      res.setHeader("Content-Security-Policy", cspHeader);
+      setHeader(res, "Content-Security-Policy", buildCspHeader(cspConfig, isProduction));
     }
 
     // X-Frame-Options
     if (config.frameOptions) {
-      res.removeHeader("X-Frame-Options");
-      res.setHeader("X-Frame-Options", config.frameOptions);
+      setHeader(res, "X-Frame-Options", config.frameOptions);
     }
 
     // X-Content-Type-Options
     if (config.contentTypeOptions) {
-      res.removeHeader("X-Content-Type-Options");
-      res.setHeader("X-Content-Type-Options", config.contentTypeOptions);
+      setHeader(res, "X-Content-Type-Options", config.contentTypeOptions);
     }
 
     // Referrer-Policy
     if (config.referrerPolicy) {
-      res.removeHeader("Referrer-Policy");
-      res.setHeader("Referrer-Policy", config.referrerPolicy);
+      setHeader(res, "Referrer-Policy", config.referrerPolicy);
     }
 
-    // Permissions-Policy (ранее Feature-Policy)
+    // Permissions-Policy
     if (config.permissionsPolicy) {
-      res.removeHeader("Permissions-Policy");
-      res.setHeader("Permissions-Policy", generatePermissionsPolicyHeader(config.permissionsPolicy));
+      setHeader(res, "Permissions-Policy", generatePermissionsPolicyHeader(config.permissionsPolicy));
     }
 
     // Strict-Transport-Security (только в production)
     if (isProduction && config.hsts) {
       let hstsValue = `max-age=${config.hsts.maxAge}`;
-      if (config.hsts.includeSubDomains) {
-        hstsValue += "; includeSubDomains";
-      }
-      if (config.hsts.preload) {
-        hstsValue += "; preload";
-      }
-      res.removeHeader("Strict-Transport-Security");
-      res.setHeader("Strict-Transport-Security", hstsValue);
+      if (config.hsts.includeSubDomains) hstsValue += "; includeSubDomains";
+      if (config.hsts.preload) hstsValue += "; preload";
+      setHeader(res, "Strict-Transport-Security", hstsValue);
     }
 
     // Кастомные заголовки
     if (config.customHeaders) {
       Object.entries(config.customHeaders).forEach(([key, value]) => {
-        res.removeHeader(key);
-        res.setHeader(key, value);
+        setHeader(res, key, value);
       });
     }
 
