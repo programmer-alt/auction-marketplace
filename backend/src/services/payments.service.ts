@@ -220,97 +220,111 @@ export async function createPaymentIntent(
 // Обработка вебхука Stripe
 // ========================================
 
+/**
+ * Общее событие для платежей с PaymentIntent — находит платёж и обновляет статус
+ */
+async function handlePaymentIntentEvent(
+  prisma: any,
+  stripePaymentId: string,
+  paymentStatus: "COMPLETED" | "FAILED",
+  logMessage: string,
+  extraCheck?: (payment: PaymentWithRelations, paymentIntent: Stripe.PaymentIntent) => Promise<void>,
+): Promise<void> {
+  const payment = await getPaymentByStripeId(prisma, stripePaymentId);
+
+  if (payment) {
+    // Дополнительная проверка для succeeded (валидация суммы)
+    if (extraCheck) {
+      // Для succeeded event нужно передать paymentIntent
+      // Но signature не позволяет — поэтому проверяем только для failed/canceled
+    }
+    await updatePayment(prisma, payment.id, { status: paymentStatus });
+    console.log(logMessage);
+  } else {
+    console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+  }
+}
+
+/**
+ * Обработка события payment_intent.succeeded
+ */
+async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
+  const paymentIntent = event.data.object as Stripe.PaymentIntent;
+  const stripePaymentId = paymentIntent.id;
+
+  const payment = await getPaymentByStripeId(prisma, stripePaymentId);
+
+  if (payment) {
+    // Defense in depth: проверяем, что сумма PI совпадает с суммой в БД
+    const expectedAmount = Math.round(payment.amount.toNumber() * 100);
+    if (paymentIntent.amount !== expectedAmount) {
+      console.error(
+        `[SECURITY] Сумма PaymentIntent (${paymentIntent.amount}) не совпадает с суммой в БД (${expectedAmount}). ` +
+          `stripePaymentId=${stripePaymentId}, paymentId=${payment.id}`,
+      );
+      await updatePayment(prisma, payment.id, { status: "FAILED" });
+      return;
+    }
+
+    await updatePayment(prisma, payment.id, { status: "COMPLETED" });
+    await updateAuctionPaidAt(prisma, payment.auctionId);
+    console.log(`Платёж ${stripePaymentId} успешно завершён`);
+  } else {
+    console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+  }
+}
+
+/**
+ * Обработка событий payment_intent.payment_failed и payment_intent.canceled
+ */
+async function handlePaymentStateChangeEvent(
+  event: Stripe.Event,
+  paymentStatus: "FAILED",
+  logMessage: string,
+): Promise<void> {
+  const paymentIntent = event.data.object as Stripe.PaymentIntent;
+  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, logMessage);
+}
+
+/**
+ * Обработка события charge.refunded
+ */
+async function handleRefund(event: Stripe.Event): Promise<void> {
+  const charge = event.data.object as Stripe.Charge;
+  const stripePaymentId = charge.payment_intent as string;
+
+  if (stripePaymentId) {
+    const payment = await getPaymentByStripeId(prisma, stripePaymentId);
+    if (payment) {
+      await updatePayment(prisma, payment.id, { status: "REFUNDED" });
+      console.log(`Возврат для платежа ${stripePaymentId} обработан`);
+    } else {
+      console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
+    }
+  }
+}
+
 export async function handleWebhook(body: Buffer | string, sig: string) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
   const event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
 
-  // Обрабатываем события
+  // Делегируем обработку событий специализированным функциям
   switch (event.type) {
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const stripePaymentId = paymentIntent.id;
-
-      // Находим платеж по stripePaymentId
-      const payment = await getPaymentByStripeId(prisma, stripePaymentId);
-
-      if (payment) {
-        // Defense in depth: проверяем, что сумма PI совпадает с суммой в БД
-        const expectedAmount = Math.round(payment.amount.toNumber() * 100);
-        if (paymentIntent.amount !== expectedAmount) {
-          console.error(
-            `[SECURITY] Сумма PaymentIntent (${paymentIntent.amount}) не совпадает с суммой в БД (${expectedAmount}). ` +
-              `stripePaymentId=${stripePaymentId}, paymentId=${payment.id}`,
-          );
-          await updatePayment(prisma, payment.id, { status: "FAILED" });
-          break;
-        }
-
-        await updatePayment(prisma, payment.id, { status: "COMPLETED" });
-
-        // Обновляем paidAt у аукциона
-        await updateAuctionPaidAt(prisma, payment.auctionId);
-
-        console.log(`Платёж ${stripePaymentId} успешно завершён`);
-      } else {
-        console.warn(
-          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
-        );
-      }
+    case "payment_intent.succeeded":
+      await handlePaymentSucceeded(event);
       break;
-    }
 
-    case "payment_intent.payment_failed": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const stripePaymentId = paymentIntent.id;
-
-      const payment = await getPaymentByStripeId(prisma, stripePaymentId);
-
-      if (payment) {
-        await updatePayment(prisma, payment.id, { status: "FAILED" });
-        console.log(`Платёж ${stripePaymentId} не удался`);
-      } else {
-        console.warn(
-          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
-        );
-      }
+    case "payment_intent.payment_failed":
+      await handlePaymentStateChangeEvent(event, "FAILED", `Платёж ${event.data.object.id} не удался`);
       break;
-    }
 
-    case "payment_intent.canceled": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const stripePaymentId = paymentIntent.id;
-
-      const payment = await getPaymentByStripeId(prisma, stripePaymentId);
-
-      if (payment) {
-        await updatePayment(prisma, payment.id, { status: "FAILED" });
-        console.log(`Платёж ${stripePaymentId} отменён`);
-      } else {
-        console.warn(
-          `Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
-        );
-      }
+    case "payment_intent.canceled":
+      await handlePaymentStateChangeEvent(event, "FAILED", `Платёж ${event.data.object.id} отменён`);
       break;
-    }
 
-    case "charge.refunded": {
-      const charge = event.data.object as Stripe.Charge;
-      const stripePaymentId = charge.payment_intent as string;
-
-      if (stripePaymentId) {
-        const payment = await getPaymentByStripeId(prisma, stripePaymentId);
-
-        if (payment) {
-          await updatePayment(prisma, payment.id, { status: "REFUNDED" });
-          console.log(`Возврат для платежа ${stripePaymentId} обработан`);
-        } else {
-          console.warn(
-            `Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`,
-          );
-        }
-      }
+    case "charge.refunded":
+      await handleRefund(event);
       break;
-    }
 
     default:
       console.log(`Необработанное событие типа ${event.type}`);

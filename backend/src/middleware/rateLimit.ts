@@ -91,7 +91,10 @@ function shouldLogRequestCount(requestCount: number): boolean {
   return logPoints.includes(requestCount);
 }
 
-export async function rateLimit(req: Request, res: Response, next: NextFunction) {
+/**
+ * Определяет, нужно ли пропустить запрос через rate limiter
+ */
+function shouldSkipRateLimit(req: Request): boolean {
   // ponytail: Исключаем /api/csrf-token, /api/auth/me и /uploads/* из rate limiting
   // - это GET-запросы для генерации токена, проверки аутентификации и статических ресурсов
   if (
@@ -100,14 +103,22 @@ export async function rateLimit(req: Request, res: Response, next: NextFunction)
     req.path === "/api/upload" ||
     req.path === "/uploads" ||
     req.path.startsWith("/uploads/")
-  )
-    return next();
+  ) {
+    return true;
+  }
 
   // Добавляем условные исключения для разработки
   if (process.env.NODE_ENV !== "production") {
-    if (req.path === "/api/auth/login" || req.path === "/api/auth/refresh" || req.path.startsWith("/api/auctions"))
-      return next();
+    if (req.path === "/api/auth/login" || req.path === "/api/auth/refresh" || req.path.startsWith("/api/auctions")) {
+      return true;
+    }
   }
+
+  return false;
+}
+
+export async function rateLimit(req: Request, res: Response, next: NextFunction) {
+  if (shouldSkipRateLimit(req)) return next();
 
   const rawIp = getClientIp(req);
   const ip = normalizeIp(rawIp);
