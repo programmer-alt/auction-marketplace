@@ -14,7 +14,7 @@ import {
   updateAuctionPaidAt,
   updatePayment,
 } from "../repositories/payments.repository";
-import type { PaymentWithAuctionSeller, PaymentWithRelations } from "../types";
+import type { PaymentWithAuctionSeller, PaymentWithRelations, Payment } from "../types";
 
 // ========================================
 // Инициализация Stripe
@@ -228,15 +228,14 @@ async function handlePaymentIntentEvent(
   stripePaymentId: string,
   paymentStatus: "COMPLETED" | "FAILED",
   logMessage: string,
-  extraCheck?: (payment: PaymentWithRelations, paymentIntent: Stripe.PaymentIntent) => Promise<void>,
+  paymentIntent?: Stripe.PaymentIntent,
+  extraCheck?: (payment: Payment, paymentIntent: Stripe.PaymentIntent) => Promise<void>,
 ): Promise<void> {
   const payment = await getPaymentByStripeId(prisma, stripePaymentId);
 
   if (payment) {
-    // Дополнительная проверка для succeeded (валидация суммы)
-    if (extraCheck) {
-      // Для succeeded event нужно передать paymentIntent
-      // Но signature не позволяет — поэтому проверяем только для failed/canceled
+    if (extraCheck && paymentIntent) {
+      await extraCheck(payment, paymentIntent);
     }
     await updatePayment(prisma, payment.id, { status: paymentStatus });
     console.log(logMessage);
@@ -283,7 +282,7 @@ async function handlePaymentStateChangeEvent(
   logMessage: string,
 ): Promise<void> {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
-  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, logMessage);
+  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, logMessage, paymentIntent);
 }
 
 /**
