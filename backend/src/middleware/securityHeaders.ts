@@ -118,7 +118,7 @@ const defaultCspConfig: CspConfig = {
   styleSrc: ["'self'", "https://fonts.googleapis.com"],
   imgSrc: ["'self'", "data:", "https:"], // Изображения с любых HTTPS источников
   fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
-  connectSrc: ["'self'", "wss://"], // WebSocket и API вызовы (HTTPS/WSS)
+  connectSrc: ["'self'", "wss:"], // WebSocket и API вызовы (HTTPS/WSS)
   mediaSrc: ["'self'"],
   objectSrc: ["'none'"], // Запрещаем <object>, <embed>, <applet>
   frameSrc: ["'none'"], // Запрещаем <iframe>, <frame>

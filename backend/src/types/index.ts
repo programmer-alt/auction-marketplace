@@ -79,6 +79,8 @@ export type BidSelect = Prisma.BidGetPayload<{
 
 export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
+export type Payment = Prisma.PaymentGetPayload<{}>;
+
 export interface CreatePaymentData {
   userId: number;
   auctionId: number;
