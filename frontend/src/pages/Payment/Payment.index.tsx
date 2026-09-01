@@ -187,7 +187,10 @@ function PaymentPage() {
 
       if (paymentIntent.status === "succeeded") {
         toast.success("Платёж успешно подтверждён");
-        window.location.href = "/profile";
+        // Даем toast время на отображение перед редиректом
+        setTimeout(() => {
+          window.location.href = "/profile";
+        }, 2000);
       }
     } catch (err: any) {
       const msg = err?.message ?? "Ошибка оплаты. Попробуйте ещё раз.";
