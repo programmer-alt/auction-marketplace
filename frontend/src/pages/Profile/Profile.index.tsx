@@ -5,11 +5,12 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Clock, ExternalLink, Gavel, ShoppingBag, User } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useProfileData } from "./hooks/useProfileData";
 
 export default function Profile() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const { myAuctions, wonAuctions, loading } = useProfileData(user);
   const { getStatusBadge } = useStatusBadge();
   const [activeTab, setActiveTab] = useState<"my" | "won">("my");
@@ -111,10 +112,10 @@ export default function Profile() {
       ) : (
         <div className="space-y-4">
           {wonAuctions.map((auction: Auction) => (
-            <Link
+            <div
               key={auction.id}
-              to={`/auctions/${auction.id}`}
               className="card hover:shadow-md transition-shadow flex items-center justify-between"
+              onClick={() => navigate(`/auctions/${auction.id}`)}
             >
               <div>
                 <h3 className="font-semibold text-gray-900">{auction.title}</h3>
@@ -124,12 +125,16 @@ export default function Profile() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Link to={`/payment/${auction.id}`} className="btn-primary text-sm py-1 px-3">
+                <Link
+                  to={`/payment/${auction.id}`}
+                  className="btn-primary text-sm py-1 px-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   Оплатить
                 </Link>
                 <ExternalLink className="h-5 w-5 text-gray-400" />
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
