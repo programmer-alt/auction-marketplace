@@ -68,9 +68,7 @@ describe("Payments Routes", () => {
       };
       mockCreatePaymentIntent.mockResolvedValue(mockResponse);
 
-      const response = await request(app)
-        .post("/api/payments/create-intent")
-        .send({ auctionId: 1 });
+      const response = await request(app).post("/api/payments/create-intent").send({ auctionId: 1 });
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe("Платёжный интент создан");
@@ -118,10 +116,7 @@ describe("Payments Routes", () => {
     it("должен вернуть 400 при ошибке обработки webhook", async () => {
       mockHandleWebhook.mockRejectedValue(new Error("Webhook Error: Invalid signature"));
 
-      const response = await request(app)
-        .post("/api/payments/webhook")
-        .set("stripe-signature", "bad_sig")
-        .send("{}");
+      const response = await request(app).post("/api/payments/webhook").set("stripe-signature", "bad_sig").send("{}");
 
       expect(response.status).toBe(400);
       expect(response.text).toContain("Webhook processing failed");
@@ -130,10 +125,7 @@ describe("Payments Routes", () => {
     it("не требует авторизации (публичный эндпоинт для Stripe)", async () => {
       mockHandleWebhook.mockResolvedValue(undefined);
 
-      const response = await request(app)
-        .post("/api/payments/webhook")
-        .set("stripe-signature", "sig_test")
-        .send("{}");
+      const response = await request(app).post("/api/payments/webhook").set("stripe-signature", "sig_test").send("{}");
 
       expect(response.status).toBe(200);
     });

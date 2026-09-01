@@ -40,8 +40,8 @@ import paymentsRouter from "@/routes/payments.routes";
 
 // Import error handler
 import { errorHandler } from "@/errors/handler";
-import { autoCompleteExpiredAuctions } from "@/services/auctions.service";
 import { securityHeaders } from "@/middleware/securityHeaders";
+import { autoCompleteExpiredAuctions } from "@/services/auctions.service";
 
 validateEnv();
 
@@ -319,16 +319,19 @@ httpServer.listen(PORT, async () => {
   // Cron-процесс: автоматическое завершение истёкших аукционов
   // Запускается каждые 5 минут
   // ========================================
-  autoCompleteInterval = setInterval(async () => {
-    try {
-      const updated = await autoCompleteExpiredAuctions();
-      if (updated.length > 0) {
-        logger.info(`Автоматически завершено аукционов: ${updated.length} (IDs: ${updated.join(", ")})`);
+  autoCompleteInterval = setInterval(
+    async () => {
+      try {
+        const updated = await autoCompleteExpiredAuctions();
+        if (updated.length > 0) {
+          logger.info(`Автоматически завершено аукционов: ${updated.length} (IDs: ${updated.join(", ")})`);
+        }
+      } catch (error) {
+        logger.error("Ошибка автоматического завершения аукционов:", error);
       }
-    } catch (error) {
-      logger.error("Ошибка автоматического завершения аукционов:", error);
-    }
-  }, 5 * 60 * 1000); // каждые 5 минут
+    },
+    5 * 60 * 1000,
+  ); // каждые 5 минут
 
   // Очистка интервала при завершении
 

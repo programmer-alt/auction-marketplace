@@ -90,14 +90,14 @@ const AuctionActions: React.FC<AuctionActionsProps> = ({
           </button>
         )}
         {isAuthenticated &&
-          ((auction.status === "COMPLETED" ||
+          (auction.status === "COMPLETED" ||
             (auction.endsAt && new Date(auction.endsAt) < new Date() && auction.winnerId)) &&
-            user?.id === auction.winnerId && (
+          user?.id === auction.winnerId && (
             <Link to={`/payment/${auction.id}`} className="btn-primary flex items-center gap-2" onClick={onPayment}>
               <CreditCard className="h-4 w-4" />
               Оплатить
             </Link>
-          ))}
+          )}
       </div>
       <Modal
         isOpen={isModalOpen}

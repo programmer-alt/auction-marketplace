@@ -1,6 +1,6 @@
-import { useAuthStore } from "@/store/auth.store";
-import { ArrowLeft, CreditCard, CheckCircle } from "lucide-react";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
+import { useAuthStore } from "@/store/auth.store";
+import { ArrowLeft, CheckCircle, CreditCard } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import AuctionSummary from "./components/AuctionSummary";
 import { usePaymentData } from "./hooks/usePaymentData";
@@ -64,48 +64,54 @@ function PaymentPage() {
   useEffect(() => {
     if (!stripeRef.current || !elementsMounted || elementsRef.current) return;
 
-    console.log('[Payment] Mounting Stripe Elements...');
+    console.log("[Payment] Mounting Stripe Elements...");
 
     try {
       const elements = stripeRef.current.elements();
 
-      elements.create('cardNumber', {
-        style: {
-          base: {
-            fontSize: '16px',
-            color: '#424770',
-            '::placeholder': { color: '#aab7c4' },
+      elements
+        .create("cardNumber", {
+          style: {
+            base: {
+              fontSize: "16px",
+              color: "#424770",
+              "::placeholder": { color: "#aab7c4" },
+            },
+            invalid: { color: "#9e2146" },
           },
-          invalid: { color: '#9e2146' },
-        },
-      }).mount(cardNumberRef.current!);
+        })
+        .mount(cardNumberRef.current!);
 
-      elements.create('cardExpiry', {
-        style: {
-          base: {
-            fontSize: '16px',
-            color: '#424770',
-            '::placeholder': { color: '#aab7c4' },
+      elements
+        .create("cardExpiry", {
+          style: {
+            base: {
+              fontSize: "16px",
+              color: "#424770",
+              "::placeholder": { color: "#aab7c4" },
+            },
+            invalid: { color: "#9e2146" },
           },
-          invalid: { color: '#9e2146' },
-        },
-      }).mount(cardExpiryRef.current!);
+        })
+        .mount(cardExpiryRef.current!);
 
-      elements.create('cardCvc', {
-        style: {
-          base: {
-            fontSize: '16px',
-            color: '#424770',
-            '::placeholder': { color: '#aab7c4' },
+      elements
+        .create("cardCvc", {
+          style: {
+            base: {
+              fontSize: "16px",
+              color: "#424770",
+              "::placeholder": { color: "#aab7c4" },
+            },
+            invalid: { color: "#9e2146" },
           },
-          invalid: { color: '#9e2146' },
-        },
-      }).mount(cardCvcRef.current!);
+        })
+        .mount(cardCvcRef.current!);
 
       elementsRef.current = elements;
-      console.log('[Payment] Stripe Elements mounted successfully');
+      console.log("[Payment] Stripe Elements mounted successfully");
     } catch (err) {
-      console.error('Failed to create Stripe Elements:', err);
+      console.error("Failed to create Stripe Elements:", err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stripeRef.current, elementsMounted]);
@@ -123,20 +129,19 @@ function PaymentPage() {
 
     isInitializing.current = true;
 
-      paymentsApi
-        .createPaymentIntent(auction.id)
-        .then((res) => {
-          if (!cancelled) {
-            const secret = res.data?.clientSecret ?? null;
-            setClientSecret(secret);
-            clientSecretRef.current = secret;
-            setSecretLoading(false);
-          }
-        })
+    paymentsApi
+      .createPaymentIntent(auction.id)
+      .then((res) => {
+        if (!cancelled) {
+          const secret = res.data?.clientSecret ?? null;
+          setClientSecret(secret);
+          clientSecretRef.current = secret;
+          setSecretLoading(false);
+        }
+      })
       .catch((err) => {
         if (!cancelled) {
-          const errorMessage =
-            err?.response?.data?.message ?? "Не удалось инициализировать платёж";
+          const errorMessage = err?.response?.data?.message ?? "Не удалось инициализировать платёж";
           setSecretError(errorMessage);
           handleBusinessLogicError(err, {
             auctionId: auction.id,
@@ -169,9 +174,9 @@ function PaymentPage() {
         clientSecretRef.current!,
         {
           payment_method: {
-            card: elementsRef.current.getElement('cardNumber'),
+            card: elementsRef.current.getElement("cardNumber"),
           },
-        }
+        },
       );
 
       if (stripeError) {
