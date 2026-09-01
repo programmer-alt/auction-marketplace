@@ -12,6 +12,20 @@ interface ModalProps {
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, onConfirm, isLoading = false }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement;
+    }
+  }, [isOpen]);
+
+  const handleClose = () => {
+    onClose();
+    if (previousActiveElementRef.current) {
+      previousActiveElementRef.current.focus();
+    }
+  };
 
   useEffect(() => {
     if (isOpen && dialogRef.current) {
@@ -21,18 +35,14 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={handleBackdropClick}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
+        if (e.key === "Escape") handleClose();
       }}
       tabIndex={-1}
       ref={dialogRef}
@@ -45,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         <div className="mb-6">{children}</div>
         <div className="flex justify-end space-x-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition"
           >
             Отмена
