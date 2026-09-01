@@ -44,4 +44,10 @@
   .badge-default {
     @apply bg-yellow-100 text-yellow-800;
   }
+
+  .stripe-element {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+  }
 }

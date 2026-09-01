@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../config/db";
 import {
   createForbiddenError,
@@ -20,7 +21,9 @@ import type { PaymentWithAuctionSeller, PaymentWithRelations, Payment } from "..
 // Инициализация Stripe
 // ========================================
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || "", {
   apiVersion: "2023-10-16",
 });
 
@@ -64,9 +67,14 @@ export async function createPaymentIntent(
   // Проверяем аукцион
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: {
-      winner: true,
-      seller: true,
+    select: {
+      id: true,
+      status: true,
+      endsAt: true,
+      currentPrice: true,
+      winnerId: true,
+      currency: true,
+      title: true,
     },
   });
 
@@ -121,8 +129,13 @@ export async function createPaymentIntent(
   }
 
   // Сумма к оплате (текущая цена аукциона)
-  const amount = Math.round(auction.currentPrice.toNumber() * 100); // в копейках/центах
   const currency = auction.currency.toLowerCase(); // гарантируем нижний регистр
+
+  // Поддержка валют с нулевым количеством десятичных знаков (JPY, KRW, VND)
+  const ZERO_DECIMAL_CURRENCIES = new Set(["jpy", "krw", "vnd"]);
+  const amount = ZERO_DECIMAL_CURRENCIES.has(currency)
+    ? Math.round(auction.currentPrice.toNumber())
+    : Math.round(auction.currentPrice.toNumber() * 100);
 
   // Создаём Payment Intent в Stripe
   const paymentIntent = await stripe.paymentIntents.create({
@@ -131,8 +144,8 @@ export async function createPaymentIntent(
     metadata: {
       auctionId: auction.id.toString(),
       userId: userId.toString(),
+      auctionTitle: auction.title ?? "",
     },
-    description: `Оплата аукциона: ${auction.title}`,
   });
 
   // Атомарное обновление статуса аукциона + создание платежа
@@ -146,7 +159,7 @@ export async function createPaymentIntent(
       prisma.auction.update({
         where: {
           id: auctionId,
-          status: { in: ["ACTIVE", "COMPLETED"] },
+          status: { in: ["COMPLETED"] },
         },
         data: { status: "COMPLETED" },
       }),
@@ -183,8 +196,7 @@ export async function createPaymentIntent(
     // Для временных ошибок (сеть, БД) — не трогаем Stripe,
     // чтобы клиент мог повторить попытку тем же PaymentIntent.
     const isApplicationError =
-      error instanceof Error &&
-      "code" in error &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"; // Prisma record not found
 
     if (isApplicationError) {
@@ -224,7 +236,7 @@ export async function createPaymentIntent(
  * Общее событие для платежей с PaymentIntent — находит платёж и обновляет статус
  */
 async function handlePaymentIntentEvent(
-  prisma: any,
+  prisma: PrismaClient,
   stripePaymentId: string,
   paymentStatus: "COMPLETED" | "FAILED",
   logMessage: string,
@@ -240,7 +252,7 @@ async function handlePaymentIntentEvent(
     await updatePayment(prisma, payment.id, { status: paymentStatus });
     console.log(logMessage);
   } else {
-    console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+    console.error(`[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
   }
 }
 
@@ -255,7 +267,10 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
 
   if (payment) {
     // Defense in depth: проверяем, что сумма PI совпадает с суммой в БД
-    const expectedAmount = Math.round(payment.amount.toNumber() * 100);
+    const ZERO_DECIMAL_CURRENCIES = new Set(["jpy", "krw", "vnd"]);
+    const expectedAmount = ZERO_DECIMAL_CURRENCIES.has(payment.currency.toLowerCase())
+      ? Math.round(payment.amount.toNumber())
+      : Math.round(payment.amount.toNumber() * 100);
     if (paymentIntent.amount !== expectedAmount) {
       console.error(
         `[SECURITY] Сумма PaymentIntent (${paymentIntent.amount}) не совпадает с суммой в БД (${expectedAmount}). ` +
@@ -269,7 +284,9 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
     await updateAuctionPaidAt(prisma, payment.auctionId);
     console.log(`Платёж ${stripePaymentId} успешно завершён`);
   } else {
-    console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+    console.error(
+      `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД — пользователь мог оплатить, но система не записала платёж`,
+    );
   }
 }
 
@@ -298,14 +315,30 @@ async function handleRefund(event: Stripe.Event): Promise<void> {
       await updatePayment(prisma, payment.id, { status: "REFUNDED" });
       console.log(`Возврат для платежа ${stripePaymentId} обработан`);
     } else {
-      console.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
+      console.error(
+        `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`,
+      );
     }
   }
 }
 
 export async function handleWebhook(body: Buffer | string, sig: string) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-  const event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("[FATAL] STRIPE_WEBHOOK_SECRET is not configured");
+    throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+  } catch (error) {
+    if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
+      console.error(`[SECURITY] Invalid webhook signature: ${error.message}`);
+      throw createValidationError("Invalid webhook signature");
+    }
+    throw error;
+  }
 
   // Делегируем обработку событий специализированным функциям
   switch (event.type) {
@@ -413,11 +446,12 @@ export async function refundPayment(
     `Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`,
   );
 
-  // Получаем обновлённый платёж
-  const updatedPayment = await getPaymentByIdWithAuction(prisma, paymentId);
-
   return {
     refundId: refund.id,
-    payment: updatedPayment as PaymentWithRelations,
+    payment: {
+      ...payment,
+      status: "REFUNDED" as const,
+      refundReason: reason ?? "Административный возврат",
+    } as PaymentWithRelations,
   };
 }

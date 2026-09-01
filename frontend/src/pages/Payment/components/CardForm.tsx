@@ -1,5 +1,4 @@
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import { PaymentElement } from "@stripe/react-stripe-js";
 import { CheckCircle } from "lucide-react";
 import type React from "react";
 
@@ -15,7 +14,13 @@ const CardForm: React.FC<CardFormProps> = ({ processing, currentPrice, onSubmit,
     <div data-testid="payment-method-container">
       <label className="block text-sm font-medium text-gray-700 mb-1">Способ оплаты</label>
       <div className="bg-white rounded-lg border border-gray-200 p-3">
-        <PaymentElement />
+        {/* CardElement монтируется сюда через raw Stripe.js */}
+        <div ref={(node) => {
+          if (node) {
+            (node as HTMLDivElement).style.border = "none";
+            (node as HTMLDivElement).style.padding = "0";
+          }
+        }} />
       </div>
     </div>
 
