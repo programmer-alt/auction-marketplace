@@ -74,7 +74,7 @@ export async function runWithRetry<T>(fn: () => Promise<T>): Promise<T> {
       lastError = error;
 
       if (attempt < maxRetries && isRetryableError(error)) {
-        const delay = 100 * Math.pow(2, attempt); // 100ms, 200ms
+        const delay = 100 * 2 ** attempt; // 100ms, 200ms
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.warn(`⚠️ Retryable error, attempt ${attempt + 1}/${maxRetries}: ${errorMsg}`);
         await new Promise((resolve) => setTimeout(resolve, delay));

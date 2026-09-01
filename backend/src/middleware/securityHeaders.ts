@@ -208,7 +208,11 @@ const defaultSecurityHeadersConfig: SecurityHeadersConfig = {
 /**
  * Устанавливает один security header на response
  */
-function setHeader(res: Response, name: string, value: string | "DENY" | "SAMEORIGIN" | "ALLOW-FROM" | "nosniff" | string): void {
+function setHeader(
+  res: Response,
+  name: string,
+  value: string | "DENY" | "SAMEORIGIN" | "ALLOW-FROM" | "nosniff" | string,
+): void {
   res.removeHeader(name);
   res.setHeader(name, value);
 }

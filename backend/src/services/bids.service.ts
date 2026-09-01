@@ -74,7 +74,9 @@ export async function createBid(
   if (currency) {
     const normalizedCurrency = currency.toLowerCase();
     if (existingAuction.currency !== normalizedCurrency) {
-      throw createValidationError(`Валюта ставки (${currency}) не совпадает с валютой аукциона (${existingAuction.currency})`);
+      throw createValidationError(
+        `Валюта ставки (${currency}) не совпадает с валютой аукциона (${existingAuction.currency})`,
+      );
     }
   }
 

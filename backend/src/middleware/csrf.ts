@@ -26,10 +26,7 @@ function getCsrfSecret(): string {
 export function generateToken(): string {
   const secret = getCsrfSecret();
   const nonce = crypto.randomBytes(32).toString("base64url");
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(nonce)
-    .digest("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(nonce).digest("base64url");
   return `${nonce}.${signature}`;
 }
 
@@ -39,10 +36,7 @@ function verifyToken(token: string): boolean {
     const [nonce, signature] = token.split(".");
     if (!nonce || !signature) return false;
 
-    const expectedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(nonce)
-      .digest("base64url");
+    const expectedSignature = crypto.createHmac("sha256", secret).update(nonce).digest("base64url");
 
     const received = Buffer.from(signature);
     const expected = Buffer.from(expectedSignature);
@@ -84,17 +78,9 @@ function getCsrfTokenFromCookies(req: Request): string | undefined {
 }
 
 // Middleware для генерации CSRF-токена
-export function generateCsrfToken(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export function generateCsrfToken(req: Request, res: Response, next: NextFunction) {
   // Для GET/HEAD/OPTIONS запросов генерируем токен только для /api/csrf-token эндпоинта
-  if (
-    req.method === "GET" ||
-    req.method === "HEAD" ||
-    req.method === "OPTIONS"
-  ) {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
     // Если это /api/csrf-token эндпоинт, генерируем токен
     const path = getRequestPath(req);
     if (path === "/api/csrf-token") {
@@ -173,27 +159,15 @@ function isAuthEndpoint(path: string | undefined): boolean {
 }
 
 // Middleware для проверки CSRF-токена (кроме GET/OPTIONS)
-export function verifyCsrfToken(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export function verifyCsrfToken(req: Request, res: Response, next: NextFunction) {
   // Пропускаем GET, HEAD, OPTIONS запросы
-  if (
-    req.method === "GET" ||
-    req.method === "HEAD" ||
-    req.method === "OPTIONS"
-  ) {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
     return next();
   }
 
   // Пропускаем webhook-маршруты и загрузки файлов (Stripe и другие)
   const path = getRequestPath(req);
-  if (
-    path?.includes("/webhook") ||
-    path?.includes("/uploads") ||
-    path?.endsWith("/upload")
-  ) {
+  if (path?.includes("/webhook") || path?.includes("/uploads") || path?.endsWith("/upload")) {
     return next();
   }
 

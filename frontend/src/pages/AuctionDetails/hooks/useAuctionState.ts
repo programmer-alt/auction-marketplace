@@ -49,16 +49,10 @@ export function useAuctionState(
   }, [auction, tick]);
 
   // Фактическое состояние: неактивен если статус не ACTIVE ИЛИ время вышло
-  const isActive = useMemo(
-    () => auction?.status === "ACTIVE" && !isTimeEnded,
-    [auction?.status, isTimeEnded],
-  );
+  const isActive = useMemo(() => auction?.status === "ACTIVE" && !isTimeEnded, [auction?.status, isTimeEnded]);
 
   // Завершён если время вышло ИЛИ статус COMPLETED
-  const isEnded = useMemo(
-    () => isTimeEnded || auction?.status === "COMPLETED",
-    [isTimeEnded, auction?.status],
-  );
+  const isEnded = useMemo(() => isTimeEnded || auction?.status === "COMPLETED", [isTimeEnded, auction?.status]);
 
   // Статус-бейдж: приоритет терминальных статусов БД, затем time-based
   const statusInfo = useMemo(() => {
@@ -83,10 +77,7 @@ export function useAuctionState(
   }, [auction, isTimeEnded, getStatusBadge]);
 
   // Логика отображения компонентов
-  const showBidForm = useMemo(
-    () => isAuthenticated && isActive && !isOwner,
-    [isAuthenticated, isActive, isOwner],
-  );
+  const showBidForm = useMemo(() => isAuthenticated && isActive && !isOwner, [isAuthenticated, isActive, isOwner]);
 
   const showLoginPrompt = useMemo(() => !isAuthenticated && isActive, [isAuthenticated, isActive]);
 

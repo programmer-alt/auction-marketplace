@@ -17,39 +17,49 @@
 | `backend/src/errors/index.ts` | ✅ Удалён |
 | `backend/src/utils/json.ts` | ✅ Удалён |
 
-### 2. Удалить unused dependencies (knip) ⏳ ОЖИДАЕТ
+### 2. Удалить unused dependencies (knip) ✅ ВЫПОЛНЕНО
 
-2 пакета установлены, но не используются в коде:
+2 пакета удалены из `frontend/package.json`:
 
-| Пакет | Где | Действие |
-|---|---|---|
-| `clsx` | frontend/package.json | `npm uninstall clsx` |
-| `socket.io-client` | frontend/package.json | `npm uninstall socket.io-client` |
+| Пакет | Статус |
+|---|---|
+| `clsx` | ✅ Удалён |
+| `socket.io-client` | ✅ Удалён |
 
 ---
 
 ## 🟠 Высокий приоритет — security (narsil)
 
-### 3. Fix insecure data transmission (6 High findings)
+### 3. Fix insecure data transmission (6 High findings) ✅ ВЫПОЛНЕНО
 
-`http://` обнаружен в CSP headers и конфигурации. Все 6 случаев — это `http://localhost:*` в dev-конфигурации CSP.
+**Реальные проблемы:** только `securityHeaders.ts` содержал `http://localhost:*` в CSP для production.
 
-| Файл | Строка | Проблема | Действие |
+| Файл | Статус |
+|---|---|
+| `backend/src/middleware/securityHeaders.ts` | ✅ Исправлен — `http://localhost:*` удалён из `defaultCspConfig`, заменён на `https://`/`wss://` |
+| `frontend/src/pages/Login/Login.index.tsx` | ❌ False positive — это SVG namespace `xmlns="http://www.w3.org/2000/svg"` |
+| `frontend/src/pages/Register/Register.index.tsx` | ❌ False positive — это SVG namespace `xmlns="http://www.w3.org/2000/svg"` |
+| `backend/src/index.ts` | ❌ False positive — это log message `http://localhost:${PORT}` |
+| `frontend/vite.config.ts` | ❌ False positive — строка 38 не существует (файл 37 строк) |
+
+### 4. Critical — Hardcoded password (1 Critical finding) ✅ FALSE POSITIVE
+
+| Файл | Строка | Проблема (narsil) | Реальность |
 |---|---|---|---|
-| `backend/src/middleware/securityHeaders.ts` | 123 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
-| `backend/src/middleware/securityHeaders.ts` | 128 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
-| `frontend/src/pages/Login/Login.index.tsx` | 112 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
-| `backend/src/index.ts` | 359 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
-| `frontend/src/pages/Register/Register.index.tsx` | 121 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
-| `frontend/vite.config.ts` | 38 | `http://` в CSP | Заменить на `https://` или оставить только для dev |
+| `frontend/src/pages/Register/Register.index.tsx` | 26 | Hardcoded password в CloudFormation | `confirmPassword: ""` — default value react-hook-form, не CloudFormation |
 
-**Решение:** Использовать `https://` для production, `http://` только в dev-режиме через условную логику.
+### 5. Mask sensitive data in logs (20 Medium findings) ✅ FALSE POSITIVE
 
-### 4. Critical — Hardcoded password (1 Critical finding)
+Все 20 findings — false positive. Проверял каждый файл:
 
-| Файл | Строка | Проблема | Действие |
-|---|---|---|---|
-| `frontend/src/pages/Register/Register.index.tsx` | 26 | Hardcoded password в CloudFormation | Заменить на параметр из environment |
+| Файл | Реальное состояние |
+|---|---|
+| `frontend/src/pages/Login/Login.index.tsx` | `console.error("Login error")` — без sensitive данных |
+| `frontend/src/pages/Register/Register.index.tsx` | Нет console.log |
+| `frontend/src/types/advanced.ts` | `console.log` только в JSDoc-комментарии |
+| `frontend/src/components/layout/Header.tsx` | Нет console.log |
+| `backend/src/controllers/auth.controller.ts` | Нет логирования |
+| `backend/src/services/auth.service.ts` | ✅ Уже использует `maskedEmail` во всех logger-вызовах |
 
 ---
 
@@ -90,27 +100,30 @@
 
 ## 📊 Complexity — рефакторинг сложных функций (narsil)
 
-### 7. Reduce cyclomatic complexity (5 hotspots)
+### 7. Reduce cyclomatic complexity (5 hotspots) ✅ ВЫПОЛНЕНО
 
-| Файл | Функция | CC | LOC | Действие |
-|---|---|---|---|---|
-| `backend/src/middleware/securityHeaders.ts` | `securityHeaders` | 33 | 91 | Разбить на подфункции |
-| `backend/src/middleware/csrf.ts` | `verifyCsrfToken` | 24 | 46 | Вынести логику в отдельные функции |
-| ~~`backend/src/utils/json.ts`~~ | ~~`validateAuction`~~ | ~~19~~ | ~~37~~ | ~~Разбить на валидаторы~~ |
-| `backend/src/middleware/rateLimit.ts` | `rateLimit` | 18 | 55 | Разделить логику |
-| `backend/src/services/payments.service.ts` | `handleWebhook` | 15 | 96 | Разделить обработчики событий |
+Все 4 функции (кроме удалённого json.ts) рефакторизованы:
+
+| Файл | Действие |
+|---|---|
+| `backend/src/middleware/securityHeaders.ts` | ✅ Вынесены: `setHeader()`, `buildCspHeader()`, `mergeDevCspConfig()` |
+| `backend/src/middleware/csrf.ts` | ✅ Вынесена: `isAuthEndpoint()` |
+| `backend/src/middleware/rateLimit.ts` | ✅ Вынесена: `shouldSkipRateLimit()` |
+| `backend/src/services/payments.service.ts` | ✅ Вынесены: `handlePaymentSucceeded()`, `handlePaymentStateChangeEvent()`, `handleRefund()` |
 
 ---
 
 ## 📈 Call graph — анализ зависимостей (narsil)
 
-### 8. Review high-degree functions (3 top callers)
+### 8. Review high-degree functions (3 top callers) ✅ ВЫПОЛНЕНО
 
-| Функция | Callers | Действие |
-|---|---|---|
-| `auth.service.ts::register` | 15 | Проверить на дублирование логики |
-| `socket.ts::getIo` | 12 | Проверить на singleton паттерн |
-| `index.ts::shutdown` | 7 | Проверить на graceful shutdown |
+**Результат анализа:** все 3 функции не требуют рефакторинга. Counts narsil были завышены за счёт учёта type references, JSDoc, импортов.
+
+| Функция | Callers (narsil) | Callers (реально) | Статус |
+|---|---|---|---|
+| `auth.service.ts::register` | 15 | 3 (1 controller + 3 теста) | ✅ Чистая, SRP, нет дублирования |
+| `socket.ts::getIo` | 12 | 6 (5 auctions.service + 1 bids.service) | ✅ Корректный модуль-level singleton |
+| `index.ts::shutdown` | 7 | 5 (SIGINT/SIGTERM/SIGBREAK/unhandledRejection/uncaughtException) | ✅ Graceful shutdown: guard + timeout + cleanup |
 
 ---
 
@@ -126,9 +139,10 @@
 
 ## Порядок выполнения
 
-1. ~~**Шаг 1:** Удалить 4 unused файла + 2 unused dependencies (knip)~~ ✅ ВЫПОЛНЕНО
-2. **Шаг 2:** Fix 6 High security findings (narsil)
-3. **Шаг 3:** Fix 1 Critical security finding (narsil)
-4. **Шаг 4:** Mask sensitive data in logs (narsil)
-5. **Шаг 5:** Replace `any` types (narsil)
-6. **Шаг 6:** Reduce complexity (narsil)
+1. ~~**Шаг 1:** Удалить 4 unused файлы~~ ✅ ВЫПОЛНЕНО
+2. ~~**Шаг 2:** Удалить 2 unused dependencies (knip)~~ ✅ ВЫПОЛНЕНО
+3. ~~**Шаг 3:** Fix 6 High security findings (narsil)~~ ✅ ВЫПОЛНЕНО
+4. ~~**Шаг 4:** Fix 1 Critical security finding (narsil)~~ ✅ FALSE POSITIVE — `confirmPassword: ""` в defaultValues, не CloudFormation
+5. ~~**Шаг 5:** Mask sensitive data in logs (narsil)~~ ✅ FALSE POSITIVE — все 20 findings ложные, backend уже маскирует email
+6. ~~**Шаг 7:** Reduce complexity (narsil)~~ ✅ ВЫПОЛНЕНО
+7. ~~**Шаг 8:** Call graph analysis (narsil)~~ ✅ ВЫПОЛНЕНО — все 3 функции не требуют рефакторинга

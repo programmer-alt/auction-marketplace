@@ -4,14 +4,19 @@ import * as paymentsRepo from "../repositories/payments.repository";
 import * as paymentsService from "./payments.service";
 
 // Мокаем Stripe через vi.hoisted
-const { mockPaymentIntentsCreate, mockWebhooksConstructEvent, mockRefundsCreate, mockPaymentIntentsRetrieve, mockPaymentIntentsCancel } =
-  vi.hoisted(() => ({
-    mockPaymentIntentsCreate: vi.fn(),
-    mockWebhooksConstructEvent: vi.fn(),
-    mockRefundsCreate: vi.fn(),
-    mockPaymentIntentsRetrieve: vi.fn(),
-    mockPaymentIntentsCancel: vi.fn(),
-  }));
+const {
+  mockPaymentIntentsCreate,
+  mockWebhooksConstructEvent,
+  mockRefundsCreate,
+  mockPaymentIntentsRetrieve,
+  mockPaymentIntentsCancel,
+} = vi.hoisted(() => ({
+  mockPaymentIntentsCreate: vi.fn(),
+  mockWebhooksConstructEvent: vi.fn(),
+  mockRefundsCreate: vi.fn(),
+  mockPaymentIntentsRetrieve: vi.fn(),
+  mockPaymentIntentsCancel: vi.fn(),
+}));
 
 vi.mock("stripe", () => {
   class Stripe {

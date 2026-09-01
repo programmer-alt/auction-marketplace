@@ -166,7 +166,7 @@ function buildUpdateData(sanitizedData: UpdateAuctionInput): Prisma.AuctionUpdat
  */
 async function processEndsAt(
   endsAt: string | undefined,
-  auctionId: number,
+  _auctionId: number,
 ): Promise<{ endsAtDate?: Date; needsReschedule: boolean }> {
   if (!endsAt) {
     return { needsReschedule: false };
