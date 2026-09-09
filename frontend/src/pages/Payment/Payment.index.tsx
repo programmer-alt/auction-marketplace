@@ -287,6 +287,7 @@ function PaymentPage() {
             "Платёж отклонён. Карта заблокирована или не активна для онлайн-оплаты.";
           setError(msg);
           toast.error(msg);
+          lastPaymentIntentIdRef.current = null;
           break;
         }
 
@@ -296,6 +297,7 @@ function PaymentPage() {
             "Требуется дополнительная верификация банка (3D Secure). Попробуйте другую карту или свяжитесь с банком.";
           setError(msg);
           toast.error(msg);
+          lastPaymentIntentIdRef.current = null;
           break;
         }
 
@@ -313,6 +315,7 @@ function PaymentPage() {
           const msg = paymentIntent.last_payment_error?.message ?? "Платёж требует подтверждения. Попробуйте ещё раз.";
           setError(msg);
           toast.error(msg);
+          lastPaymentIntentIdRef.current = null;
           break;
         }
 
@@ -320,6 +323,7 @@ function PaymentPage() {
           const msg = "Платёж отменён. Средств на карте недостаточно или операция запрещена.";
           setError(msg);
           toast.error(msg);
+          lastPaymentIntentIdRef.current = null;
           break;
         }
 
