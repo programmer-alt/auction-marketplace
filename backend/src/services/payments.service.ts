@@ -82,11 +82,16 @@ export async function createPaymentIntent(
   // или использовать countryCode для других целей в Stripe
   const currency = auction.currency?.toLowerCase() || "usd"; // Базовая валюта из аукциона или USD по умолчанию
 
+  // Stripe требует amount в минорных единицах (центы), НО для zero-decimal валют (JPY, KRW, VND)
+  // сумма передаётся как есть, без умножения на 100
+  const ZERO_DECIMAL_CURRENCIES = new Set(["jpy", "krw", "vnd"]);
+  const multiplier = ZERO_DECIMAL_CURRENCIES.has(currency) ? 1 : 100;
+
   // Создаем PaymentIntent через Stripe
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Number(auction.currentPrice) * 100, // Цена в центах
-    currency: currency,
-    description: `Оплата аукциона: ${auction.title}`, // Добавляем описание
+    amount: Math.round(Number(auction.currentPrice) * multiplier),
+    currency,
+    description: `Оплата аукциона: ${auction.title}`,
     automatic_payment_methods: {
       enabled: true,
     },
