@@ -30,9 +30,7 @@ function PaymentPage() {
 
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
-  const cardNumberRef = useRef<HTMLDivElement>(null);
-  const cardExpiryRef = useRef<HTMLDivElement>(null);
-  const cardCvcRef = useRef<HTMLDivElement>(null);
+  const cardContainerRef = useRef<HTMLDivElement>(null);
   const [elementsMounted, setElementsMounted] = useState(false);
   const isInitializing = useRef(false);
   const clientSecretRef = useRef<string | null>(null);
@@ -60,7 +58,7 @@ function PaymentPage() {
     }
   }, []);
 
-  // 2. Создаём Elements и CardNumber/CardExpiry/CardCvc
+  // 2. Создаём единый Card Element с postal code
   useEffect(() => {
     if (!stripeRef.current || !elementsMounted || elementsRef.current) return;
 
@@ -70,7 +68,7 @@ function PaymentPage() {
       const elements = stripeRef.current.elements();
 
       elements
-        .create("cardNumber", {
+        .create("card", {
           style: {
             base: {
               fontSize: "16px",
@@ -79,34 +77,9 @@ function PaymentPage() {
             },
             invalid: { color: "#9e2146" },
           },
+          hidePostalCode: false,
         })
-        .mount(cardNumberRef.current!);
-
-      elements
-        .create("cardExpiry", {
-          style: {
-            base: {
-              fontSize: "16px",
-              color: "#424770",
-              "::placeholder": { color: "#aab7c4" },
-            },
-            invalid: { color: "#9e2146" },
-          },
-        })
-        .mount(cardExpiryRef.current!);
-
-      elements
-        .create("cardCvc", {
-          style: {
-            base: {
-              fontSize: "16px",
-              color: "#424770",
-              "::placeholder": { color: "#aab7c4" },
-            },
-            invalid: { color: "#9e2146" },
-          },
-        })
-        .mount(cardCvcRef.current!);
+        .mount(cardContainerRef.current!);
 
       elementsRef.current = elements;
       console.log("[Payment] Stripe Elements mounted successfully");
@@ -161,7 +134,7 @@ function PaymentPage() {
     };
   }, [auction, stripeLoaded, clientSecret, secretError]);
 
-  // 4. Обработчик платежа
+  // 4. Обработчик платежа — полная обработка всех сценариев Stripe
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auction || !stripeRef.current || !elementsRef.current) return;
@@ -170,27 +143,92 @@ function PaymentPage() {
     setError(null);
 
     try {
+      const cardElement = elementsRef.current.getElement("card");
       const { error: stripeError, paymentIntent } = await stripeRef.current.confirmCardPayment(
         clientSecretRef.current!,
         {
           payment_method: {
-            card: elementsRef.current.getElement("cardNumber"),
+            card: cardElement,
           },
         },
       );
 
+      // Сценарий 1: Ошибка валидации/отклонения от Stripe
       if (stripeError) {
-        setError(stripeError.message ?? "Ошибка подтверждения платежа");
-        toast.error("Ошибка оплаты");
+        const errorMsg = formatStripeError(stripeError);
+        setError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
-      if (paymentIntent.status === "succeeded") {
-        toast.success("Платёж успешно подтверждён");
-        // Даем toast время на отображение перед редиректом
-        setTimeout(() => {
-          window.location.href = "/profile";
-        }, 2000);
+      // Сценарий 2: Нет paymentIntent — непредвиденная ошибка
+      if (!paymentIntent) {
+        const msg = "Не получен статус платежа от Stripe";
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      // Сценарий 3: Обработка по статусу PaymentIntent
+      switch (paymentIntent.status) {
+        case "succeeded": {
+          toast.success("Платёж успешно подтверждён!");
+          setTimeout(() => {
+            window.location.href = "/profile";
+          }, 2000);
+          break;
+        }
+
+        case "requires_payment_method": {
+          const msg =
+            paymentIntent.last_payment_error?.message ??
+            "Платёж отклонён. Карта заблокирована или не активна для онлайн-оплаты.";
+          setError(msg);
+          toast.error(msg);
+          break;
+        }
+
+        case "requires_action": {
+          const msg =
+            paymentIntent.last_payment_error?.message ??
+            "Требуется дополнительная верификация банка (3D Secure). Попробуйте другую карту или свяжитесь с банком.";
+          setError(msg);
+          toast.error(msg);
+          break;
+        }
+
+        case "processing": {
+          const msg = "Платёж обрабатывается банком. Результат будет указан в течение нескольких минут.";
+          setError(msg);
+          toast(msg, { icon: "⏳", duration: 5000 });
+          setTimeout(() => {
+            window.location.href = "/profile";
+          }, 3000);
+          break;
+        }
+
+        case "requires_confirmation": {
+          const msg = paymentIntent.last_payment_error?.message ?? "Платёж требует подтверждения. Попробуйте ещё раз.";
+          setError(msg);
+          toast.error(msg);
+          break;
+        }
+
+        case "canceled": {
+          const msg = "Платёж отменён. Средств на карте недостаточно или операция запрещена.";
+          setError(msg);
+          toast.error(msg);
+          break;
+        }
+
+        default: {
+          const msg = `Платёж в статусе: ${paymentIntent.status}. Ожидается обработка.`;
+          setError(msg);
+          toast(msg, { icon: "ℹ️", duration: 5000 });
+          setTimeout(() => {
+            window.location.href = "/profile";
+          }, 3000);
+        }
       }
     } catch (err: any) {
       const msg = err?.message ?? "Ошибка оплаты. Попробуйте ещё раз.";
@@ -200,6 +238,59 @@ function PaymentPage() {
       setProcessing(false);
     }
   };
+
+  // Форматирование ошибок Stripe в понятные сообщения
+  function formatStripeError(error: { type?: string; code?: string; message?: string }): string {
+    const code = error.code;
+    const type = error.type;
+
+    // Недостаточно средств
+    if (code === "insufficient_funds") {
+      return "На карте недостаточно средств. Пополните счёт или используйте другую карту.";
+    }
+
+    // Карта заблокирована / запрещены онлайн-платежи
+    if (code === "card_held" || code === "lost_card" || code === "stolen_card") {
+      return "Карта заблокирована. Свяжитесь с банком для разблокировки.";
+    }
+
+    // Недостаточно информации (не заполнены данные)
+    if (code === "missing") {
+      return "Недостаточно данных для оплаты. Проверьте номер карты, срок и CVC.";
+    }
+
+    // Отклонена банком
+    if (code === "processing_error" || code === "call_isuer") {
+      return "Ошибка обработки банком-эмитентом. Попробуйте через 5 минут или свяжитесь с банком.";
+    }
+
+    // 3D Secure не прошёл
+    if (code === "authentication_required") {
+      return "Верификация банка не пройдена. Попробуйте другую карту или свяжитесь с банком.";
+    }
+
+    // Просрочена карта
+    if (code === "expired_card") {
+      return "Срок действия карты истёк. Используйте другую карту.";
+    }
+
+    // Недостаточно информации
+    if (code === "incorrect_cvc") {
+      return "Неверный CVC код. Проверьте последние 3 цифры на обороте карты.";
+    }
+
+    if (code === "incorrect_zip") {
+      return "Неверный почтовый индекс. Введите индекс, указанный в договоре с банком.";
+    }
+
+    // Generic decline
+    if (code === "card_declined" || type === "card_error") {
+      return "Платёж отклонён банком. Проверьте данные карты или используйте другую.";
+    }
+
+    // По умолчанию — сообщение от Stripe
+    return error.message ?? "Ошибка оплаты. Попробуйте ещё раз.";
+  }
 
   // Состояния загрузки
   if (auctionLoading || !stripeLoaded || secretLoading) {
@@ -260,49 +351,16 @@ function PaymentPage() {
 
         <form onSubmit={handlePayment} className="mt-8 space-y-5">
           <div data-testid="payment-method-container">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Номер карты</label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden">
-              <div
-                ref={(node) => {
-                  cardNumberRef.current = node;
-                  if (cardNumberRef.current && cardExpiryRef.current && cardCvcRef.current) {
-                    setElementsMounted(true);
-                  }
-                }}
-                className="stripe-element"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Срок действия</label>
-              <div className="border border-gray-300 rounded-lg overflow-hidden">
-                <div
-                  ref={(node) => {
-                    cardExpiryRef.current = node;
-                    if (cardNumberRef.current && cardExpiryRef.current && cardCvcRef.current) {
-                      setElementsMounted(true);
-                    }
-                  }}
-                  className="stripe-element"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CVC</label>
-              <div className="border border-gray-300 rounded-lg overflow-hidden">
-                <div
-                  ref={(node) => {
-                    cardCvcRef.current = node;
-                    if (cardNumberRef.current && cardExpiryRef.current && cardCvcRef.current) {
-                      setElementsMounted(true);
-                    }
-                  }}
-                  className="stripe-element"
-                />
-              </div>
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Номер карты, срок действия и CVC</label>
+            <div
+              ref={(node) => {
+                cardContainerRef.current = node;
+                if (cardContainerRef.current) {
+                  setElementsMounted(true);
+                }
+              }}
+              className="border border-gray-300 rounded-lg p-3"
+            />
           </div>
 
           {error ? (

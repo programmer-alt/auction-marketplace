@@ -98,4 +98,29 @@ export const paymentsController = {
       payment: result.payment,
     });
   }),
+
+  // Manual capture — вызывается после завершения торгов
+  capturePayment: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const paymentId = Number(req.params.id);
+    if (!paymentId || paymentId <= 0) {
+      return next(createValidationError("Некорректный ID платежа"));
+    }
+
+    const result = await paymentsService.capturePayment(paymentId);
+    res.json({
+      message: "Платёж успешно списан",
+      paymentIntentId: result.paymentIntentId,
+    });
+  }),
+
+  // Отмена холда — вызывается если пользователь не победил
+  cancelHold: asyncHandler<AuthRequest>(async (req, res, next) => {
+    const paymentId = Number(req.params.id);
+    if (!paymentId || paymentId <= 0) {
+      return next(createValidationError("Некорректный ID платежа"));
+    }
+
+    await paymentsService.cancelHold(paymentId);
+    res.json({ message: "Холд отменён" });
+  }),
 };

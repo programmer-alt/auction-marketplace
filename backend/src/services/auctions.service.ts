@@ -280,6 +280,58 @@ export async function completeAuction(id: number, userId: number) {
     },
   });
 
+  // Списываем деньги с победителя (manual capture)
+  try {
+    // Проверяем, что winnerId не равен null перед выполнением запроса
+    if (updatedAuction.winnerId !== null) {
+      const winnerPayment = await prisma.payment.findFirst({
+        where: {
+          auctionId: id,
+          userId: updatedAuction.winnerId, // Убрано !, так как теперь проверка на null
+          status: "AUTHORIZED",
+        },
+        select: { id: true },
+      });
+
+      if (winnerPayment) {
+        const { capturePayment } = await import("./payments.service");
+        await capturePayment(winnerPayment.id);
+        console.log(`[CAPTURE] Автоматическое списание для победителя аукциона ${id}`);
+      }
+    }
+  } catch (error) {
+    // Не блокируем завершение аукциона из-за ошибки списания
+    console.error(`[ERROR] Не удалось списать деньги для аукциона ${id}:`, error);
+  }
+
+  // Отменяем холды у всех проигравших
+  try {
+    // Проверяем, что winnerId не равен null перед использованием в условии `not`
+    if (updatedAuction.winnerId !== null) {
+      const otherPayments = await prisma.payment.findMany({
+        where: {
+          auctionId: id,
+          userId: { not: updatedAuction.winnerId }, // Убрано !, так как теперь проверка на null
+          status: "AUTHORIZED",
+        },
+        select: { id: true },
+      });
+
+      if (otherPayments.length > 0) {
+        const { cancelHold } = await import("./payments.service");
+        for (const payment of otherPayments) {
+          await cancelHold(payment.id);
+        }
+        console.log(`[CANCEL] Отменено ${otherPayments.length} холдов для аукциона ${id}`);
+      }
+    } else {
+      // Если winnerId равен null, значит, никто не выиграл, и отменять холды не у кого.
+      console.log(`[INFO] Аукцион ${id} завершён без победителя, пропуск отмены холдов.`);
+    }
+  } catch (error) {
+    console.error(`[ERROR] Не удалось отменить холды для аукциона ${id}:`, error);
+  }
+
   // Уведомление через WebSocket о завершении аукциона
   getIo().to(`auction:${id}`).emit("auction:completed", { id, status: "COMPLETED" });
 

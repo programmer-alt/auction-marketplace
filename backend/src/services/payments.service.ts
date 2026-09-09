@@ -124,10 +124,14 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
     ? Math.round(auction.currentPrice.toNumber())
     : Math.round(auction.currentPrice.toNumber() * 100);
 
-  // Создаём Payment Intent в Stripe
+  // Создаём Payment Intent в Stripe с manual capture (холдирование)
+  // Деньги замораживаются на карте, но не списываются
+  // Списываются только после завершения торгов и manual capture
   const paymentIntent = await stripe.paymentIntents.create({
     amount,
     currency,
+    payment_method_types: ["card"],
+    capture_method: "manual", // холдирование — не списывать сразу
     metadata: {
       auctionId: auction.id.toString(),
       userId: userId.toString(),
@@ -150,7 +154,7 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
         },
         data: { status: "COMPLETED" },
       }),
-      // Создаём запись о платеже
+      // Создаём запись о платеже со статусом AUTHORIZED (холд создан)
       prisma.payment.create({
         data: {
           userId,
@@ -158,7 +162,7 @@ export async function createPaymentIntent(auctionId: number, userId: number): Pr
           amount: auction.currentPrice,
           currency,
           stripePaymentId: paymentIntent.id,
-          status: "PENDING",
+          status: "AUTHORIZED", // холд создан, но деньги не списаны
         },
         include: {
           user: {
@@ -241,6 +245,7 @@ async function handlePaymentIntentEvent(
 
 /**
  * Обработка события payment_intent.succeeded
+ * Вызывается после manual capture (списания) или automatic capture
  */
 async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -263,9 +268,10 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
       return;
     }
 
+    // При manual capture — статус меняется на COMPLETED
     await updatePayment(prisma, payment.id, { status: "COMPLETED" });
     await updateAuctionPaidAt(prisma, payment.auctionId);
-    console.log(`Платёж ${stripePaymentId} успешно завершён`);
+    console.log(`[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`);
   } else {
     console.error(
       `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД — пользователь мог оплатить, но система не записала платёж`,
@@ -279,10 +285,11 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
 async function handlePaymentStateChangeEvent(
   event: Stripe.Event,
   paymentStatus: "FAILED",
-  logMessage: string,
+  logMessagePrefix: string,
 ): Promise<void> {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
-  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, logMessage, paymentIntent);
+  const fullLogMessage = `${logMessagePrefix} ${paymentIntent.id}`;
+  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, fullLogMessage, paymentIntent);
 }
 
 /**
@@ -322,17 +329,30 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
   }
 
   // Делегируем обработку событий специализированным функциям
-  switch (event.type) {
+  const eventType = event.type as string;
+  switch (eventType) {
     case "payment_intent.succeeded":
       await handlePaymentSucceeded(event);
       break;
 
     case "payment_intent.payment_failed":
-      await handlePaymentStateChangeEvent(event, "FAILED", `Платёж ${event.data.object.id} не удался`);
+      await handlePaymentStateChangeEvent(event, "FAILED", "Платёж не удался");
       break;
 
     case "payment_intent.canceled":
-      await handlePaymentStateChangeEvent(event, "FAILED", `Платёж ${event.data.object.id} отменён`);
+      await handlePaymentStateChangeEvent(event, "FAILED", "Платёж отменён");
+      break;
+
+    case "payment_intent.requires_capture":
+      // PaymentIntent готов к manual capture — статус AUTHORIZED
+      {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        const payment = await getPaymentByStripeId(prisma, paymentIntent.id);
+        if (payment) {
+          await updatePayment(prisma, payment.id, { status: "AUTHORIZED" });
+          console.log(`[AUTH] PaymentIntent готов к capture, paymentId=${payment.id}`);
+        }
+      }
       break;
 
     case "charge.refunded":
@@ -340,8 +360,135 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
       break;
 
     default:
-      console.log(`Необработанное событие типа ${event.type}`);
+      console.log(`Необработанное событие типа ${eventType}`);
   }
+}
+
+// ========================================
+// Ручное списание (manual capture) после победы
+// ========================================
+
+export async function capturePayment(paymentId: number): Promise<{ success: boolean; paymentIntentId: string }> {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: {
+      id: true,
+      stripePaymentId: true,
+      status: true,
+      auctionId: true,
+      userId: true,
+    },
+  });
+
+  if (!payment) {
+    throw createNotFoundError("Платёж не найден");
+  }
+
+  if (payment.status !== "AUTHORIZED") {
+    throw createValidationError(`Платёж не в статусе холда (текущий: ${payment.status})`);
+  }
+
+  if (!payment.stripePaymentId) {
+    throw createValidationError("У платежа отсутствует Stripe ID");
+  }
+
+  // SECURITY: проверяем что аукцион завершён и пользователь — победитель
+  const auction = await prisma.auction.findUnique({
+    where: { id: payment.auctionId },
+    select: { status: true, winnerId: true, endsAt: true },
+  });
+
+  if (!auction) {
+    throw createNotFoundError("Аукцион не найден");
+  }
+
+  if (auction.status !== "COMPLETED") {
+    throw createValidationError("Списание возможно только после завершения аукциона");
+  }
+
+  if (auction.winnerId !== payment.userId) {
+    throw createValidationError("Списание возможно только для победителя аукциона");
+  }
+
+  if (auction.endsAt && new Date(auction.endsAt) > new Date()) {
+    throw createValidationError("Аукцион ещё не завершён по времени");
+  }
+
+  // Списываем деньги (manual capture)
+  const capturedIntent = await stripe.paymentIntents.capture(payment.stripePaymentId);
+
+  // Обновляем статус в БД
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: { status: "COMPLETED" },
+  });
+
+  // Обновляем auction paidAt
+  await updateAuctionPaidAt(prisma, payment.auctionId);
+
+  console.log(`[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`);
+
+  return { success: true, paymentIntentId: capturedIntent.id };
+}
+
+// ========================================
+// Отмена холда (если пользователь не победил)
+// ========================================
+
+export async function cancelHold(paymentId: number): Promise<void> {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: {
+      id: true,
+      stripePaymentId: true,
+      status: true,
+      auctionId: true,
+      userId: true,
+    },
+  });
+
+  if (!payment) {
+    return; // Уже удалён
+  }
+
+  if (payment.status !== "AUTHORIZED") {
+    return; // Не в статусе холда
+  }
+
+  // SECURITY: проверяем что аукцион завершён и пользователь НЕ победитель
+  const auction = await prisma.auction.findUnique({
+    where: { id: payment.auctionId },
+    select: { status: true, winnerId: true },
+  });
+
+  if (!auction) {
+    // Аукцион удалён — просто удаляем запись
+    await prisma.payment.delete({ where: { id: payment.id } });
+    return;
+  }
+
+  if (auction.winnerId === payment.userId) {
+    // Победитель — холд НЕ отменяем (будет списан)
+    return;
+  }
+
+  if (!payment.stripePaymentId) {
+    // Удаляем запись из БД
+    await prisma.payment.delete({ where: { id: payment.id } });
+    return;
+  }
+
+  // Отменяем холд в Stripe
+  try {
+    await stripe.paymentIntents.cancel(payment.stripePaymentId);
+    console.log(`[CANCEL] Холд отменён: paymentId=${payment.id}`);
+  } catch (error) {
+    // Холд мог истечь автоматически (24-168ч в зависимости от банка)
+    console.warn(`[WARN] Не удалось отменить холд ${payment.stripePaymentId}:`, error);
+  }
+
+  // Удаляем запись из БД
+  await prisma.payment.delete({ where: { id: payment.id } });
 }
 
 // ========================================

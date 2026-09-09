@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["src/*"]
     },
     "module": "ESNext",
+    "ignoreDeprecations": "6.0",
     "lib": ["ES2022"],
     "rootDir": "./src",
     "outDir": "./dist",
