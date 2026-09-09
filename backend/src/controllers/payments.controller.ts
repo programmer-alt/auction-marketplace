@@ -11,6 +11,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 
 const createPaymentSchema = z.object({
   auctionId: z.number().int().positive("ID аукциона должен быть положительным"),
+  countryCode: z.string().length(2, "Код страны должен состоять из 2 букв"), // Добавляем countryCode
 });
 
 const refundPaymentSchema = z.object({
@@ -36,7 +37,8 @@ export const paymentsController = {
       return next(createValidationError("Пользователь не аутентифицирован"));
     }
 
-    const result = await paymentsService.createPaymentIntent(parsed.data.auctionId, req.user.id);
+    // Передаем countryCode в сервис
+    const result = await paymentsService.createPaymentIntent(parsed.data.auctionId, req.user.id, parsed.data.countryCode);
     res.status(201).json({
       message: "Платёжный интент создан",
       clientSecret: result.clientSecret,
