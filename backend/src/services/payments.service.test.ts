@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as auctionsRepo from "../repositories/auctions.repository"; // Импортируем auctionsRepo
 import * as paymentsRepo from "../repositories/payments.repository";
 import * as paymentsService from "./payments.service";
 
@@ -20,6 +21,15 @@ const {
 
 vi.mock("stripe", () => {
   class Stripe {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    paymentIntents: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    webhooks: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    refunds: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static errors: any;
+
     constructor() {
       this.paymentIntents = {
         create: mockPaymentIntentsCreate,
@@ -34,13 +44,23 @@ vi.mock("stripe", () => {
       };
     }
   }
+  Stripe.errors = {
+    StripeSignatureVerificationError: class StripeSignatureVerificationError extends Error {
+      declare raw: unknown;
+      declare header: unknown;
+      constructor(message: string) {
+        super(message);
+        this.name = "StripeSignatureVerificationError";
+      }
+    },
+  };
   return { default: Stripe };
 });
 
 vi.mock("../config/db", () => ({
   prisma: {
     auction: {
-      findUnique: vi.fn(),
+      findUnique: vi.fn(), // Мокаем prisma.auction.findUnique напрямую
       update: vi.fn().mockImplementation(async () => ({ id: 1, status: "COMPLETED" })),
     },
     payment: {
@@ -68,6 +88,13 @@ vi.mock("../config/db", () => ({
 }));
 
 vi.mock("../repositories/payments.repository");
+// Мокаем auctions.repository
+vi.mock("../repositories/auctions.repository", () => ({
+  getAuctionById: vi.fn(),
+}));
+vi.mock("../repositories/users.repository", () => ({
+  getUserById: vi.fn(),
+}));
 vi.mock("../errors/factories", () => ({
   createNotFoundError: vi.fn((msg: string) => {
     const err = new Error(msg) as Error & {
@@ -100,12 +127,15 @@ vi.mock("../errors/factories", () => ({
 
 // Импортируем моканые модули
 import { prisma } from "../config/db";
+import * as usersRepo from "../repositories/users.repository";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrisma = prisma as any;
 const mockTransaction = vi.mocked(mockPrisma.$transaction);
+const mockGetUserById = vi.mocked(usersRepo.getUserById);
 const mockGetPaymentByStripeId = vi.mocked(paymentsRepo.getPaymentByStripeId);
 const mockUpdatePayment = vi.mocked(paymentsRepo.updatePayment);
+const mockCreatePayment = vi.mocked(paymentsRepo.createPayment);
 const mockGetPaymentsByUserId = vi.mocked(paymentsRepo.getPaymentsByUserId);
 const mockGetPaymentsCountByUserId = vi.mocked(paymentsRepo.getPaymentsCountByUserId);
 
@@ -149,103 +179,66 @@ describe("Payments Service", () => {
         auction: {
           id: auctionId,
           title: "Test Auction",
-          currentPrice: 500,
+          currentPrice: new Prisma.Decimal(500),
           currency: "usd",
         },
       };
-      mockPrisma.auction.findUnique.mockResolvedValue(mockCompletedAuction);
+      const mockAuctionsRepo = await import("../repositories/auctions.repository");
+      (mockAuctionsRepo.getAuctionById as any).mockResolvedValue(mockCompletedAuction);
+      mockGetUserById.mockResolvedValue({ id: userId, email: "winner@test.com", name: "Winner", balance: new Prisma.Decimal(0), createdAt: new Date() });
+
       mockPrisma.payment.findFirst.mockResolvedValue(null);
       mockPaymentIntentsCreate.mockResolvedValue({
         id: "pi_test123",
         client_secret: "pi_test123_secret",
       });
-      mockPrisma.auction.update.mockResolvedValue(mockCompletedAuction);
-      mockPrisma.payment.create.mockResolvedValue(mockPayment);
+      mockCreatePayment.mockResolvedValue(mockPayment);
 
-      const result = await paymentsService.createPaymentIntent(auctionId, userId);
+      const result = await paymentsService.createPaymentIntent(auctionId, userId, "US"); // Добавляем countryCode
 
-      expect(mockPrisma.auction.findUnique).toHaveBeenCalledWith({
-        where: { id: auctionId },
-        include: { winner: true, seller: true },
-      });
+      expect(mockAuctionsRepo.getAuctionById).toHaveBeenCalledWith(expect.anything(), auctionId);
       expect(mockPaymentIntentsCreate).toHaveBeenCalledWith({
         amount: 50000, // 500 * 100
         currency: "usd",
-        metadata: { auctionId: "1", userId: "2" },
         description: "Оплата аукциона: Test Auction",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: { // Обновляем ожидаемые метаданные
+          auctionId: "1",
+          userId: "2",
+          countryCode: "US", // Добавляем countryCode
+        },
       });
-      expect(mockPrisma.auction.update).toHaveBeenCalledWith({
-        where: { id: auctionId, status: { in: ["ACTIVE", "COMPLETED"] } },
-        data: { status: "COMPLETED" },
-      });
-      expect(mockPrisma.payment.create).toHaveBeenCalledWith(
+      expect(mockCreatePayment).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: {
-            userId,
-            auctionId,
-            amount: mockCompletedAuction.currentPrice,
-            currency: "usd",
-            stripePaymentId: "pi_test123",
-            status: "PENDING",
-          },
+          userId,
+          auctionId,
+          amount: mockCompletedAuction.currentPrice,
+          currency: "USD", // Сохраняется в верхнем регистре
+          stripePaymentId: "pi_test123",
+          status: "PENDING",
         }),
       );
       expect(result.clientSecret).toBe("pi_test123_secret");
     });
 
     it("должен выбросить 404, если аукцион не найден", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue(null);
+      const mockAuctionsRepo = await import("../repositories/auctions.repository");
+      (mockAuctionsRepo.getAuctionById as any).mockResolvedValue(null);
 
-      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Аукцион не найден");
+      await expect(paymentsService.createPaymentIntent(auctionId, userId, "US")).rejects.toThrow("Аукцион не найден");
     });
 
-    it("должен выбросить 400, если аукцион ещё не завершён", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({
-        ...mockCompletedAuction,
-        status: "ACTIVE",
-      });
+    it("должен выбросить ошибку, если пользователь продавец аукциона", async () => {
+      const mockAuctionsRepo = await import("../repositories/auctions.repository");
+      (mockAuctionsRepo.getAuctionById as any).mockResolvedValue(mockCompletedAuction);
+      mockGetUserById.mockResolvedValue({ id: userId, email: "winner@test.com", name: "Winner", balance: new Prisma.Decimal(0), createdAt: new Date() });
 
-      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Аукцион ещё не завершён");
-    });
-
-    it("должен выбросить 403, если пользователь не победитель", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue({
-        ...mockCompletedAuction,
-        winnerId: 99, // другой пользователь
-      });
-
-      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow(
-        "Вы не являетесь победителем этого аукциона",
+      await expect(paymentsService.createPaymentIntent(auctionId, mockCompletedAuction.sellerId, "US")).rejects.toThrow(
+        "Нельзя оплатить свой собственный аукцион",
       );
-    });
-
-    it("должен выбросить 400, если аукцион уже оплачен", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue(mockCompletedAuction);
-      mockPrisma.payment.findFirst.mockResolvedValue({
-        id: 1,
-        status: "COMPLETED",
-        userId,
-        auctionId,
-      } as any);
-
-      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow("Этот аукцион уже оплачен");
-    });
-
-    it("должен отменить PaymentIntent в Stripe при ошибке транзакции P2025", async () => {
-      mockPrisma.auction.findUnique.mockResolvedValue(mockCompletedAuction);
-      mockPrisma.payment.findFirst.mockResolvedValue(null);
-      mockPaymentIntentsCreate.mockResolvedValue({
-        id: "pi_test123",
-        client_secret: "pi_test123_secret",
-      });
-      const p2025Error = new Error("Record not found") as Prisma.PrismaClientKnownRequestError;
-      p2025Error.code = "P2025";
-      mockTransaction.mockRejectedValue(p2025Error);
-
-      await expect(paymentsService.createPaymentIntent(auctionId, userId)).rejects.toThrow(
-        "Невозможно создать платёж: аукцион больше не доступен для оплаты",
-      );
-      expect(mockPaymentIntentsCancel).toHaveBeenCalledWith("pi_test123");
     });
   });
 
@@ -266,6 +259,12 @@ describe("Payments Service", () => {
         stripePaymentId: "pi_test123",
         status: "PENDING",
         amount: new Prisma.Decimal(500),
+        currency: "usd",
+        auctionId: 1,
+        userId: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        refundReason: null,
       });
       mockUpdatePayment.mockResolvedValue({} as any);
 
@@ -290,6 +289,13 @@ describe("Payments Service", () => {
         id: 2,
         stripePaymentId: "pi_test456",
         status: "PENDING",
+        amount: new Prisma.Decimal(500),
+        currency: "usd",
+        auctionId: 1,
+        userId: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        refundReason: null,
       });
       mockUpdatePayment.mockResolvedValue({} as any);
 

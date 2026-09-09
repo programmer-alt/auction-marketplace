@@ -12,6 +12,68 @@ import toast from "react-hot-toast";
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
+// Список стран для оплаты картой
+const COUNTRIES = [
+  { code: "US", name: "🇺🇸 США" },
+  { code: "GB", name: "🇬🇧 Великобритания" },
+  { code: "DE", name: "🇩🇪 Германия" },
+  { code: "FR", name: "🇫🇷 Франция" },
+  { code: "IT", name: "🇮🇹 Италия" },
+  { code: "ES", name: "🇪🇸 Испания" },
+  { code: "NL", name: "🇳🇱 Нидерланды" },
+  { code: "BE", name: "🇧🇪 Бельгия" },
+  { code: "AT", name: "🇦🇹 Австрия" },
+  { code: "PT", name: "🇵🇹 Португалия" },
+  { code: "IE", name: "🇮🇪 Ирландия" },
+  { code: "LU", name: "🇱🇺 Люксембург" },
+  { code: "FI", name: "🇫🇮 Финляндия" },
+  { code: "SE", name: "🇸🇪 Швеция" },
+  { code: "DK", name: "🇩🇰 Дания" },
+  { code: "PL", name: "🇵🇱 Польша" },
+  { code: "CZ", name: "🇨🇿 Чехия" },
+  { code: "RO", name: "🇷🇴 Румыния" },
+  { code: "BG", name: "🇧🇬 Болгария" },
+  { code: "GR", name: "🇬🇷 Греция" },
+  { code: "HR", name: "🇭🇷 Хорватия" },
+  { code: "SK", name: "🇸🇰 Словакия" },
+  { code: "SI", name: "🇸🇮 Словения" },
+  { code: "LT", name: "🇱🇹 Литва" },
+  { code: "LV", name: "🇱🇻 Латвия" },
+  { code: "EE", name: "🇪🇪 Эстония" },
+  { code: "RU", name: "🇷🇺 Россия" },
+  { code: "UA", name: "🇺🇦 Украина" },
+  { code: "BY", name: "🇧🇾 Беларусь" },
+  { code: "KZ", name: "🇰🇿 Казахстан" },
+  { code: "UZ", name: "🇺🇿 Узбекистан" },
+  { code: "GE", name: "🇬🇪 Грузия" },
+  { code: "AM", name: "🇦🇲 Армения" },
+  { code: "AZ", name: "🇦🇿 Азербайджан" },
+  { code: "MD", name: "🇲🇩 Молдова" },
+  { code: "JP", name: "🇯🇵 Япония" },
+  { code: "KR", name: "🇰🇷 Южная Корея" },
+  { code: "CN", name: "🇨🇳 Китай" },
+  { code: "IN", name: "🇮🇳 Индия" },
+  { code: "BR", name: "🇧🇷 Бразилия" },
+  { code: "CA", name: "🇨🇦 Канада" },
+  { code: "AU", name: "🇦🇺 Австралия" },
+  { code: "SG", name: "🇸🇬 Сингапур" },
+  { code: "MY", name: "🇲🇾 Малайзия" },
+  { code: "TH", name: "🇹🇭 Таиланд" },
+  { code: "PH", name: "🇵🇭 Филиппины" },
+  { code: "ID", name: "🇮🇩 Индонезия" },
+  { code: "VN", name: "🇻🇳 Вьетнам" },
+  { code: "TR", name: "🇹🇷 Турция" },
+  { code: "AE", name: "🇦🇪 ОАЭ" },
+  { code: "SA", name: "🇸🇦 Саудовская Аравия" },
+  { code: "IL", name: "🇮🇱 Израиль" },
+  { code: "ZA", name: "🇿🇦 ЮАР" },
+  { code: "MX", name: "🇲🇽 Мексика" },
+  { code: "AR", name: "🇦🇷 Аргентина" },
+  { code: "CL", name: "🇨🇱 Чили" },
+  { code: "CO", name: "🇨🇴 Колумбия" },
+  { code: "OTHER", name: "🌍 Другая" },
+] as const;
+
 // ========================================
 // Основной компонент страницы оплаты
 // ========================================
@@ -21,12 +83,12 @@ function PaymentPage() {
   const { user } = useAuthStore();
   const { auction, loading: auctionLoading } = usePaymentData(id, user);
 
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [secretLoading, setSecretLoading] = useState(true);
   const [secretError, setSecretError] = useState<string | null>(null);
   const [stripeLoaded, setStripeLoaded] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState("US");
 
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
@@ -34,6 +96,8 @@ function PaymentPage() {
   const [elementsMounted, setElementsMounted] = useState(false);
   const isInitializing = useRef(false);
   const clientSecretRef = useRef<string | null>(null);
+  const paymentDebounceRef = useRef(false);
+  const lastPaymentIntentIdRef = useRef<string | null>(null);
 
   // 1. Инициализируем Stripe.js v3 (из <script> тега)
   useEffect(() => {
@@ -95,7 +159,7 @@ function PaymentPage() {
 
     let cancelled = false;
 
-    if (clientSecret || secretError) {
+    if (clientSecretRef.current || secretError) {
       setSecretLoading(false);
       return;
     }
@@ -103,11 +167,10 @@ function PaymentPage() {
     isInitializing.current = true;
 
     paymentsApi
-      .createPaymentIntent(auction.id)
+      .createPaymentIntent(auction.id, selectedCountry) // Передаем selectedCountry
       .then((res) => {
         if (!cancelled) {
           const secret = res.data?.clientSecret ?? null;
-          setClientSecret(secret);
           clientSecretRef.current = secret;
           setSecretLoading(false);
         }
@@ -132,23 +195,62 @@ function PaymentPage() {
       cancelled = true;
       isInitializing.current = false;
     };
-  }, [auction, stripeLoaded, clientSecret, secretError]);
+  }, [auction, stripeLoaded, secretError, selectedCountry]); // Добавляем selectedCountry в зависимости
 
   // 4. Обработчик платежа — полная обработка всех сценариев Stripe
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auction || !stripeRef.current || !elementsRef.current) return;
+    if (processing || paymentDebounceRef.current) return;
 
     setProcessing(true);
     setError(null);
+    paymentDebounceRef.current = true;
+
+    // Idempotency guard: блокируем повторный вызов тем же PI
+    const currentSecret = clientSecretRef.current;
+    if (!currentSecret || typeof currentSecret !== 'string') {
+      const msg = "Невозможно подтвердить платёж: недействительный секретный ключ.";
+      setError(msg);
+      toast.error(msg);
+      setProcessing(false);
+      paymentDebounceRef.current = false;
+      return;
+    }
+
+    // Усиленная валидация формата Stripe PaymentIntent client secret
+    const piIdMatch = currentSecret.match(/^(pi_[a-zA-Z0-9]+)_secret_([a-zA-Z0-9]+)$/);
+    if (!piIdMatch) {
+      const msg = "Невозможно подтвердить платёж: недействительный формат ключа Stripe.";
+      setError(msg);
+      toast.error(msg);
+      setProcessing(false);
+      paymentDebounceRef.current = false;
+      return;
+    }
+
+    const piId = piIdMatch[1];
+    if (lastPaymentIntentIdRef.current === piId) {
+      toast("Платёж уже обрабатывается, пожалуйста, подождите...", { icon: "ℹ️" });
+      setProcessing(false);
+      paymentDebounceRef.current = false;
+      return;
+    }
+    lastPaymentIntentIdRef.current = piId;
 
     try {
       const cardElement = elementsRef.current.getElement("card");
+      
       const { error: stripeError, paymentIntent } = await stripeRef.current.confirmCardPayment(
         clientSecretRef.current!,
         {
           payment_method: {
             card: cardElement,
+            billing_details: { // Можно добавить, если нужно
+              address: {
+                country: selectedCountry // Передаем выбранную страну
+              }
+            }
           },
         },
       );
@@ -231,11 +333,79 @@ function PaymentPage() {
         }
       }
     } catch (err: any) {
-      const msg = err?.message ?? "Ошибка оплаты. Попробуйте ещё раз.";
-      setError(msg);
-      toast.error(msg);
+      console.error("[Payment] confirmCardPayment error object:", err); // Логируем объект ошибки
+      console.error("[Payment] Error details:", {
+        message: err?.message,
+        code: err?.code,
+        type: err?.type,
+        stripeError: err?.stripeError,
+        name: err?.name, // Добавим имя ошибки, например TypeError
+      });
+
+      // Специальная обработка payment_intent_unexpected_state
+      // Возникает когда PI уже в неправильном состоянии (например, уже requires_capture)
+      if (err?.stripeError?.code === "payment_intent_unexpected_state") {
+        console.warn("[Payment] PI unexpected state — retrieving current state from Stripe...");
+        try {
+          const piId = clientSecretRef.current?.split("_")[2]; // pi_XXX_secret_YYY
+          if (piId) {
+            // Извлекаем stripePaymentId из clientSecret (pi_...)
+            const piMatch = clientSecretRef.current?.match(/^(pi_[a-zA-Z0-9]+)/);
+            if (piMatch) {
+              const currentPI = await stripeRef.current.paymentIntents.retrieve(piMatch[1]);
+              console.log("[Payment] Current PI state:", currentPI.status);
+
+              if (currentPI.status === "requires_capture") {
+                // Оплата уже обработана — холд создан
+                toast.success("Платёж авторизован! Средства зарезервированы на карте.");
+                setTimeout(() => {
+                  window.location.href = "/profile";
+                }, 2000);
+                return;
+              }
+
+              if (currentPI.status === "succeeded") {
+                toast.success("Платёж уже был успешно совершён ранее.");
+                setTimeout(() => {
+                  window.location.href = "/profile";
+                }, 2000);
+                return;
+              }
+
+              if (currentPI.status === "canceled" || currentPI.status === "payment_intent_invalid") {
+                const msg = "Платёж отменён. Попробуйте ещё раз или обновите страницу.";
+                setError(msg);
+                toast.error(msg);
+                return;
+              }
+            }
+          }
+        } catch (retrieveErr) {
+          console.error("[Payment] Failed to retrieve PI state:", retrieveErr);
+        }
+      }
+
+      // Проверяем, была ли ошибка типа card_declined передана напрямую в err
+      let errorMessage = "Ошибка оплаты. Попробуйте ещё раз.";
+      if (err?.code === 'card_declined') {
+        errorMessage = "Платёж отклонён банком. Проверьте данные карты или используйте другую.";
+      } else if (err?.stripeError?.message) {
+        errorMessage = err.stripeError.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.toString) {
+        // Пытаемся получить строковое представление объекта ошибки, например, "TypeError: ..."
+        errorMessage = `Ошибка оплаты: ${err.toString()}`;
+      } else {
+        // Если всё остальное не сработало, используем общее сообщение
+        errorMessage = "Ошибка оплаты. Попробуйте ещё раз.";
+      }
+
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setProcessing(false);
+      paymentDebounceRef.current = false;
     }
   };
 
@@ -260,7 +430,7 @@ function PaymentPage() {
     }
 
     // Отклонена банком
-    if (code === "processing_error" || code === "call_isuer") {
+    if (code === "processing_error" || code === "call_issuer") {
       return "Ошибка обработки банком-эмитентом. Попробуйте через 5 минут или свяжитесь с банком.";
     }
 
@@ -305,7 +475,7 @@ function PaymentPage() {
     );
   }
 
-  if (secretError && !clientSecret) {
+  if (secretError && !clientSecretRef.current) {
     return (
       <div className="max-w-lg mx-auto">
         <div className="card">
@@ -350,6 +520,24 @@ function PaymentPage() {
         <AuctionSummary auction={auction} />
 
         <form onSubmit={handlePayment} className="mt-8 space-y-5">
+          <div data-testid="country-selector">
+            <label htmlFor="country-select" className="block text-sm font-medium text-gray-700 mb-1">
+              Страна карты
+            </label>
+            <select
+              id="country-select"
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-white"
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div data-testid="payment-method-container">
             <label className="block text-sm font-medium text-gray-700 mb-1">Номер карты, срок действия и CVC</label>
             <div

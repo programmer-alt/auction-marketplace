@@ -68,7 +68,7 @@ describe("Payments Routes", () => {
       };
       mockCreatePaymentIntent.mockResolvedValue(mockResponse);
 
-      const response = await request(app).post("/api/payments/create-intent").send({ auctionId: 1 });
+      const response = await request(app).post("/api/payments/create-intent").send({ auctionId: 1, countryCode: "US" }); // Добавляем countryCode
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe("Платёжный интент создан");
