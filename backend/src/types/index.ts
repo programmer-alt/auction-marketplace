@@ -77,7 +77,7 @@ export type BidSelect = Prisma.BidGetPayload<{
 // Типы для Payment
 // ========================================
 
-export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "AUTHORIZED";
 
 export type Payment = Prisma.PaymentGetPayload<{}>;
 
