@@ -21,6 +21,7 @@ export interface Auction {
   endsAt: string;
   bids: Bid[];
   createdAt: string;
+  currency: string;
 }
 
 export interface Bid {
