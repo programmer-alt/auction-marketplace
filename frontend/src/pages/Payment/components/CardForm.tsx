@@ -11,11 +11,12 @@ interface CardFormProps {
 
 const CardForm: React.FC<CardFormProps> = ({ processing, currentPrice, onSubmit, error }) => (
   <form data-testid="payment-form" onSubmit={onSubmit} className="space-y-5">
-    <div data-testid="payment-method-container">
+    {/* Удаляем контейнер для элемента карты, он теперь в PaymentPage */}
+    {/* <div data-testid="payment-method-container">
       <label className="block text-sm font-medium text-gray-700 mb-1">Способ оплаты</label>
       <div className="bg-white rounded-lg border border-gray-200 p-3">
-        {/* CardElement монтируется сюда через raw Stripe.js */}
-        <div
+        {/* CardElement монтируется сюда через raw Stripe.js */
+/*         <div
           ref={(node) => {
             if (node) {
               (node as HTMLDivElement).style.border = "none";
@@ -24,7 +25,7 @@ const CardForm: React.FC<CardFormProps> = ({ processing, currentPrice, onSubmit,
           }}
         />
       </div>
-    </div>
+    </div> */}
 
     {error ? (
       <div data-testid="payment-error" className="bg-red-50 rounded-lg p-3 text-sm text-red-700">

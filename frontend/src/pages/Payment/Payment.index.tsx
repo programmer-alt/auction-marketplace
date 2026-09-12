@@ -90,10 +90,19 @@ function PaymentPage() {
   const [selectedCountry, setSelectedCountry] = useState("US");
 
   const stripeRef = useRef<any>(null);
-  const elementsRef = useRef<any>(null);
-  const cardElementRef = useRef<any>(null); // Добавим ref для cardElement
-  const cardContainerRef = useRef<HTMLDivElement>(null);
-  const [elementsMounted] = useState(true);
+  const elementsRef = useRef<any>(null); // Для хранения экземпляра Elements
+  // Заменяем useRef на useState для отслеживания DOM-элементов
+  const [cardNumberElement, setCardNumberElement] = useState<any>(null);
+  const [cardExpiryElement, setCardExpiryElement] = useState<any>(null);
+  const [cardCvcElement, setCardCvcElement] = useState<any>(null);
+  const [cardPostalElement, setCardPostalElement] = useState<any>(null);
+
+  // --- НОВОЕ: Ref для экземпляров элементов Stripe ---
+  const cardNumberElementInstanceRef = useRef<any>(null);
+  const cardExpiryElementInstanceRef = useRef<any>(null);
+  const cardCvcElementInstanceRef = useRef<any>(null);
+  const cardPostalElementInstanceRef = useRef<any>(null);
+
   const isInitializing = useRef(false);
   const clientSecretRef = useRef<string | null>(null);
   const lastPaymentIntentIdRef = useRef<string | null>(null);
@@ -130,38 +139,82 @@ function PaymentPage() {
     }
   }, []);
 
-  // 2. Создаём единый Card Element с postal code
+  // 2. Создаём и монтируем отдельные элементы карты, когда Stripe готов и DOM-элементы доступны
+  // Зависимости: stripeLoaded и состояния DOM-элементов
   useEffect(() => {
-    if (!stripeRef.current || !elementsMounted || elementsRef.current) return;
+    console.log("[Payment] useEffect for mounting card elements triggered (callback ref version)");
+    console.log("[Payment] stripeLoaded?", stripeLoaded);
+    console.log("[Payment] elementsRef.current already set?", !!elementsRef.current);
+    console.log("[Payment] cardNumberElement ready?", !!cardNumberElement);
+    console.log("[Payment] All required elements ready?", !!cardNumberElement && !!cardExpiryElement && !!cardCvcElement && !!cardPostalElement);
 
-    console.log("[Payment] Mounting Stripe Elements...");
+    // Проверяем, готовы ли все условия и не были ли элементы уже инициализированы
+    if (!stripeLoaded || elementsRef.current || !cardNumberElement || !cardExpiryElement || !cardCvcElement || !cardPostalElement) {
+      console.log("[Payment] Conditions not met or elements already mounted, skipping mount.");
+      return;
+    }
+
+    console.log("[Payment] All conditions met, creating and mounting Stripe Card Elements...");
 
     try {
-      const elements = stripeRef.current.elements();
+      const elementsInstance = stripeRef.current.elements();
 
-      // Создаём CardElement и сохраняем ссылку
-      const card = elements.create("card", {
-        style: {
-          base: {
-            fontSize: "16px",
-            color: "#424770",
-            "::placeholder": { color: "#aab7c4" },
-          },
-          invalid: { color: "#9e2146" },
+      // Стили для всех элементов
+      const elementStyles = {
+        base: {
+          fontSize: "16px",
+          color: "#424770",
+          "::placeholder": { color: "#aab7c4" }, // Цвет подсказок внутри поля
         },
-        hidePostalCode: false,
+        invalid: { color: "#9e2146" },
+      };
+
+      // --- МОНТИРОВАНИЕ И СОХРАНЕНИЕ ЭКЗЕМПЛЯРОВ ---
+      // Номер карты
+      const cardNumber = elementsInstance.create("cardNumber", {
+        style: elementStyles,
+        placeholder: "Номер карты (например, 4242 4242 4242 4242)",
       });
+      console.log("[Payment] Mounting cardNumber element to", cardNumberElement);
+      cardNumber.mount(cardNumberElement);
+      cardNumberElementInstanceRef.current = cardNumber; // <-- Сохраняем экземпляр
 
-      card.mount(cardContainerRef.current!);
-      cardElementRef.current = card; // Сохраняем ссылку на cardElement
+      // Срок действия
+      const cardExpiry = elementsInstance.create("cardExpiry", {
+        style: elementStyles,
+        placeholder: "Срок действия (MM/YY)",
+      });
+      console.log("[Payment] Mounting cardExpiry element to", cardExpiryElement);
+      cardExpiry.mount(cardExpiryElement);
+      cardExpiryElementInstanceRef.current = cardExpiry; // <-- Сохраняем экземпляр
 
-      elementsRef.current = elements;
-      console.log("[Payment] Stripe Elements mounted successfully");
+      // CVC
+      const cardCvc = elementsInstance.create("cardCvc", {
+        style: elementStyles,
+        placeholder: "CVC (3 цифры)",
+      });
+      console.log("[Payment] Mounting cardCvc element to", cardCvcElement);
+      cardCvc.mount(cardCvcElement);
+      cardCvcElementInstanceRef.current = cardCvc; // <-- Сохраняем экземпляр
+
+      // Почтовый индекс
+      const cardPostal = elementsInstance.create("postalCode", {
+        style: elementStyles,
+        placeholder: "Почтовый индекс",
+      });
+      console.log("[Payment] Mounting cardPostal element to", cardPostalElement);
+      cardPostal.mount(cardPostalElement);
+      cardPostalElementInstanceRef.current = cardPostal; // <-- Сохраняем экземпляр
+
+      // Сохраняем экземпляр Elements
+      elementsRef.current = elementsInstance;
+
+      console.log("[Payment] Stripe Card Elements mounted successfully");
     } catch (err) {
-      console.error("Failed to create Stripe Elements:", err);
+      console.error("Failed to create or mount Stripe Card Elements:", err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stripeRef.current, elementsMounted]);
+  }, [stripeLoaded, cardNumberElement, cardExpiryElement, cardCvcElement, cardPostalElement]); // Зависимости от состояний DOM-элементов
 
   // 3. Получаем clientSecret когда auction готов
   useEffect(() => {
@@ -213,8 +266,16 @@ function PaymentPage() {
   };
 
   // 4. Обработчик платежа — полная обработка всех сценариев Stripe
+  // 4. Обработчик платежа — создание PaymentMethod и его подтверждение
   const handlePayment = async () => {
-    if (!cardElementRef.current || !clientSecretRef.current) return; // Используем cardElementRef.current
+    // Проверяем, инициализированы ли элементы Stripe и доступен ли clientSecret
+    // Проверяем, что экземпляры элементов также готовы
+    if (!stripeRef.current || !clientSecretRef.current || !cardNumberElementInstanceRef.current) {
+        console.error("Stripe или экземпляры элементов карты не готовы.");
+        setError("Форма оплаты не готова. Попробуйте перезагрузить страницу.");
+        toast.error("Ошибка инициализации платежа.");
+        return;
+    }
 
     const piId = extractPaymentIntentId(clientSecretRef.current);
     if (lastPaymentIntentIdRef.current === piId) {
@@ -222,24 +283,41 @@ function PaymentPage() {
       return;
     }
 
-    setProcessing(true); // Используем setProcessing
+    setProcessing(true);
     setError(null);
 
-    let paymentIntentResult = null; // Объявляем переменную вне try
+    let paymentIntentResult = null;
 
     try {
-      // 1. Подтверждаем PaymentIntent
+      // 1. Создаем PaymentMethod из экземпляра элемента номера карты
+      // Остальные элементы (expiry, cvc, postalCode) автоматически связаны с cardNumber в рамках одного Elements контекста.
+      // Мы передаем экземпляр элемента, который был создан и смонтирован ранее.
+      const {error: pmError, paymentMethod} = await stripeRef.current.createPaymentMethod({
+        type: 'card',
+        card: cardNumberElementInstanceRef.current, // <-- Используем экземпляр элемента Stripe
+        billing_details: {
+          address: {
+            country: selectedCountry,
+            // postal_code можно не указывать здесь, если он вводится в отдельном поле и собирается автоматически
+          },
+        },
+      });
+
+      if (pmError) {
+         console.error("Ошибка создания Payment Method:", pmError);
+         let msg = pmError.message || "Ошибка при подготовке платежа.";
+         setError(msg);
+         toast.error(msg);
+         return;
+      }
+
+      console.log("Payment Method создан:", paymentMethod.id);
+
+      // 2. Подтверждаем PaymentIntent, используя ID созданного Payment Method
       const { error: stripeError, paymentIntent } = await stripeRef.current!.confirmCardPayment(
         clientSecretRef.current,
         {
-          payment_method: {
-            card: cardElementRef.current, // Используем cardElementRef.current
-            billing_details: {
-              address: {
-                country: selectedCountry, // Передаем страну
-              },
-            },
-          },
+          payment_method: paymentMethod.id,
         },
       );
 
@@ -419,7 +497,28 @@ function PaymentPage() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Данные карты
           </label>
-          <div ref={cardContainerRef} className="border border-gray-300 rounded-md p-3" />
+          {/* Контейнеры для отдельных элементов карты */}
+          {/* Используем callback ref */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
+              <div ref={node => setCardNumberElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Срок действия</label>
+                <div ref={node => setCardExpiryElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">CVC</label>
+                <div ref={node => setCardCvcElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+              </div>
+            </div>
+             <div>
+              <label className="block text-xs text-gray-500 mb-1">Почтовый индекс</label>
+              <div ref={node => setCardPostalElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+            </div>
+          </div>
         </div>
 
         {error && (
