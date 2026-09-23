@@ -1,5 +1,5 @@
 import type { AxiosError } from "axios";
-import type { DetailedError, HandledError } from "./advanced";
+import { DetailedError, HandledError } from "./error.types";
 
 // ========================================
 // Типы для обработки ошибок
@@ -32,8 +32,7 @@ export function isAxiosError(error: any): error is AxiosError {
  * Type guard для проверки ошибки как стандартной Error
  */
 export function isError(error: any): error is Error {
-  return error && typeof error === "object" && "message" in error && "name" in error;
-}
+  return error instanceof Error || (error && typeof error.message === 'string');
 
 /**
  * Type guard для проверки ошибки как DetailedError
@@ -50,23 +49,18 @@ export function isDetailedError(error: any): error is DetailedError {
  * Функция для пометки ошибки как обработанной
  * Принимает конкретные типы ошибок для улучшенной типобезопасности
  */
-export const markErrorAsHandled = (error: Error | AxiosError | DetailedError | HandledError): void => {
-  if (!error) return;
-
-  // Для ошибок с config (AxiosError расширяет Error с config)
-  if ("config" in error && error.config !== undefined) {
-    (error as HandledError).config = {
-      ...(error as HandledError).config,
-      handled: true,
-    };
+export function markErrorAsHandled(error: Error | AxiosError | DetailedError | HandledError): void {
+  if (isHandledError(error)) {
     return;
   }
-
-  // Для обычных ошибок добавляем config
-  (error as HandledError).config = {
-    handled: true,
-  };
-};
+  
+  if (error && typeof error === 'object') {
+    if (!error.config) {
+      (error as any).config = {};
+    }
+    (error as any).config.handled = true;
+  }
+}
 
 /**
  * Функция для проверки, была ли ошибка уже обработана

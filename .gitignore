@@ -104,3 +104,4 @@ AGENTS.md
 .narsil.yaml
 .serena/project.yml
 .serena/.gitignore
+.depwire/cache.db
