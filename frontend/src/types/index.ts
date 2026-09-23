@@ -90,8 +90,14 @@ export interface CreateBidData {
   amount: number;
 }
 
-// Экспортируем все типы из advanced.ts
-export * from "./advanced";
+// Экспортируем все типы из новых файлов
+export * from "./auth.types";
+export * from "./auction.types";
+export * from "./bid.types";
+export * from "./payment.types";
+export * from "./error.types";
+export * from "./api.types";
+export * from "./utility.types";
 
 // Экспортируем утилиты для WebSocket
 export * from "../utils/websocket";

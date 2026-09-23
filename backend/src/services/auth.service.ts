@@ -4,35 +4,8 @@ import { prisma } from "../config/db";
 import logger from "../config/logger";
 import { createForbiddenError, createValidationError } from "../errors/factories";
 import { createUser, getUserByEmail, getUserById } from "../repositories/users.repository";
-import type { Prisma } from "../types";
 
 import { getJwtAccessExpiresIn, getJwtRefreshExpiresIn, getJwtSecret, maskEmail } from "../config/jwt";
-
-// ========================================
-// Типы
-// ========================================
-
-export interface RegisterData {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-export interface LoginData {
-  email: string;
-  password: string;
-}
-
-export interface AuthResult {
-  user: {
-    id: number;
-    email: string;
-    name: string | null;
-    balance?: Prisma.Decimal;
-  };
-  accessToken: string;
-  refreshToken: string;
-}
 
 /**
  * Генерация пары токенов (access + refresh)

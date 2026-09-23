@@ -1,6 +1,6 @@
 import { auctionsApi } from "@/api/auctions";
 import type { Auction } from "@/types";
-import type { User } from "@/types/advanced";
+import type { User } from "@/types";
 import { markErrorAsHandled } from "@/utils/errorHandler";
 import type { AxiosError } from "axios";
 import { useEffect, useState } from "react";

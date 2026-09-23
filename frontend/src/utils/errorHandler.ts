@@ -1,5 +1,5 @@
 import type { AxiosError } from "axios";
-import { type DetailedError, type HandledError, isAxiosError } from "../types/advanced";
+import { type DetailedError, type HandledError, isAxiosError } from "../types/error.types";
 
 /**
  * Упрощенная функция для пометки ошибки как обработанной

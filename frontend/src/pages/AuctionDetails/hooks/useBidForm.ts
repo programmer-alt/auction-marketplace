@@ -1,5 +1,6 @@
 import { bidsApi } from "@/api/bids";
-import type { AsyncState, Bid } from "@/types/advanced";
+import type { Bid } from "@/types";
+import type { AsyncState } from "@/types/utility.types";
 import { markErrorAsHandled } from "@/utils/errorHandler";
 import { useCallback, useState } from "react";
 import toast from "react-hot-toast";
