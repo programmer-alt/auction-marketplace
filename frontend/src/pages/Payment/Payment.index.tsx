@@ -6,7 +6,7 @@ import { usePaymentData } from "./hooks/usePaymentData";
 
 import { paymentsApi } from "@/api/payments";
 import { handleBusinessLogicError } from "@/utils/universalErrorHandler";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; // Убран useLayoutEffect
 import toast from "react-hot-toast";
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
@@ -42,34 +42,34 @@ const COUNTRIES = [
   { code: "RU", name: "🇷🇺 Россия" },
   { code: "UA", name: "🇺🇦 Украина" },
   { code: "BY", name: "🇧🇾 Беларусь" },
-  { code: "KZ", name: "🇰🇿 Казахстан" },
-  { code: "UZ", name: "🇺🇿 Узбекистан" },
-  { code: "GE", name: "🇬🇪 Грузия" },
-  { code: "AM", name: "🇦🇲 Армения" },
-  { code: "AZ", name: "🇦🇿 Азербайджан" },
-  { code: "MD", name: "🇲🇩 Молдова" },
-  { code: "JP", name: "🇯🇵 Япония" },
-  { code: "KR", name: "🇰🇷 Южная Корея" },
-  { code: "CN", name: "🇨🇳 Китай" },
-  { code: "IN", name: "🇮🇳 Индия" },
-  { code: "BR", name: "🇧🇷 Бразилия" },
-  { code: "CA", name: "🇨🇦 Канада" },
-  { code: "AU", name: "🇦🇺 Австралия" },
-  { code: "SG", name: "🇸🇬 Сингапур" },
-  { code: "MY", name: "🇲🇾 Малайзия" },
-  { code: "TH", name: "🇹🇭 Таиланд" },
-  { code: "PH", name: "🇵🇭 Филиппины" },
-  { code: "ID", name: "🇮🇩 Индонезия" },
-  { code: "VN", name: "🇻🇳 Вьетнам" },
-  { code: "TR", name: "🇹🇷 Турция" },
-  { code: "AE", name: "🇦🇪 ОАЭ" },
-  { code: "SA", name: "🇸🇦 Саудовская Аравия" },
-  { code: "IL", name: "🇮🇱 Израиль" },
-  { code: "ZA", name: "🇿🇦 ЮАР" },
-  { code: "MX", name: "🇲🇽 Мексика" },
-  { code: "AR", name: "🇦🇷 Аргентина" },
-  { code: "CL", name: "🇨🇱 Чили" },
-  { code: "CO", name: "🇨🇴 Колумбия" },
+  { code: "KZ", name: " Kazakhstan 🇰🇿" },
+  { code: "UZ", name: " Uzbekistan 🇺🇿" },
+  { code: "GE", name: " Georgia 🇬🇪" },
+  { code: "AM", name: " Armenia 🇦🇲" },
+  { code: "AZ", name: " Azerbaijan 🇦🇿" },
+  { code: "MD", name: " Moldova 🇲🇩" },
+  { code: "JP", name: " Japan 🇯🇵" },
+  { code: "KR", name: " South Korea 🇰🇷" },
+  { code: "CN", name: " China 🇨🇳" },
+  { code: "IN", name: " India 🇮🇳" },
+  { code: "BR", name: " Brazil 🇧🇷" },
+  { code: "CA", name: " Canada 🇨🇦" },
+  { code: "AU", name: " Australia 🇦🇺" },
+  { code: "SG", name: " Singapore 🇸🇬" },
+  { code: "MY", name: " Malaysia 🇲🇾" },
+  { code: "TH", name: " Thailand 🇹🇭" },
+  { code: "PH", name: " Philippines 🇵🇭" },
+  { code: "ID", name: " Indonesia 🇮🇩" },
+  { code: "VN", name: " Vietnam 🇻🇳" },
+  { code: "TR", name: " Turkey 🇹🇷" },
+  { code: "AE", name: " UAE 🇦🇪" },
+  { code: "SA", name: " Saudi Arabia 🇸🇦" },
+  { code: "IL", name: " Israel 🇮🇱" },
+  { code: "ZA", name: " South Africa 🇿🇦" },
+  { code: "MX", name: " Mexico 🇲🇽" },
+  { code: "AR", name: " Argentina 🇦🇷" },
+  { code: "CL", name: " Chile 🇨🇱" },
+  { code: "CO", name: " Colombia 🇨🇴" },
   { code: "OTHER", name: "🌍 Другая" },
 ] as const;
 
@@ -91,13 +91,14 @@ function PaymentPage() {
 
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null); // Для хранения экземпляра Elements
-  // Заменяем useRef на useState для отслеживания DOM-элементов
+
+  // useState для DOM-нод, управляемых callback ref ---
   const [cardNumberElement, setCardNumberElement] = useState<any>(null);
   const [cardExpiryElement, setCardExpiryElement] = useState<any>(null);
   const [cardCvcElement, setCardCvcElement] = useState<any>(null);
   const [cardPostalElement, setCardPostalElement] = useState<any>(null);
 
-  // --- НОВОЕ: Ref для экземпляров элементов Stripe ---
+  //  useRef для экземпляров элементов Stripe ---
   const cardNumberElementInstanceRef = useRef<any>(null);
   const cardExpiryElementInstanceRef = useRef<any>(null);
   const cardCvcElementInstanceRef = useRef<any>(null);
@@ -110,7 +111,9 @@ function PaymentPage() {
   // Сбрасываем clientSecret при смене страны, чтобы создать новый PaymentIntent с корректной страной
   useEffect(() => {
     if (clientSecretRef.current) {
-      console.log("[Payment] Country changed, resetting clientSecret for new PaymentIntent");
+      console.log(
+        "[Payment] Country changed, resetting clientSecret for new PaymentIntent",
+      );
       clientSecretRef.current = null;
       setSecretError(null);
     }
@@ -140,21 +143,43 @@ function PaymentPage() {
   }, []);
 
   // 2. Создаём и монтируем отдельные элементы карты, когда Stripe готов и DOM-элементы доступны
-  // Зависимости: stripeLoaded и состояния DOM-элементов
+  // Зависимости: stripeLoaded и состояния DOM-элементов (callback ref)
   useEffect(() => {
-    console.log("[Payment] useEffect for mounting card elements triggered (callback ref version)");
+    console.log(
+      "[Payment] useEffect for mounting card elements triggered (callback ref version)",
+    );
     console.log("[Payment] stripeLoaded?", stripeLoaded);
-    console.log("[Payment] elementsRef.current already set?", !!elementsRef.current);
+    console.log(
+      "[Payment] elementsRef.current already set?",
+      !!elementsRef.current,
+    );
     console.log("[Payment] cardNumberElement ready?", !!cardNumberElement);
-    console.log("[Payment] All required elements ready?", !!cardNumberElement && !!cardExpiryElement && !!cardCvcElement && !!cardPostalElement);
+    console.log(
+      "[Payment] All required elements ready?",
+      !!cardNumberElement &&
+        !!cardExpiryElement &&
+        !!cardCvcElement &&
+        !!cardPostalElement,
+    );
 
     // Проверяем, готовы ли все условия и не были ли элементы уже инициализированы
-    if (!stripeLoaded || elementsRef.current || !cardNumberElement || !cardExpiryElement || !cardCvcElement || !cardPostalElement) {
-      console.log("[Payment] Conditions not met or elements already mounted, skipping mount.");
+    if (
+      !stripeLoaded ||
+      elementsRef.current ||
+      !cardNumberElement ||
+      !cardExpiryElement ||
+      !cardCvcElement ||
+      !cardPostalElement
+    ) {
+      console.log(
+        "[Payment] Conditions not met or elements already mounted, skipping mount.",
+      );
       return;
     }
 
-    console.log("[Payment] All conditions met, creating and mounting Stripe Card Elements...");
+    console.log(
+      "[Payment] All conditions met, creating and mounting Stripe Card Elements...",
+    );
 
     try {
       const elementsInstance = stripeRef.current.elements();
@@ -173,25 +198,31 @@ function PaymentPage() {
       // Номер карты
       const cardNumber = elementsInstance.create("cardNumber", {
         style: elementStyles,
-        placeholder: "Номер карты (например, 4242 4242 4242 4242)",
+        placeholder: "Номер карты (например, 4242 4242 4242 4242)", // Добавлен placeholder
       });
-      console.log("[Payment] Mounting cardNumber element to", cardNumberElement);
+      console.log(
+        "[Payment] Mounting cardNumber element to",
+        cardNumberElement,
+      );
       cardNumber.mount(cardNumberElement);
       cardNumberElementInstanceRef.current = cardNumber; // <-- Сохраняем экземпляр
 
       // Срок действия
       const cardExpiry = elementsInstance.create("cardExpiry", {
         style: elementStyles,
-        placeholder: "Срок действия (MM/YY)",
+        placeholder: "Срок действия (MM/YY)", // Добавлен placeholder
       });
-      console.log("[Payment] Mounting cardExpiry element to", cardExpiryElement);
+      console.log(
+        "[Payment] Mounting cardExpiry element to",
+        cardExpiryElement,
+      );
       cardExpiry.mount(cardExpiryElement);
       cardExpiryElementInstanceRef.current = cardExpiry; // <-- Сохраняем экземпляр
 
       // CVC
       const cardCvc = elementsInstance.create("cardCvc", {
         style: elementStyles,
-        placeholder: "CVC (3 цифры)",
+        placeholder: "CVC (3 цифры)", // Добавлен placeholder
       });
       console.log("[Payment] Mounting cardCvc element to", cardCvcElement);
       cardCvc.mount(cardCvcElement);
@@ -200,9 +231,12 @@ function PaymentPage() {
       // Почтовый индекс
       const cardPostal = elementsInstance.create("postalCode", {
         style: elementStyles,
-        placeholder: "Почтовый индекс",
+        placeholder: "Почтовый индекс", // Добавлен placeholder
       });
-      console.log("[Payment] Mounting cardPostal element to", cardPostalElement);
+      console.log(
+        "[Payment] Mounting cardPostal element to",
+        cardPostalElement,
+      );
       cardPostal.mount(cardPostalElement);
       cardPostalElementInstanceRef.current = cardPostal; // <-- Сохраняем экземпляр
 
@@ -214,7 +248,13 @@ function PaymentPage() {
       console.error("Failed to create or mount Stripe Card Elements:", err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stripeLoaded, cardNumberElement, cardExpiryElement, cardCvcElement, cardPostalElement]); // Зависимости от состояний DOM-элементов
+  }, [
+    stripeLoaded,
+    cardNumberElement,
+    cardExpiryElement,
+    cardCvcElement,
+    cardPostalElement,
+  ]); // Зависимости от состояний DOM-элементов (callback ref)
 
   // 3. Получаем clientSecret когда auction готов
   useEffect(() => {
@@ -240,7 +280,9 @@ function PaymentPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          const errorMessage = err?.response?.data?.message ?? "Не удалось инициализировать платёж";
+          const errorMessage =
+            err?.response?.data?.message ??
+            "Не удалось инициализировать платёж";
           setSecretError(errorMessage);
           handleBusinessLogicError(err, {
             auctionId: auction.id,
@@ -262,19 +304,22 @@ function PaymentPage() {
 
   // Функция для извлечения ID PaymentIntent из clientSecret
   const extractPaymentIntentId = (clientSecret: string): string => {
-    return clientSecret.split('_secret_')[0];
+    return clientSecret.split("_secret_")[0];
   };
 
-  // 4. Обработчик платежа — полная обработка всех сценариев Stripe
-  // 4. Обработчик платежа — создание PaymentMethod и его подтверждение
+  // 4. Обработчик платежа — подтверждение PaymentIntent
   const handlePayment = async () => {
     // Проверяем, инициализированы ли элементы Stripe и доступен ли clientSecret
     // Проверяем, что экземпляры элементов также готовы
-    if (!stripeRef.current || !clientSecretRef.current || !cardNumberElementInstanceRef.current) {
-        console.error("Stripe или экземпляры элементов карты не готовы.");
-        setError("Форма оплаты не готова. Попробуйте перезагрузить страницу.");
-        toast.error("Ошибка инициализации платежа.");
-        return;
+    if (
+      !stripeRef.current ||
+      !clientSecretRef.current ||
+      !cardNumberElementInstanceRef.current
+    ) {
+      console.error("Stripe или экземпляры элементов карты не готовы.");
+      setError("Форма оплаты не готова. Попробуйте перезагрузить страницу.");
+      toast.error("Ошибка инициализации платежа.");
+      return;
     }
 
     const piId = extractPaymentIntentId(clientSecretRef.current);
@@ -289,89 +334,66 @@ function PaymentPage() {
     let paymentIntentResult = null;
 
     try {
-      // 1. Создаем PaymentMethod из экземпляра элемента номера карты
-      // Остальные элементы (expiry, cvc, postalCode) автоматически связаны с cardNumber в рамках одного Elements контекста.
-      // Мы передаем экземпляр элемента, который был создан и смонтирован ранее.
-      const {error: pmError, paymentMethod} = await stripeRef.current.createPaymentMethod({
-        type: 'card',
-        card: cardNumberElementInstanceRef.current, // <-- Используем экземпляр элемента Stripe
-        billing_details: {
-          address: {
-            country: selectedCountry,
-            // postal_code можно не указывать здесь, если он вводится в отдельном поле и собирается автоматически
+      // 1. Submit elements to ensure all data is collected before confirming PaymentIntent
+      elementsRef.current.submit();
+
+      // 2. Подтверждаем PaymentIntent напрямую, передавая clientSecret и объект payment_method.
+      // Stripe автоматически извлечет данные карты (включая индекс) из elementsRef.current или из экземпляра cardNumber.
+      const { error: stripeError, paymentIntent } =
+        await stripeRef.current!.confirmCardPayment(clientSecretRef.current, {
+          payment_method: {
+            card: cardNumberElementInstanceRef.current, // Передаем экземпляр cardNumber, к которому привязаны другие поля
+            billing_details: {
+              address: {
+                country: selectedCountry,
+                // postal_code не указываем здесь, он вводится в элементе cardPostal
+              },
+            },
           },
-        },
-      });
+        });
 
-      if (pmError) {
-         console.error("Ошибка создания Payment Method:", pmError);
-         let msg = pmError.message || "Ошибка при подготовке платежа.";
-         setError(msg);
-         toast.error(msg);
-         return;
-      }
-
-      console.log("Payment Method создан:", paymentMethod.id);
-
-      // 2. Подтверждаем PaymentIntent, используя ID созданного Payment Method
-      const { error: stripeError, paymentIntent } = await stripeRef.current!.confirmCardPayment(
-        clientSecretRef.current,
-        {
-          payment_method: paymentMethod.id,
-        },
-      );
-
-      // 2. Проверяем наличие ошибки Stripe
+      // 3. Проверяем наличие ошибки Stripe при подтверждении (включая ошибки валидации)
       if (stripeError) {
-        console.error("Ошибка Stripe:", stripeError);
+        console.error(
+          "Ошибка подтверждения PaymentIntent (включая валидацию):",
+          stripeError,
+        );
+        console.error("Детали ошибки:", JSON.stringify(stripeError, null, 2));
         let msg = "Неизвестная ошибка при оплате.";
 
+        // Обновляем параметры ошибок, так как теперь используется confirmCardPayment
         switch (stripeError.type) {
           case "card_error":
             msg = stripeError.message || msg;
             break;
           case "validation_error":
+            // Теперь сюда может попасть 'incomplete_zip'
             msg = stripeError.message || msg;
             break;
-          case "payment_intent_invalid_parameter":
-            if (stripeError.param === "payment_method_data[card][number]") {
-              msg = "Некорректный номер карты.";
-            } else if (stripeError.param === "payment_method_data[card][exp_month]") {
-              msg = "Некорректный месяц истечения срока действия карты.";
-            } else if (stripeError.param === "payment_method_data[card][exp_year]") {
-              msg = "Некорректный год истечения срока действия карты.";
-            } else if (stripeError.param === "payment_method_data[card][cvc]") {
-              msg = "Некорректный CVC/CVV код.";
-            } else if (stripeError.param === "payment_method_data[billing_details][address][line1]") {
-              msg = "Некорректный адрес (улица).";
-            } else if (stripeError.param === "payment_method_data[billing_details][address][city]") {
-              msg = "Некорректный город.";
-            } else if (stripeError.param === "payment_method_data[billing_details][address][postal_code]") {
-              msg = "Некорректный почтовый индекс.";
-            } else if (stripeError.param === "payment_method_data[billing_details][address][country]") {
-              msg = "Некорректная страна.";
-            }
-            break;
+          // Эти ошибки могут отличаться при использовании confirmCardPayment
           default:
             msg = stripeError.message || msg;
         }
         setError(msg);
         toast.error(msg);
-        return; // ВАЖНО: возвращаемся, не устанавливая lastPaymentIntentIdRef
+        return;
       }
 
-      // 3. Проверяем результат подтверждения
+      // 4. Проверяем результат подтверждения
       if (!paymentIntent) {
         setError("Не получен результат подтверждения платежа.");
         toast.error("Ошибка: не получен результат подтверждения.");
-        return; // ВАЖНО: возвращаемся, не устанавливая lastPaymentIntentIdRef
+        return;
       }
 
-      paymentIntentResult = paymentIntent; // Сохраняем результат
+      paymentIntentResult = paymentIntent;
 
-      // 4. Проверяем ошибки, возникшие уже после подтверждения (async)
+      // 5. Проверяем ошибки, возникшие уже после подтверждения (async)
       if (paymentIntent.last_payment_error) {
-        console.error("Ошибка последнего платежа:", paymentIntent.last_payment_error);
+        console.error(
+          "Ошибка последнего платежа:",
+          paymentIntent.last_payment_error,
+        );
         let msg = "Платёж отклонён.";
         switch (paymentIntent.last_payment_error.code) {
           case "card_declined":
@@ -390,7 +412,8 @@ function PaymentPage() {
             msg = "Недостаточно средств на карте.";
             break;
           case "invalid_cvc":
-            msg = "Платёж отклонён. Карта заблокирована или не активна для онлайн-оплаты.";
+            msg =
+              "Платёж отклонён. Карта заблокирована или не активна для онлайн-оплаты.";
             break;
           default:
             msg =
@@ -399,28 +422,25 @@ function PaymentPage() {
         }
         setError(msg);
         toast.error(msg);
-        return; // ВАЖНО: возвращаемся, не устанавливая lastPaymentIntentIdRef
+        return;
       }
 
-      // 5. Успешное подтверждение
+      // 6. Успешное подтверждение
       toast.success("Платёж успешно обработан!");
       console.log("Успешный PaymentIntent:", paymentIntent);
-      lastPaymentIntentIdRef.current = piId; // Устанавливаем только при успехе
+      lastPaymentIntentIdRef.current = piId;
     } catch (error) {
-      // 6. Обработка любых JS-исключений
+      // 7. Обработка любых JS-исключений
       console.error("JS ошибка при оплате:", error);
       setError("Произошла ошибка при обработке платежа.");
       toast.error("Произошла ошибка.");
-      // Не устанавливаем lastPaymentIntentIdRef при исключениях
     } finally {
-      // 7. В любом случае (успех, ошибка Stripe, ошибка валидации, JS исключение), сбрасываем флаг
-      setProcessing(false); // Используем setProcessing
-      // ИСПРАВЛЕНИЕ: Очищаем lastPaymentIntentIdRef.current, если статус не 'succeeded'.
-      // Это предотвращает блокировку повторной попытки после неудачной.
-      // Проверяем статус из сохраненного результата
-      const wasSuccessful = paymentIntentResult && paymentIntentResult.status === 'succeeded';
+      // 8. Сброс флага обработки
+      setProcessing(false);
+      const wasSuccessful =
+        paymentIntentResult && paymentIntentResult.status === "succeeded";
       if (!wasSuccessful) {
-        lastPaymentIntentIdRef.current = null; // Сбрасываем, если неуспешно или была ошибка JS
+        lastPaymentIntentIdRef.current = null;
       }
     }
   };
@@ -442,7 +462,9 @@ function PaymentPage() {
     return (
       <div className="max-w-lg mx-auto">
         <div className="card">
-          <div className="bg-red-50 rounded-lg p-4 text-red-700">{secretError}</div>
+          <div className="bg-red-50 rounded-lg p-4 text-red-700">
+            {secretError}
+          </div>
           <Link
             to={`/auctions/${id}`}
             className="inline-flex items-center gap-2 text-gray-600 hover:text-primary-600 mt-4"
@@ -501,22 +523,40 @@ function PaymentPage() {
           {/* Используем callback ref */}
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
-              <div ref={node => setCardNumberElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+              <label className="block text-xs text-gray-500 mb-1">
+                Номер карты
+              </label>
+              <div
+                ref={(node) => setCardNumberElement(node)}
+                className="border border-gray-300 rounded-md p-3 h-11"
+              ></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Срок действия</label>
-                <div ref={node => setCardExpiryElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Срок действия
+                </label>
+                <div
+                  ref={(node) => setCardExpiryElement(node)}
+                  className="border border-gray-300 rounded-md p-3 h-11"
+                ></div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">CVC</label>
-                <div ref={node => setCardCvcElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+                <div
+                  ref={(node) => setCardCvcElement(node)}
+                  className="border border-gray-300 rounded-md p-3 h-11"
+                ></div>
               </div>
             </div>
-             <div>
-              <label className="block text-xs text-gray-500 mb-1">Почтовый индекс</label>
-              <div ref={node => setCardPostalElement(node)} className="border border-gray-300 rounded-md p-3 h-11"></div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                Почтовый индекс
+              </label>
+              <div
+                ref={(node) => setCardPostalElement(node)}
+                className="border border-gray-300 rounded-md p-3 h-11"
+              ></div>
             </div>
           </div>
         </div>
@@ -532,7 +572,9 @@ function PaymentPage() {
           disabled={processing || !clientSecretRef.current}
           className={`btn btn-primary w-full mt-6 ${processing ? "loading" : ""}`}
         >
-          {processing ? "Обработка..." : `Оплатить ${auction.currentPrice} ${auction.currency}`}
+          {processing
+            ? "Обработка..."
+            : `Оплатить ${auction.currentPrice} ${auction.currency}`}
         </button>
 
         <Link
