@@ -44,13 +44,6 @@ export interface Payment {
   createdAt: string;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
 export interface AuctionsListResponse {
   auctions: Auction[];
   pagination: {
@@ -90,14 +83,21 @@ export interface CreateBidData {
   amount: number;
 }
 
-// Экспортируем все типы из новых файлов
-export * from "./auth.types";
-export * from "./auction.types";
-export * from "./bid.types";
-export * from "./payment.types";
-export * from "./error.types";
+// Экспортируем модульные типы
 export * from "./api.types";
+export * from "./error.types";
+export * from "./auction.types";
+export * from "./payment.types";
+export * from "./user.types";
+export * from "./bid.types";
+export * from "./async.types";
+export * from "./form.types";
+export * from "./event.types";
+export * from "./date.types";
+export * from "./react.types";
+export * from "./object.types";
 export * from "./utility.types";
+export * from "./auth.types";
 
 // Экспортируем утилиты для WebSocket
 export * from "../utils/websocket";

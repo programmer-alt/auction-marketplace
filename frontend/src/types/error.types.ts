@@ -1,17 +1,12 @@
 /**
- * Типы для обработки ошибок
+ * Error handling types
  */
 
 import type { AxiosError } from "axios";
 
-export interface ErrorContract {
-  message: string;
-  level: "info" | "warning" | "error" | "critical";
-  context?: Record<string, any>;
-  handled?: boolean;
-  timestamp?: Date;
-}
-
+/**
+ * Категории ошибок для классификации
+ */
 export enum ErrorCategory {
   NETWORK = "NETWORK",
   VALIDATION = "VALIDATION",
@@ -22,39 +17,54 @@ export enum ErrorCategory {
   UNKNOWN = "UNKNOWN",
 }
 
-export type PossibleError = unknown;
+/**
+ * Определяем контракт ошибки для унификации обработки
+ */
+export interface ErrorContract {
+  message: string;
+  level: "info" | "warning" | "error" | "critical";
+  context?: Record<string, any>;
+  handled?: boolean;
+  timestamp?: Date;
+}
 
+/**
+ * Интерфейс для детализации ошибки
+ */
 export interface DetailedError extends ErrorContract {
   code?: string;
   category: ErrorCategory;
   originalError?: any;
 }
 
+/**
+ * Интерфейс для пометки ошибок как обработанных
+ */
 export interface HandledError extends Error {
   config?: {
     handled?: boolean;
   };
 }
 
-export interface ApiError {
-  success: false;
-  error: string;
-  code?: string;
-  details?: unknown;
-}
+/**
+ * Возможные типы ошибок - упрощаем до unknown
+ */
+export type PossibleError = unknown;
 
-export function isApiSuccess<T>(response: any): response is { success: true; data: T; message?: string } {
-  return response.success === true;
-}
+// ========================================
+// Type guards для ошибок
+// ========================================
 
-export function isApiError(response: any): response is ApiError {
-  return response.success === false;
-}
-
+/**
+ * Type guard для проверки ошибки как HandledError
+ */
 export function isHandledError(error: any): error is HandledError {
   return error && typeof error === "object" && error.config?.handled === true;
 }
 
+/**
+ * Type guard для проверки ошибки как AxiosError
+ */
 export function isAxiosError(error: any): error is AxiosError {
   return error && typeof error === "object" && "isAxiosError" in error;
 }

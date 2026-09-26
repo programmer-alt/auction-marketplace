@@ -273,7 +273,7 @@ function PaymentPage() {
       .createPaymentIntent(auction.id, selectedCountry) // Передаем selectedCountry
       .then((res) => {
         if (!cancelled) {
-          const secret = res.data?.clientSecret ?? null;
+          const secret = res.success ? res.data?.clientSecret ?? null : null;
           clientSecretRef.current = secret;
           setSecretLoading(false);
         }

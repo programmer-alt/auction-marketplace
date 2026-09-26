@@ -1,12 +1,17 @@
 /**
- * Типы для платежей
+ * Payment-related types
  */
 
-import { Auction } from './index';
+import type { Auction, Payment } from "./index";
 
-// PaymentStatus уже определен в основном интерфейсе Payment
-export type PaymentStatusUnion = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+/**
+ * Статусы платежа как union тип
+ */
+export type PaymentStatusUnion = Payment["status"];
 
+/**
+ * Тип для платежа с деталями аукциона
+ */
 export type PaymentWithAuction = Payment & {
   auction: Pick<Auction, "id" | "title" | "imageUrl" | "sellerId">;
 };
