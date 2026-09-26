@@ -88,6 +88,7 @@ function PaymentPage() {
   const [processing, setProcessing] = useState(false); // Используем setProcessing
   const [error, setError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState("US");
+  const [postalCode, setPostalCode] = useState("");
 
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null); // Для хранения экземпляра Elements
@@ -96,13 +97,11 @@ function PaymentPage() {
   const [cardNumberElement, setCardNumberElement] = useState<any>(null);
   const [cardExpiryElement, setCardExpiryElement] = useState<any>(null);
   const [cardCvcElement, setCardCvcElement] = useState<any>(null);
-  const [cardPostalElement, setCardPostalElement] = useState<any>(null);
 
   //  useRef для экземпляров элементов Stripe ---
   const cardNumberElementInstanceRef = useRef<any>(null);
   const cardExpiryElementInstanceRef = useRef<any>(null);
   const cardCvcElementInstanceRef = useRef<any>(null);
-  const cardPostalElementInstanceRef = useRef<any>(null);
 
   const isInitializing = useRef(false);
   const clientSecretRef = useRef<string | null>(null);
@@ -158,8 +157,7 @@ function PaymentPage() {
       "[Payment] All required elements ready?",
       !!cardNumberElement &&
         !!cardExpiryElement &&
-        !!cardCvcElement &&
-        !!cardPostalElement,
+        !!cardCvcElement,
     );
 
     // Проверяем, готовы ли все условия и не были ли элементы уже инициализированы
@@ -168,8 +166,7 @@ function PaymentPage() {
       elementsRef.current ||
       !cardNumberElement ||
       !cardExpiryElement ||
-      !cardCvcElement ||
-      !cardPostalElement
+      !cardCvcElement
     ) {
       console.log(
         "[Payment] Conditions not met or elements already mounted, skipping mount.",
@@ -228,18 +225,6 @@ function PaymentPage() {
       cardCvc.mount(cardCvcElement);
       cardCvcElementInstanceRef.current = cardCvc; // <-- Сохраняем экземпляр
 
-      // Почтовый индекс
-      const cardPostal = elementsInstance.create("postalCode", {
-        style: elementStyles,
-        placeholder: "Почтовый индекс", // Добавлен placeholder
-      });
-      console.log(
-        "[Payment] Mounting cardPostal element to",
-        cardPostalElement,
-      );
-      cardPostal.mount(cardPostalElement);
-      cardPostalElementInstanceRef.current = cardPostal; // <-- Сохраняем экземпляр
-
       // Сохраняем экземпляр Elements
       elementsRef.current = elementsInstance;
 
@@ -253,7 +238,6 @@ function PaymentPage() {
     cardNumberElement,
     cardExpiryElement,
     cardCvcElement,
-    cardPostalElement,
   ]); // Зависимости от состояний DOM-элементов (callback ref)
 
   // 3. Получаем clientSecret когда auction готов
@@ -338,15 +322,14 @@ function PaymentPage() {
       elementsRef.current.submit();
 
       // 2. Подтверждаем PaymentIntent напрямую, передавая clientSecret и объект payment_method.
-      // Stripe автоматически извлечет данные карты (включая индекс) из elementsRef.current или из экземпляра cardNumber.
       const { error: stripeError, paymentIntent } =
         await stripeRef.current!.confirmCardPayment(clientSecretRef.current, {
           payment_method: {
-            card: cardNumberElementInstanceRef.current, // Передаем экземпляр cardNumber, к которому привязаны другие поля
+            card: cardNumberElementInstanceRef.current,
             billing_details: {
               address: {
                 country: selectedCountry,
-                // postal_code не указываем здесь, он вводится в элементе cardPostal
+                postal_code: postalCode,
               },
             },
           },
@@ -553,10 +536,14 @@ function PaymentPage() {
               <label className="block text-xs text-gray-500 mb-1">
                 Почтовый индекс
               </label>
-              <div
-                ref={(node) => setCardPostalElement(node)}
-                className="border border-gray-300 rounded-md p-3 h-11"
-              ></div>
+              <input
+                type="text"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                placeholder="Почтовый индекс (например, 1010)"
+                className="w-full border border-gray-300 rounded-md p-3 h-11"
+                required
+              />
             </div>
           </div>
         </div>
