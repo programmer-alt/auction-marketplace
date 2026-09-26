@@ -1,0 +1,117 @@
+---
+title: "Payment Flow — Поток оплаты через Stripe"
+description: "Полная диаграмма процесса оплаты аукциона: 12 шагов от ввода карты до списания"
+---
+
+%% ========================================================
+%% Payment Flow — Диаграмма потока оплаты
+%% Проект: Global Auction Marketplace
+%% ========================================================
+
+flowchart TD
+    %% ========================================
+    %% СТИЛИ
+    %% ========================================
+    classDef user fill:#f0f9ff,stroke:#3b82f6,stroke-width:2px,color:#000
+    classDef frontend fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#000
+    classDef backend fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#000
+    classDef stripe fill:#ede9fe,stroke:#8b5cf6,stroke-width:2px,color:#000
+    classDef db fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#000
+    classDef decision fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,shape:rhombus,color:#000
+    classDef success fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#000
+    classDef fail fill:#fee2e2,stroke:#ef4444,stroke-width:2px,color:#000
+
+    %% ========================================
+    %% УРОВЕНЬ: Пользователь
+    %% ========================================
+    UserStart(["👤 Пользователь\nОткрывает страницу оплаты"]):::user
+
+    %% ========================================
+    %% УРОВЕНЬ: Frontend
+    %% ========================================
+    FrontendPage["🖥 Frontend — PaymentPage\nФайл: Payment.index.tsx"]:::frontend
+
+    Step1["ШАГ 1: Ввод данных\n• Карта: 4242 4242 4242 4242\n• Expiry: 12 / 2030\n• CVC: 123\n• Country: AT\n• ZIP: 1010\n(input field + React state)"]:::frontend
+
+    Step2["ШАГ 2: useEffect → createPaymentIntent\n• POST /api/payments/create-intent\n• Тело: { auctionId: 1, countryCode: AT }\n• Файл: api/payments.ts"]:::frontend
+
+    Step8["ШАГ 8: handlePayment() — подтверждение\n• elementsRef.current.submit()\n• stripe.confirmCardPayment(clientSecret, {\n    payment_method: {\n      card: cardNumberElement,\n      billing_details: {\n        address: { country: AT, postal_code: 1010 }\n      }\n    }\n  })\n• Файл: Payment.index.tsx:325-336"]:::frontend
+
+    Step10["ШАГ 10: Frontend результат\n• error: null\n• paymentIntent.status: requires_capture\n• toast.success(Платёж успешно обработан!)\n• PaymentResult.tsx → redirect_status: succeeded\n• Отображение: Оплата прошла успешно! ✅"]:::frontend
+
+    %% ========================================
+    %% УРОВЕНЬ: Backend
+    %% ========================================
+    Step3["ШАГ 3: Backend Controller\nФайл: payments.controller.ts\n• Zod валидация: auctionId (number), countryCode (2 chars)\n• authMiddleware: проверка JWT token\n• Вызов: paymentsService.createPaymentIntent()"]:::backend
+
+    Step4["ШАГ 4: Backend Service\nФайл: payments.service.ts\n• getAuctionById() — проверка существования\n• getUserById() — проверка пользователя\n• Проверка: sellerId !== userId\n  (нельзя оплатить свой аукцион)\n• currency = auction.currency.toLowerCase() (usd)\n• ZERO_DECIMAL_CURRENCIES check\n• multiplier = 100 (для USD)\n• amount в центах = 10.01 × 100 = 1001"]:::backend
+
+    Step6["ШАГ 6: payments.repository.createPayment()\nФайл: payments.repository.ts\n• INSERT INTO payment {\n    userId: 2, auctionId: 1,\n    amount: 10.01, currency: USD,\n    stripePaymentId: pi_xxx,\n    status: PENDING\n  }"]:::db
+
+    Step11["ШАГ 11: Stripe Webhook\n• POST /api/payments/webhook\n• Header: stripe-signature: sig_xxx\n• paymentsController.handleWebhook()\n• stripe.webhooks.constructEvent(body, sig, secret)\n• event.type: payment_intent.requires_capture\n• updatePayment(status: AUTHORIZED)\n• DB: PENDING → AUTHORIZED\n• Файл: payments.service.ts:269-281"]:::backend
+
+    %% ========================================
+    %% УРОВЕНЬ: Stripe API
+    %% ========================================
+    Step5["💳 ШАГ 5: Stripe API — paymentIntents.create\n• amount: 1001 (центы = $10.01)\n• currency: usd\n• description: Оплата аукциона: карандаш\n• automatic_payment_methods: { enabled: true }\n• metadata: { auctionId: 1, userId: 2, countryCode: AT }\n→ Возврат: { id: pi_xxx, client_secret: pi_xxx_secret_yyy }"]:::stripe
+
+    Step9["💳 ШАГ 9: Stripe Processing\n• ✅ ZIP check: Passed\n• ✅ CVC check: Passed\n• ✅ Fraud check: Passed\n• PaymentIntent.status = requires_capture\n• Деньги заблокированы (hold/холд)"]:::stripe
+
+    %% ========================================
+    %% УРОВЕНЬ: Результат
+    %% ========================================
+    AuctionComplete["ШАГ 12: Аукцион завершён\nОпределяется победитель"]:::decision
+
+    BranchWinner["✅ Победитель:\ncapturePayment(paymentId) [admin]\n• stripe.paymentIntents.capture()\n• DB: status → COMPLETED\n• updateAuctionPaidAt() → paidAt=NOW()"]:::success
+
+    BranchLoser["❌ Не победил:\ncancelHold(paymentId) [admin]\n• stripe.paymentIntents.cancel()\n• DELETE payment из БД\n• Холд истекает 24-168ч"]:::fail
+
+    BranchFailed["💥 Ошибка оплаты:\n• card_declined / expired_card / incorrect_cvc\n• Webhook: payment_intent.payment_failed\n• DB: status → FAILED"]:::fail
+
+    %% ========================================
+    %% СВЯЗИ
+    %% ========================================
+    UserStart -->|"открывает страницу"| FrontendPage
+    FrontendPage --> Step1
+    Step1 -->|"вводит данные"| Step2
+    Step2 -->|"HTTP POST"| Step3
+    Step3 -->|"вызов"| Step4
+    Step4 -->|"API call"| Step5
+    Step5 -->|"callback + client_secret"| Step6
+    Step6 -->|"response: clientSecret"| Step8
+    Step8 -->|"пользователь жмёт Оплатить"| Step9
+    Step9 -->|"result: requires_capture"| Step10
+    Step10 -->|"Stripe webhook"| Step11
+    Step11 -->|"статус AUTHORIZED"| AuctionComplete
+    AuctionComplete -->|"✅ победил"| BranchWinner
+    AuctionComplete -->|"❌ не победил"| BranchLoser
+    AuctionComplete -->|"💥 отклонён"| BranchFailed
+
+    %% ========================================
+    %% ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ
+    %% ========================================
+    subgraph Info ["📋 Ключевые файлы"]
+        direction TB
+        F1["Frontend Page\nPayment.index.tsx"]
+        F2["Frontend Result\nPaymentResult.tsx"]
+        F3["Frontend API\npayments.ts"]
+        F4["Backend Controller\npayments.controller.ts"]
+        F5["Backend Service\npayments.service.ts"]
+        F6["Backend Repository\npayments.repository.ts"]
+        F7["Backend Routes\npayments.routes.ts"]
+    end
+
+    subgraph StatusFlow ["🔄 Жизненный цикл статуса платежа"]
+        direction LR
+        S1["PENDING"] -->|"webhook requires_capture"| S2["AUTHORIZED"] -->|"capture"| S3["COMPLETED"]
+        S1 -->|"webhook payment_failed"| S4["FAILED"]
+        S3 -->|"admin refund"| S5["REFUNDED"]
+    end
+
+    subgraph Metadata ["📦 Metadata PaymentIntent"]
+        M1["auctionId: string"]
+        M2["userId: string"]
+        M3["countryCode: string"]
+    end
+
+    Step5 -.->|"metadata"| Metadata
