@@ -1,5 +1,4 @@
-import type { Auction, Bid, Payment } from "../types";
-import type { AuctionEvent, BidEvent, EventHandlers, WebSocketEvent } from "../types/auction.types";
+import type { Auction, AuctionEvent, Bid, BidEvent, EventHandlers, Payment, WebSocketEvent } from "../types";
 
 /**
  * Утилита для регистрации обработчиков WebSocket-событий

@@ -1,13 +1,6 @@
 import type { AxiosError } from "axios";
 import toast from "react-hot-toast";
-import { 
-  type DetailedError, 
-  ErrorCategory, 
-  type ErrorContract, 
-  isAxiosError, 
-  isHandledError 
-} from "../types/error.types";
-import type { PossibleError } from "../types/errorTypes";
+import { type DetailedError, ErrorCategory, type ErrorContract, isAxiosError, isHandledError, type PossibleError } from "../types/error.types";
 import { markErrorAsHandled } from "./errorHandler";
 
 /**

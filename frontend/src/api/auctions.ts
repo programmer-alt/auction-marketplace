@@ -1,7 +1,6 @@
 import type { AuctionsListResponse, CreateAuctionData } from "../types";
-import type { Auction } from "../types";
-import type { AuctionDetail, ExtractApiData, ApiResponse } from "../types/api.types";
-import type { isApiSuccess, isApiError } from "../types/error.types";
+import type { ApiResponse, ExtractApiData } from "../types/api.types";
+import type { Auction, AuctionDetail } from "../types/auction.types";
 import api from "./axios";
 
 interface AuctionMutationResponse {
@@ -104,4 +103,4 @@ export function extractApiData<T extends ApiResponse<any>>(response: T): Extract
 }
 
 // Утилиты для проверки типа ответа
-export { isApiSuccess, isApiError } from "../types/error.types";
+export { isApiSuccess, isApiError } from "../types/api.types";

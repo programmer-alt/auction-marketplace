@@ -1,33 +1,66 @@
 /**
- * Типы для аукционов
+ * Auction-related types
  */
 
-import { User, Bid } from './index';
+import type { Auction, Bid, User } from "./index";
 
-// Основной интерфейс аукциона уже определен в index.ts
-export type AuctionStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
+// Re-export Auction for convenience — allows direct imports from auction.types
+// Note: Auction is also available via barrel export from '@/types'
+export type { Auction } from "./index";
 
-export type AuctionStatusUnion = AuctionStatus;
+// ========================================
+// Статусы и типы аукционов
+// ========================================
 
+/**
+ * Статусы аукциона как union тип
+ */
+export type AuctionStatusUnion = Auction["status"];
+
+/**
+ * Тип для фильтрации аукционов по статусу
+ */
 export type AuctionByStatus<S extends AuctionStatusUnion> = Auction & { status: S };
 
+/**
+ * Тип для активных аукционов
+ */
 export type ActiveAuction = AuctionByStatus<"ACTIVE">;
 
+/**
+ * Тип для завершенных аукционов
+ */
 export type CompletedAuction = AuctionByStatus<"COMPLETED">;
 
+/**
+ * Тип для отмененных аукционов
+ */
 export type CancelledAuction = AuctionByStatus<"CANCELLED">;
 
+/**
+ * Тип для аукциона с минимальными данными (для списков)
+ */
 export type AuctionPreview = Pick<
   Auction,
   "id" | "title" | "imageUrl" | "currentPrice" | "status" | "endsAt" | "seller"
 >;
 
+/**
+ * Тип для детального представления аукциона
+ */
 export type AuctionDetail = Auction & {
   bids: Bid[];
   seller: User;
   winner: User | null;
 };
 
+// ========================================
+// Состояние аукциона (discriminated union)
+// ========================================
+
+/**
+ * Тип для состояния аукциона с discriminated union
+ */
 export type AuctionState =
   | { type: "not_found" }
   | { type: "loading" }
@@ -35,32 +68,20 @@ export type AuctionState =
   | { type: "completed"; auction: CompletedAuction; winner: User | null }
   | { type: "cancelled"; auction: CancelledAuction; reason?: string };
 
-export type AuctionEvent = `auction:${AuctionStatusUnion | "created" | "updated" | "deleted"}`;
+// ========================================
+// Type guards для аукционов
+// ========================================
 
-export type AuctionFilters = {
-  status?: AuctionStatusUnion | "ALL";
-  minPrice?: number;
-  maxPrice?: number;
-  sellerId?: number;
-  endsBefore?: DateLike;
-  search?: string;
-} & PaginationParams;
+/**
+ * Type guard для проверки активного аукциона
+ */
+export function isActiveAuction(auction: Auction): auction is ActiveAuction {
+  return auction.status === "ACTIVE";
+}
 
-export type DateLike = Date | string | number;
-
-export type TimeRange = {
-  from: DateLike;
-  to: DateLike;
-};
-
-export type DateFilter = {
-  field: "createdAt" | "endsAt" | "updatedAt";
-  range: TimeRange;
-};
-
-export type PaginationParams = {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-};
+/**
+ * Type guard для проверки завершенного аукциона
+ */
+export function isCompletedAuction(auction: Auction): auction is CompletedAuction {
+  return auction.status === "COMPLETED";
+}

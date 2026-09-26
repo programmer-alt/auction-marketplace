@@ -1,7 +1,7 @@
 import { auctionsApi } from "@/api/auctions";
 import type { Auction, CreateAuctionData } from "@/types";
-import type { ApiResponse, AsyncState, AuctionDetail } from "@/types/api.types";
-import { isApiSuccess } from "@/types/error.types";
+import type { ApiResponse, AsyncState, AuctionDetail } from "@/types";
+import { isApiSuccess } from "@/types";
 import { markErrorAsHandled } from "@/utils/errorHandler";
 import { useCallback, useEffect, useState } from "react";
 import { useForm, useFormState } from "react-hook-form";

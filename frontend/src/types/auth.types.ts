@@ -1,27 +1,18 @@
 /**
- * Типы для аутентификации и авторизации
+ * Auth-related types
  */
 
-import { User } from './index';
+import type { User, ApiResponse } from "./index";
+import type { UserUpdate } from "./user.types";
 
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface RegisterCredentials extends LoginCredentials {
-  name: string;
-}
-
-export type PublicUser = Pick<User, "id" | "name" | "email" | "createdAt">;
-
-export type UserUpdate = Partial<Pick<User, "name" | "email">>;
-
+/**
+ * Пример: Тип для контекста аутентификации
+ */
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (credentials: { email: string; password: string }) => Promise<any>;
+  login: (credentials: { email: string; password: string }) => Promise<ApiResponse<User>>;
   logout: () => void;
-  register: (data: { email: string; password: string; name: string }) => Promise<any>;
-  updateProfile: (data: UserUpdate) => Promise<any>;
+  register: (data: { email: string; password: string; name: string }) => Promise<ApiResponse<User>>;
+  updateProfile: (data: UserUpdate) => Promise<ApiResponse<User>>;
 }

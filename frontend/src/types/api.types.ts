@@ -1,42 +1,87 @@
 /**
- * Типы для API
+ * API response types
  */
 
-export type ApiSuccess<T> = {
+// ========================================
+// Базовые типы для ответов API
+// ========================================
+
+/**
+ * Базовый тип для успешного ответа API
+ */
+export interface ApiSuccess<T> {
   success: true;
   data: T;
   message?: string;
-};
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
 }
 
-export type ApiErrorResponse = {
+/**
+ * Базовый тип для ошибки API
+ */
+export interface ApiError {
   success: false;
   error: string;
   code?: string;
   details?: unknown;
-};
+}
 
-export type PaginatedApiResponse<T> = ApiSuccess<{
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}>;
+/**
+ * Union тип для ответа API
+ */
+export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
-export type PaginationParams = {
+/**
+ * Тип для пагинированного ответа
+ */
+export interface PaginatedApiResponse<T> {
+  success: true;
+  data: {
+    items: T[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+/**
+ * Тип для параметров пагинации
+ */
+export interface PaginationParams {
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
-};
+}
 
-export type ExtractApiData<T> = T extends ApiSuccess<infer U> ? U : never;
+// ========================================
+// Утилиты для извлечения данных
+// ========================================
 
+/**
+ * Извлекает тип данных из ApiResponse
+ */
+export type ExtractApiData<T> = T extends ApiResponse<infer U> ? U : never;
+
+/**
+ * Извлекает тип элемента из PaginatedApiResponse
+ */
 export type ExtractPaginatedItem<T> = T extends PaginatedApiResponse<infer U> ? U : never;
+
+// ========================================
+// Type guards
+// ========================================
+
+/**
+ * Type guard для проверки типа ApiSuccess
+ */
+export function isApiSuccess<T>(response: ApiResponse<T>): response is ApiSuccess<T> {
+  return response.success === true;
+}
+
+/**
+ * Type guard для проверки типа ApiError
+ */
+export function isApiError<T>(response: ApiResponse<T>): response is ApiError {
+  return response.success === false;
+}
