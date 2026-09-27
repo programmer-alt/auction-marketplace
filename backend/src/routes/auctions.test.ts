@@ -18,6 +18,10 @@ const { mockPrisma, mockIo } = vi.hoisted(() => {
     user: {
       findUnique: vi.fn(),
     },
+    payment: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
   };
 
   const mockIo = {
@@ -68,6 +72,9 @@ app.use(errorHandler);
 describe("Auctions Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock values for payment methods (used in completeAuction)
+    mockPrisma.payment.findFirst.mockResolvedValue(null);
+    mockPrisma.payment.findMany.mockResolvedValue([]);
   });
 
   // ========================================
@@ -575,10 +582,6 @@ describe("Auctions Routes", () => {
   // POST /api/auctions/:id/complete — завершение аукциона
   // ========================================
   describe("POST /api/auctions/:id/complete", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
     it("должен завершить аукцион", async () => {
       mockPrisma.auction.findUnique.mockResolvedValue({
         id: 1,

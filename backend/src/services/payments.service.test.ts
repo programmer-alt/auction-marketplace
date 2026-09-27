@@ -130,7 +130,7 @@ import * as usersRepo from "../repositories/users.repository";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrisma = prisma as any;
-const mockTransaction = vi.mocked(mockPrisma.$transaction);
+const _mockTransaction = vi.mocked(mockPrisma.$transaction);
 const mockGetUserById = vi.mocked(usersRepo.getUserById);
 const mockGetPaymentByStripeId = vi.mocked(paymentsRepo.getPaymentByStripeId);
 const mockUpdatePayment = vi.mocked(paymentsRepo.updatePayment);
