@@ -55,6 +55,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         <div className="mb-6">{children}</div>
         <div className="flex justify-end space-x-3">
           <button
+            type="button"
             onClick={handleClose}
             className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition"
           >

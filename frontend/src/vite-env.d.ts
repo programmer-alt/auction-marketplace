@@ -5,6 +5,7 @@ declare module "*.css" {
   export default content;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: global augmentation for Stripe
 interface Window {
   Stripe?: (key: string) => Promise<any>;
 }
