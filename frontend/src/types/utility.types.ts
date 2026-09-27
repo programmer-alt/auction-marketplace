@@ -29,7 +29,7 @@ export type DeepRequired<T> = {
  */
 export type DeepReadonly<T> = {
   readonly [P in keyof T]: T[P] extends object
-    ? T[P] extends (...args: unknown[]) => unknown
+    ? T[P] extends (...args: infer _A) => infer _R
       ? T[P]
       : DeepReadonly<T[P]>
     : T[P];
