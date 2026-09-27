@@ -31,7 +31,7 @@
 - **Zustand**: Маленький, быстрый и масштабируемый способ управления состоянием.
 - **React Hook Form**: Производительные, гибкие формы с простой валидацией.
 - **Zod**: Библиотека для объявления схем и валидации, ориентированная на TypeScript.
-- **Native WebSocket**: Двусторонняя связь в реальном времени (нативный WebSocket API браузера).
+- **Socket.io-client**: Двусторонняя связь в реальном времени на основе событий (клиентская библиотека Socket.io).
 - **Stripe React & JS**: Библиотеки для интеграции платежей Stripe.
 - **Date-fns**: Современная библиотека утилит для работы с датами в JavaScript.
 - **Lucide React**: Красивые, простые, идеально пиксельные иконки.
@@ -86,7 +86,7 @@ graph TB
 
     subgraph "Бэкенд (Node.js/Express)"
         BE[Express-сервер]
-        IO[Socket.io]
+        SIO[Socket.io сервер]
         JWT[JWT Аутентификация]
         PM[Модуль оплаты]
     end
@@ -101,7 +101,6 @@ graph TB
     end
 
     F <-- HTTP/AJAX --> BE
-    F <-- WebSocket --> IO
     BE <-- Prisma ORM --> DB
     BE <-- API Call --> PM
     PM <-- API Call --> STP

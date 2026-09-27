@@ -1,20 +1,35 @@
+import { type Socket, io } from "socket.io-client";
 import type { Auction, AuctionEvent, Bid, BidEvent, EventHandlers, Payment, WebSocketEvent } from "../types";
 
+const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 /**
- * Утилита для регистрации обработчиков WebSocket-событий
- * @param socket WebSocket-соединение
+ * Подключается к Socket.io-серверу и возвращает экземпляр сокета.
+ * @param token — JWT-токен для аутентификации (необязательно, гости подключаются как анонимы).
+ */
+export function createSocketConnection(token?: string): Socket {
+  const socket = io(SOCKET_URL, {
+    auth: token ? { token } : undefined,
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+  });
+
+  return socket;
+}
+
+/**
+ * Утилита для регистрации обработчиков Socket.io-событий.
+ * @param socket Socket.io-соединение
  * @param handlers Объект с обработчиками событий
  */
-export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<EventHandlers>): () => void {
-  // Сопоставление событий с обработчиками
+export function registerSocketHandlers(socket: Socket, handlers: Partial<EventHandlers>): () => void {
   const eventHandlerMap: { [K in WebSocketEvent]?: (data: Record<string, unknown>) => void } = {};
 
-  // Регистрация обработчиков на основе предоставленных
   Object.entries(handlers).forEach(([handlerKey, handlerFn]) => {
     if (typeof handlerFn === "function") {
-      // Убираем префикс "on" из названия обработчика
       const eventName = handlerKey.replace(/^on/, "").toLowerCase();
-      // Ищем соответствующее WebSocket-событие
       const wsEvents = getAllWebSocketEvents();
       const matchingEvent = wsEvents.find(
         (event) =>
@@ -24,7 +39,6 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
       );
 
       if (matchingEvent) {
-        // Создаем безопасную обертку с обработкой ошибок
         const safeHandler = (data: Record<string, unknown>) => {
           try {
             handlerFn(data);
@@ -32,18 +46,15 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
             console.error(`Ошибка при обработке события ${matchingEvent}:`, error);
           }
         };
-        // Сохраняем безопасную обертку в карту для последующего удаления
         eventHandlerMap[matchingEvent as WebSocketEvent] = safeHandler;
-        // Регистрируем безопасную обертку в WebSocket
-        socket.addEventListener(matchingEvent as keyof WebSocketEventMap, safeHandler as unknown as EventListener);
+        socket.on(matchingEvent as WebSocketEvent, safeHandler);
       }
     }
   });
 
-  // Возвращаем функцию отписки
   return () => {
     Object.entries(eventHandlerMap).forEach(([event, handler]) => {
-      socket.removeEventListener(event as keyof WebSocketEventMap, handler as unknown as EventListener);
+      socket.off(event as WebSocketEvent, handler);
     });
   };
 }
@@ -54,13 +65,13 @@ export function registerWebSocketHandlers(socket: WebSocket, handlers: Partial<E
 function getAllWebSocketEvents(): string[] {
   const auctionEvents: string[] = ["created", "updated", "deleted"].map((suffix) => `auction:${suffix}`);
   const bidEvents: string[] = ["created", "updated", "deleted", "won"].map((suffix) => `bid:${suffix}`);
-  const paymentEvents: string[] = ["PENDING", "COMPLETED", "FAILED"].map((suffix) => `payment:${suffix}`);
+  const paymentEvents: string[] = ["PENDING", "COMPLETED", "FAILED", "REFUNDED"].map((suffix) => `payment:${suffix}`);
 
   return [...auctionEvents, ...bidEvents, ...paymentEvents];
 }
 
 /**
- * Типизированные действия для WebSocket
+ * Типизированные действия для Socket.io
  */
 export const WebSocketActions = {
   // Аукционные события
@@ -77,6 +88,7 @@ export const WebSocketActions = {
   PAYMENT_PENDING: "payment:PENDING" as `payment:${Payment["status"]}`,
   PAYMENT_COMPLETED: "payment:COMPLETED" as `payment:${Payment["status"]}`,
   PAYMENT_FAILED: "payment:FAILED" as `payment:${Payment["status"]}`,
+  PAYMENT_REFUNDED: "payment:REFUNDED" as `payment:${Payment["status"]}`,
 };
 
 /**
@@ -106,17 +118,8 @@ export interface WebSocketMessage<T = Record<string, unknown>> {
 }
 
 /**
- * Отправка типизированного сообщения через WebSocket
+ * Отправка типизированного сообщения через Socket.io
  */
-export function sendWebSocketMessage<T>(socket: WebSocket, event: WebSocketEvent, data: T): void {
-  if (socket.readyState === WebSocket.OPEN) {
-    const message: WebSocketMessage<T> = {
-      event,
-      data,
-      timestamp: new Date().toISOString(),
-    };
-    socket.send(JSON.stringify(message));
-  } else {
-    console.warn(`Попытка отправить сообщение "${event}", но соединение закрыто`);
-  }
+export function sendWebSocketMessage<T>(socket: Socket, event: WebSocketEvent, data: T): void {
+  socket.emit(event, data);
 }

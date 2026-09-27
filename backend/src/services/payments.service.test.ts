@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as auctionsRepo from "../repositories/auctions.repository"; // Импортируем auctionsRepo
 import * as paymentsRepo from "../repositories/payments.repository";
 import * as paymentsService from "./payments.service";
 
@@ -185,7 +184,13 @@ describe("Payments Service", () => {
       };
       const mockAuctionsRepo = await import("../repositories/auctions.repository");
       (mockAuctionsRepo.getAuctionById as any).mockResolvedValue(mockCompletedAuction);
-      mockGetUserById.mockResolvedValue({ id: userId, email: "winner@test.com", name: "Winner", balance: new Prisma.Decimal(0), createdAt: new Date() });
+      mockGetUserById.mockResolvedValue({
+        id: userId,
+        email: "winner@test.com",
+        name: "Winner",
+        balance: new Prisma.Decimal(0),
+        createdAt: new Date(),
+      });
 
       mockPrisma.payment.findFirst.mockResolvedValue(null);
       mockPaymentIntentsCreate.mockResolvedValue({
@@ -204,7 +209,8 @@ describe("Payments Service", () => {
         automatic_payment_methods: {
           enabled: true,
         },
-        metadata: { // Обновляем ожидаемые метаданные
+        metadata: {
+          // Обновляем ожидаемые метаданные
           auctionId: "1",
           userId: "2",
           countryCode: "US", // Добавляем countryCode
@@ -234,7 +240,13 @@ describe("Payments Service", () => {
     it("должен выбросить ошибку, если пользователь продавец аукциона", async () => {
       const mockAuctionsRepo = await import("../repositories/auctions.repository");
       (mockAuctionsRepo.getAuctionById as any).mockResolvedValue(mockCompletedAuction);
-      mockGetUserById.mockResolvedValue({ id: userId, email: "winner@test.com", name: "Winner", balance: new Prisma.Decimal(0), createdAt: new Date() });
+      mockGetUserById.mockResolvedValue({
+        id: userId,
+        email: "winner@test.com",
+        name: "Winner",
+        balance: new Prisma.Decimal(0),
+        createdAt: new Date(),
+      });
 
       await expect(paymentsService.createPaymentIntent(auctionId, mockCompletedAuction.sellerId, "US")).rejects.toThrow(
         "Нельзя оплатить свой собственный аукцион",

@@ -8,7 +8,10 @@ export interface CreatePaymentIntentResponse {
 }
 
 export const paymentsApi = {
-  createPaymentIntent: async (auctionId: number, countryCode: string): Promise<ApiResponse<CreatePaymentIntentResponse>> => {
+  createPaymentIntent: async (
+    auctionId: number,
+    countryCode: string,
+  ): Promise<ApiResponse<CreatePaymentIntentResponse>> => {
     const response = await api.post<CreatePaymentIntentResponse>("/payments/create-intent", { auctionId, countryCode });
     return {
       success: true,
