@@ -120,6 +120,7 @@ export default function Profile() {
               role="link"
               tabIndex={0}
               onKeyDown={(e) => {
+                if (e.key === " ") e.preventDefault();
                 if (e.key === "Enter" || e.key === " ") navigate(`/auctions/${auction.id}`);
               }}
             >
