@@ -286,20 +286,22 @@ function PaymentPage() {
       elementsRef.current.submit();
 
       // 2. Подтверждаем PaymentIntent напрямую, передавая clientSecret и объект payment_method.
-      const { error: stripeError, paymentIntent } = await stripeRef.current!.confirmCardPayment(
-        clientSecretRef.current,
-        {
-          payment_method: {
-            card: cardNumberElementInstanceRef.current,
-            billing_details: {
-              address: {
-                country: selectedCountry,
-                postal_code: postalCode,
-              },
+      const stripeCurrent = stripeRef.current;
+      if (!stripeCurrent) {
+        console.error("Stripe instance is not available");
+        return;
+      }
+      const { error: stripeError, paymentIntent } = await stripeCurrent.confirmCardPayment(clientSecretRef.current, {
+        payment_method: {
+          card: cardNumberElementInstanceRef.current,
+          billing_details: {
+            address: {
+              country: selectedCountry,
+              postal_code: postalCode,
             },
           },
         },
-      );
+      });
 
       // 3. Проверяем наличие ошибки Stripe при подтверждении (включая ошибки валидации)
       if (stripeError) {
@@ -457,10 +459,7 @@ function PaymentPage() {
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
-              <div
-                ref={(node) => setCardNumberElement(node)}
-                className="border border-gray-300 rounded-md p-3 h-11"
-              ></div>
+              <div ref={(node) => setCardNumberElement(node)} className="border border-gray-300 rounded-md p-3 h-11" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -468,14 +467,11 @@ function PaymentPage() {
                 <div
                   ref={(node) => setCardExpiryElement(node)}
                   className="border border-gray-300 rounded-md p-3 h-11"
-                ></div>
+                />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">CVC</label>
-                <div
-                  ref={(node) => setCardCvcElement(node)}
-                  className="border border-gray-300 rounded-md p-3 h-11"
-                ></div>
+                <div ref={(node) => setCardCvcElement(node)} className="border border-gray-300 rounded-md p-3 h-11" />
               </div>
             </div>
             <div>
@@ -495,6 +491,7 @@ function PaymentPage() {
         {error && <div className="mt-4 bg-red-50 rounded-lg p-4 text-red-700">{error}</div>}
 
         <button
+          type="button"
           onClick={handlePayment}
           disabled={processing || !clientSecretRef.current}
           className={`btn btn-primary w-full mt-6 ${processing ? "loading" : ""}`}

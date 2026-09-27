@@ -28,7 +28,11 @@ export type DeepRequired<T> = {
  * Делает все свойства объекта доступными только для чтения (включая вложенные)
  */
 export type DeepReadonly<T> = {
-  readonly [P in keyof T]: T[P] extends object ? (T[P] extends Function ? T[P] : DeepReadonly<T[P]>) : T[P];
+  readonly [P in keyof T]: T[P] extends object
+    ? T[P] extends (...args: unknown[]) => unknown
+      ? T[P]
+      : DeepReadonly<T[P]>
+    : T[P];
 };
 
 /**

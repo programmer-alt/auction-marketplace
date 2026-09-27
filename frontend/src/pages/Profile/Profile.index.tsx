@@ -41,6 +41,7 @@ export default function Profile() {
         {(["my", "won"] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
             className={`px-4 py-3 font-medium transition-colors relative ${activeTab === tab ? "text-primary-600" : "text-gray-500 hover:text-gray-700"}`}
             onClick={() => setActiveTab(tab)}
           >
@@ -116,6 +117,11 @@ export default function Profile() {
               key={auction.id}
               className="card hover:shadow-md transition-shadow flex items-center justify-between"
               onClick={() => navigate(`/auctions/${auction.id}`)}
+              role="link"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") navigate(`/auctions/${auction.id}`);
+              }}
             >
               <div>
                 <h3 className="font-semibold text-gray-900">{auction.title}</h3>
