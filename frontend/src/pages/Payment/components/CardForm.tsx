@@ -16,7 +16,7 @@ const CardForm: React.FC<CardFormProps> = ({ processing, currentPrice, onSubmit,
       <label className="block text-sm font-medium text-gray-700 mb-1">Способ оплаты</label>
       <div className="bg-white rounded-lg border border-gray-200 p-3">
         {/* CardElement монтируется сюда через raw Stripe.js */
-/*         <div
+    /*         <div
           ref={(node) => {
             if (node) {
               (node as HTMLDivElement).style.border = "none";

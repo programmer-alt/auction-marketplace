@@ -2,7 +2,7 @@
  * Auth-related types
  */
 
-import type { User, ApiResponse } from "./index";
+import type { ApiResponse, User } from "./index";
 import type { UserUpdate } from "./user.types";
 
 /**

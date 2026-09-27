@@ -1,33 +1,26 @@
-import { type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import { prisma } from "../config/db";
+// Импортируем глобальный экземпляр stripe
+import { stripe } from "../config/stripe";
+// Импортируем функции ошибок
+import { createNotFoundError, createValidationError } from "../errors/factories";
+import { getAuctionById } from "../repositories/auctions.repository";
 import {
   createPayment,
   getPaymentByStripeId,
   updateAuctionPaidAt,
   updatePayment,
 } from "../repositories/payments.repository";
-import { getAuctionById } from "../repositories/auctions.repository";
-import { getUserById } from "../repositories/users.repository";
-// Импортируем типы, включая Payment
-import type {
-  Payment,
-  PaymentWithAuctionSeller,
-  PaymentWithRelations,
-} from "../types/index";
-// Импортируем функции ошибок
-import {
-  createValidationError,
-  createNotFoundError,
-} from "../errors/factories";
 // Импортируем остальные функции репозитория
 import {
+  getPaymentByIdWithAuction,
   getPaymentsByUserId,
   getPaymentsCountByUserId,
-  getPaymentByIdWithAuction,
 } from "../repositories/payments.repository";
-// Импортируем глобальный экземпляр stripe
-import { stripe } from "../config/stripe";
+import { getUserById } from "../repositories/users.repository";
+// Импортируем типы, включая Payment
+import type { Payment, PaymentWithAuctionSeller, PaymentWithRelations } from "../types/index";
 
 // ========================================
 // Типы
@@ -85,7 +78,22 @@ export async function createPaymentIntent(
   // Stripe требует amount в минорных единицах (центы), НО для zero-decimal валют (JPY, KRW, VND и др.)
   // сумма передаётся как есть, без умножения на 100
   const ZERO_DECIMAL_CURRENCIES = new Set([
-    "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
+    "bif",
+    "clp",
+    "djf",
+    "gnf",
+    "jpy",
+    "kmf",
+    "krw",
+    "mga",
+    "pyg",
+    "rwf",
+    "ugx",
+    "vnd",
+    "vuv",
+    "xaf",
+    "xof",
+    "xpf",
     // ISK, HUF, TWD, UGX (специальные случаи) не включены сюда в базовой реализации
   ]);
   const multiplier = ZERO_DECIMAL_CURRENCIES.has(currency) ? 1 : 100;
@@ -134,10 +142,7 @@ async function handlePaymentIntentEvent(
   paymentStatus: "COMPLETED" | "FAILED",
   logMessage: string,
   paymentIntent?: Stripe.PaymentIntent,
-  extraCheck?: (
-    payment: Payment,
-    paymentIntent: Stripe.PaymentIntent,
-  ) => Promise<void>,
+  extraCheck?: (payment: Payment, paymentIntent: Stripe.PaymentIntent) => Promise<void>,
 ): Promise<void> {
   const payment = await getPaymentByStripeId(prisma, stripePaymentId);
 
@@ -148,9 +153,7 @@ async function handlePaymentIntentEvent(
     await updatePayment(prisma, payment.id, { status: paymentStatus });
     console.log(logMessage);
   } else {
-    console.warn(
-      `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД`,
-    );
+    console.warn(`[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
   }
 }
 
@@ -167,9 +170,7 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
   if (payment) {
     // Defense in depth: проверяем, что сумма PI совпадает с суммой в БД
     const ZERO_DECIMAL_CURRENCIES = new Set(["jpy", "krw", "vnd"]);
-    const expectedAmount = ZERO_DECIMAL_CURRENCIES.has(
-      payment.currency.toLowerCase(),
-    )
+    const expectedAmount = ZERO_DECIMAL_CURRENCIES.has(payment.currency.toLowerCase())
       ? Math.round(payment.amount.toNumber())
       : Math.round(payment.amount.toNumber() * 100);
     if (paymentIntent.amount !== expectedAmount) {
@@ -184,9 +185,7 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
     // При manual capture — статус меняется на COMPLETED
     await updatePayment(prisma, payment.id, { status: "COMPLETED" });
     await updateAuctionPaidAt(prisma, payment.auctionId);
-    console.log(
-      `[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`,
-    );
+    console.log(`[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`);
   } else {
     console.warn(
       `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД — пользователь мог оплатить, но система не записала платёж`,
@@ -204,13 +203,7 @@ async function handlePaymentStateChangeEvent(
 ): Promise<void> {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
   const fullLogMessage = `${logMessagePrefix} ${paymentIntent.id}`;
-  await handlePaymentIntentEvent(
-    prisma,
-    paymentIntent.id,
-    paymentStatus,
-    fullLogMessage,
-    paymentIntent,
-  );
+  await handlePaymentIntentEvent(prisma, paymentIntent.id, paymentStatus, fullLogMessage, paymentIntent);
 }
 
 /**
@@ -226,9 +219,7 @@ async function handleRefund(event: Stripe.Event): Promise<void> {
       await updatePayment(prisma, payment.id, { status: "REFUNDED" });
       console.log(`Возврат для платежа ${stripePaymentId} обработан`);
     } else {
-      console.error(
-        `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`,
-      );
+      console.error(`[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
     }
   }
 }
@@ -273,9 +264,7 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
         const payment = await getPaymentByStripeId(prisma, paymentIntent.id);
         if (payment) {
           await updatePayment(prisma, payment.id, { status: "AUTHORIZED" });
-          console.log(
-            `[AUTH] PaymentIntent готов к capture, paymentId=${payment.id}`,
-          );
+          console.log(`[AUTH] PaymentIntent готов к capture, paymentId=${payment.id}`);
         }
       }
       break;
@@ -293,9 +282,7 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
 // Ручное списание (manual capture) после победы
 // ========================================
 
-export async function capturePayment(
-  paymentId: number,
-): Promise<{ success: boolean; paymentIntentId: string }> {
+export async function capturePayment(paymentId: number): Promise<{ success: boolean; paymentIntentId: string }> {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: {
@@ -312,9 +299,7 @@ export async function capturePayment(
   }
 
   if (payment.status !== "AUTHORIZED") {
-    throw createValidationError(
-      `Платёж не в статусе холда (текущий: ${payment.status})`,
-    );
+    throw createValidationError(`Платёж не в статусе холда (текущий: ${payment.status})`);
   }
 
   if (!payment.stripePaymentId) {
@@ -332,15 +317,11 @@ export async function capturePayment(
   }
 
   if (auction.status !== "COMPLETED") {
-    throw createValidationError(
-      "Списание возможно только после завершения аукциона",
-    );
+    throw createValidationError("Списание возможно только после завершения аукциона");
   }
 
   if (auction.winnerId !== payment.userId) {
-    throw createValidationError(
-      "Списание возможно только для победителя аукциона",
-    );
+    throw createValidationError("Списание возможно только для победителя аукциона");
   }
 
   if (auction.endsAt && new Date(auction.endsAt) > new Date()) {
@@ -348,9 +329,7 @@ export async function capturePayment(
   }
 
   // Списываем деньги (manual capture)
-  const capturedIntent = await stripe.paymentIntents.capture(
-    payment.stripePaymentId,
-  );
+  const capturedIntent = await stripe.paymentIntents.capture(payment.stripePaymentId);
 
   // Обновляем статус в БД
   await prisma.payment.update({
@@ -361,9 +340,7 @@ export async function capturePayment(
   // Обновляем auction paidAt
   await updateAuctionPaidAt(prisma, payment.auctionId);
 
-  console.log(
-    `[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`,
-  );
+  console.log(`[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`);
 
   return { success: true, paymentIntentId: capturedIntent.id };
 }
@@ -421,10 +398,7 @@ export async function cancelHold(paymentId: number): Promise<void> {
     console.log(`[CANCEL] Холд отменён: paymentId=${payment.id}`);
   } catch (error) {
     // Холд мог истечь автоматически (24-168ч в зависимости от банка)
-    console.warn(
-      `[WARN] Не удалось отменить холд ${payment.stripePaymentId}:`,
-      error,
-    );
+    console.warn(`[WARN] Не удалось отменить холд ${payment.stripePaymentId}:`, error);
   }
 
   // Удаляем запись из БД
@@ -470,11 +444,7 @@ export async function getPaymentHistory(
 // Возврат платежа (Refund)
 // ========================================
 
-export async function refundPayment(
-  paymentId: number,
-  adminId: number,
-  reason?: string,
-): Promise<RefundPaymentResult> {
+export async function refundPayment(paymentId: number, adminId: number, reason?: string): Promise<RefundPaymentResult> {
   // Находим платёж с данными аукциона
   const payment = await getPaymentByIdWithAuction(prisma, paymentId);
 
@@ -483,15 +453,11 @@ export async function refundPayment(
   }
 
   if (payment.status !== "COMPLETED") {
-    throw createValidationError(
-      "Возврат возможен только для завершённых платежей",
-    );
+    throw createValidationError("Возврат возможен только для завершённых платежей");
   }
 
   if (!payment.stripePaymentId) {
-    throw createValidationError(
-      "У платежа отсутствует Stripe ID — возврат невозможен",
-    );
+    throw createValidationError("У платежа отсутствует Stripe ID — возврат невозможен");
   }
 
   // Создаём возврат в Stripe
@@ -510,9 +476,7 @@ export async function refundPayment(
     refundReason: reason ?? "Административный возврат",
   });
 
-  console.log(
-    `Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`,
-  );
+  console.log(`Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`);
 
   return {
     refundId: refund.id,

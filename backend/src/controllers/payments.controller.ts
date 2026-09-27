@@ -38,7 +38,11 @@ export const paymentsController = {
     }
 
     // Передаем countryCode в сервис
-    const result = await paymentsService.createPaymentIntent(parsed.data.auctionId, req.user.id, parsed.data.countryCode);
+    const result = await paymentsService.createPaymentIntent(
+      parsed.data.auctionId,
+      req.user.id,
+      parsed.data.countryCode,
+    );
     res.status(201).json({
       message: "Платёжный интент создан",
       clientSecret: result.clientSecret,
