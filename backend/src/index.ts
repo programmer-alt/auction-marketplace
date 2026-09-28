@@ -18,13 +18,16 @@ import cors from "cors";
 import express, { type Request, type Response } from "express";
 import helmet from "helmet";
 import hpp from "hpp";
-
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { upload } from "@/config/upload";
 
 // Таймаут для async операций
-function timeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> {
+function timeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  errorMsg: string,
+): Promise<T> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error(errorMsg)), ms);
   });
@@ -67,7 +70,12 @@ const httpServer = createServer(app);
  */
 function validatePort(input: string | number): number {
   const port = Number(input);
-  if (!Number.isFinite(port) || !Number.isInteger(port) || port < 1 || port > 65535) {
+  if (
+    !Number.isFinite(port) ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  ) {
     throw new Error(`Invalid PORT: ${input} (должен быть integer 1-65535)`);
   }
   return port;
@@ -88,6 +96,12 @@ export { io };
 // ========================================
 // Middleware безопасности и производительности
 // ========================================
+
+// Dashboard — отдаём статический HTML (ДО CSP middleware)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.get("/dashboard", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../public/dashboard.html"));
+});
 
 // Helmet для базовых security headers (отключаем CSP, т.к. используем кастомный middleware)
 app.use(
@@ -149,9 +163,6 @@ app.get("/metrics", async (_req, res) => {
     res.status(500).end(err);
   }
 });
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Статические файлы (загруженные изображения)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // CSRF токен эндпоинт — фронтенд вызывает при старте
 app.get("/api/csrf-token", generateCsrfToken, (_req, res) => {
@@ -168,14 +179,19 @@ app.get("/api/csrf-token", generateCsrfToken, (_req, res) => {
 });
 
 // Загрузка изображений
-app.post("/api/upload", authMiddleware, upload.single("image"), (req: Request, res: Response) => {
-  if (!req.file) {
-    res.status(400).json({ error: "Файл не загружен" });
-    return;
-  }
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-  res.json({ imageUrl });
-});
+app.post(
+  "/api/upload",
+  authMiddleware,
+  upload.single("image"),
+  (req: Request, res: Response) => {
+    if (!req.file) {
+      res.status(400).json({ error: "Файл не загружен" });
+      return;
+    }
+    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    res.json({ imageUrl });
+  },
+);
 
 // API routes
 app.get("/api", (_req, res) => {
@@ -215,7 +231,12 @@ io.on("connection", (socket) => {
   }
 
   socket.on("auction:join", (data: unknown) => {
-    if (!data || typeof data !== "object" || typeof (data as Record<string, unknown>).auctionId !== "number") return;
+    if (
+      !data ||
+      typeof data !== "object" ||
+      typeof (data as Record<string, unknown>).auctionId !== "number"
+    )
+      return;
     const { auctionId } = data as { auctionId: number };
     socket.join(`auction:${auctionId}`);
     logger.info(`Клиент ${socket.id} присоединился к аукциону:${auctionId}`);
@@ -228,7 +249,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    logger.info(`Клиент отключен: ${socket.id} (пользователь ${user?.id ?? "гость"})`);
+    logger.info(
+      `Клиент отключен: ${socket.id} (пользователь ${user?.id ?? "гость"})`,
+    );
   });
 });
 
@@ -250,7 +273,9 @@ async function shutdown(signal: string) {
     // Второй сигнал — планируем принудительный выход, но НЕ запускаем cleanup заново
     if (shutdownTimeout) return; // уже запланирован
 
-    logger.info(`Получен повторный сигнал ${signal}. Планируется принудительное завершение.`);
+    logger.info(
+      `Получен повторный сигнал ${signal}. Планируется принудительное завершение.`,
+    );
     shutdownTimeout = setTimeout(() => {
       logger.warn("Принудительное завершение (повторный сигнал).");
       shutdownFailed = true;
@@ -324,7 +349,9 @@ httpServer.listen(PORT, async () => {
       try {
         const updated = await autoCompleteExpiredAuctions();
         if (updated.length > 0) {
-          logger.info(`Автоматически завершено аукционов: ${updated.length} (IDs: ${updated.join(", ")})`);
+          logger.info(
+            `Автоматически завершено аукционов: ${updated.length} (IDs: ${updated.join(", ")})`,
+          );
         }
       } catch (error) {
         logger.error("Ошибка автоматического завершения аукционов:", error);
@@ -362,9 +389,14 @@ httpServer.listen(PORT, async () => {
             logger.info("✅ Reconnected to database successfully");
             break;
           } catch (reconnectErr) {
-            logger.error(`❌ Reconnect attempt ${attempt} failed:`, reconnectErr);
+            logger.error(
+              `❌ Reconnect attempt ${attempt} failed:`,
+              reconnectErr,
+            );
             if (attempt >= maxAttempts) {
-              logger.error("❌ Max reconnect attempts reached. Application may be unstable.");
+              logger.error(
+                "❌ Max reconnect attempts reached. Application may be unstable.",
+              );
             }
           }
         }
@@ -386,7 +418,10 @@ httpServer.on("error", async (error: NodeJS.ErrnoException) => {
     );
     logger.info(`Попытка найти и завершить процесс на порту ${PORT}...`);
 
-    const spawnChild = (command: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
+    const spawnChild = (
+      command: string,
+      args: string[],
+    ): Promise<{ stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         // No shell: use direct command execution for better security
         const child = spawn(command, args);
@@ -430,39 +465,62 @@ httpServer.on("error", async (error: NodeJS.ErrnoException) => {
               logger.warn(
                 `Порт ${PORT} находится в состоянии TIME_WAIT (ожидание освобождения после закрытия соединения).`,
               );
-              logger.info("Это нормально, процесс уже завершился, но сокет еще не освободился системой.");
-              logger.info("Пожалуйста, подождите 30-60 секунд и попробуйте снова.");
+              logger.info(
+                "Это нормально, процесс уже завершился, но сокет еще не освободился системой.",
+              );
+              logger.info(
+                "Пожалуйста, подождите 30-60 секунд и попробуйте снова.",
+              );
               process.exit(1);
             }
           } catch {
             /* ignore format errors */
           }
-          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-          logger.info("Это может быть связано с устаревшим сокетом или другой сетевой проблемой.");
+          logger.warn(
+            `Процессы на порту ${PORT} не найдены, но порт все еще занят.`,
+          );
+          logger.info(
+            "Это может быть связано с устаревшим сокетом или другой сетевой проблемой.",
+          );
           process.exit(1);
         } else {
           for (const pid of pids) {
             if (pid && !Number.isNaN(Number.parseInt(pid))) {
               logger.info(`Найден процесс с PID: ${pid}. Попытка завершить...`);
               try {
-                await spawnChild("powershell", ["-Command", `Stop-Process -Id ${pid} -Force`]);
-                logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+                await spawnChild("powershell", [
+                  "-Command",
+                  `Stop-Process -Id ${pid} -Force`,
+                ]);
+                logger.info(
+                  `Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`,
+                );
                 process.exit(1);
               } catch (killErr: unknown) {
-                const msg = killErr instanceof Error ? killErr.message : String(killErr);
+                const msg =
+                  killErr instanceof Error ? killErr.message : String(killErr);
                 logger.error(`Не удалось завершить процесс ${pid}: ${msg}`);
-                logger.info("ВНИМАНИЕ: Может потребоваться запуск от имени администратора.");
+                logger.info(
+                  "ВНИМАНИЕ: Может потребоваться запуск от имени администратора.",
+                );
                 process.exit(1);
               }
               break;
             }
           }
-          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
+          logger.warn(
+            `Процессы на порту ${PORT} не найдены, но порт все еще занят.`,
+          );
           process.exit(1);
         }
       } catch (err: unknown) {
-        logger.error("Не удалось выполнить команду PowerShell для поиска процесса:", err);
-        logger.info("Пожалуйста, вручную проверьте процессы, использующие порт 5000.");
+        logger.error(
+          "Не удалось выполнить команду PowerShell для поиска процесса:",
+          err,
+        );
+        logger.info(
+          "Пожалуйста, вручную проверьте процессы, использующие порт 5000.",
+        );
         process.exit(1);
       }
     } else {
@@ -474,22 +532,31 @@ httpServer.on("error", async (error: NodeJS.ErrnoException) => {
           logger.info(`Найден процесс с PID: ${pid}. Попытка завершить...`);
           try {
             await spawnChild("kill", ["-9", pid]);
-            logger.info(`Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`);
+            logger.info(
+              `Процесс ${pid} успешно завершен. Пожалуйста, перезапустите приложение.`,
+            );
             process.exit(1);
           } catch (killErr: unknown) {
-            const msg = killErr instanceof Error ? killErr.message : String(killErr);
+            const msg =
+              killErr instanceof Error ? killErr.message : String(killErr);
             logger.error(`Не удалось завершить процесс ${pid}: ${msg}`);
             logger.info("ВНИМАНИЕ: Может потребоваться sudo.");
             process.exit(1);
           }
         } else {
-          logger.warn(`Процессы на порту ${PORT} не найдены, но порт все еще занят.`);
-          logger.info("Это может быть связано с устаревшим сокетом или другой сетевой проблемой.");
+          logger.warn(
+            `Процессы на порту ${PORT} не найдены, но порт все еще занят.`,
+          );
+          logger.info(
+            "Это может быть связано с устаревшим сокетом или другой сетевой проблемой.",
+          );
           process.exit(1);
         }
       } catch (err: unknown) {
         logger.error("Не удалось найти процесс, использующий порт:", err);
-        logger.info("Пожалуйста, вручную проверьте процессы, использующие порт 5000.");
+        logger.info(
+          "Пожалуйста, вручную проверьте процессы, использующие порт 5000.",
+        );
         process.exit(1);
       }
     }
@@ -510,7 +577,9 @@ process.on("SIGINT", () => {
 });
 process.on("SIGTERM", () => {
   if (!isShuttingDown) {
-    logger.info("Получен сигнал SIGTERM. Инициируется корректное завершение...");
+    logger.info(
+      "Получен сигнал SIGTERM. Инициируется корректное завершение...",
+    );
     shutdown("SIGTERM");
   } else {
     logger.info("Завершение уже в процессе. SIGTERM игнорируется.");
@@ -520,7 +589,9 @@ process.on("SIGTERM", () => {
 // Обработка нажатия Ctrl+C в Windows
 process.on("SIGBREAK", () => {
   if (!isShuttingDown) {
-    logger.info("Получен сигнал SIGBREAK (Ctrl+C в Windows). Инициируется корректное завершение...");
+    logger.info(
+      "Получен сигнал SIGBREAK (Ctrl+C в Windows). Инициируется корректное завершение...",
+    );
     shutdown("SIGBREAK");
   } else {
     logger.info("Завершение уже в процессе. SIGBREAK игнорируется.");
@@ -532,7 +603,10 @@ process.on("unhandledRejection", (reason: unknown) => {
   // Если unhandledRejection произошёл на фоне shutdown — не запускаем shutdown заново,
   // просто логируем, чтобы не получить каскад ошибок от закрытых соединений.
   if (isShuttingDown) {
-    logger.error("Необработанное отклонение промиса во время завершения:", reason);
+    logger.error(
+      "Необработанное отклонение промиса во время завершения:",
+      reason,
+    );
     return;
   }
 

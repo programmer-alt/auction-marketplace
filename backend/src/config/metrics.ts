@@ -1,7 +1,3 @@
-/**
- * Конфигурация для сбора метрик Prometheus
- */
-
 import promClient from "prom-client";
 
 // Создаем реестр метрик
@@ -62,25 +58,6 @@ export const websocketMessagesTotal = new promClient.Counter({
   name: "websocket_messages_total",
   help: "Total number of WebSocket messages",
   labelNames: ["event", "direction"],
-  registers: [register],
-});
-
-// ========================================
-// Очереди метрики
-// ========================================
-
-export const queueJobsTotal = new promClient.Counter({
-  name: "queue_jobs_total",
-  help: "Total number of queue jobs",
-  labelNames: ["queue", "status"],
-  registers: [register],
-});
-
-export const queueJobsDuration = new promClient.Histogram({
-  name: "queue_job_duration_seconds",
-  help: "Duration of queue jobs in seconds",
-  labelNames: ["queue"],
-  buckets: [1, 5, 10, 30, 60, 300],
   registers: [register],
 });
 
