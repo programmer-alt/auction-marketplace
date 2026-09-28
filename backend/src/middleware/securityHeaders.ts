@@ -159,6 +159,7 @@ const devCspConfig: CspConfig = {
     "chrome-extension:*",
     "https://fonts.googleapis.com",
     "https://fonts.gstatic.com",
+    "https://cdn.jsdelivr.net",
   ],
   styleSrcElem: [
     ...(defaultCspConfig.styleSrcElem || []),

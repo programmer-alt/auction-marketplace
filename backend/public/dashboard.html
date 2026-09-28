@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;padding:24px}
+    h1{text-align:center;margin-bottom:20px;color:#38bdf8}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+    .card{background:#1e293b;border-radius:8px;padding:16px;border:1px solid #334155}
+    .card h3{color:#94a3b8;font-size:.8rem;text-transform:uppercase;margin-bottom:6px}
+    .card .val{font-size:1.8rem;font-weight:700;color:#38bdf8}
+    .card .sub{font-size:.75rem;color:#64748b;margin-top:2px}
+    .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:12px}
+    .chart-card{background:#1e293b;border-radius:8px;padding:16px;border:1px solid #334155}
+    .chart-card h3{color:#94a3b8;font-size:.85rem;margin-bottom:10px}
+    .bar-chart{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
+    .bar{flex:1;background:#38bdf8;border-radius:4px 4px 0 0;min-height:2px;position:relative;transition:height .3s}
+    .bar:hover{background:#7dd3fc}
+    .bar-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.65rem;color:#64748b;white-space:nowrap}
+    .bar-value{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.65rem;color:#94a3b8}
+    .memory-bar{height:20px;background:#334155;border-radius:4px;overflow:hidden;margin-top:6px}
+    .memory-fill{height:100%;border-radius:4px;transition:width .3s}
+    .memory-fill.used{background:#a855f7}
+    .memory-fill.total{background:#38bdf8}
+    #lastUpdate{text-align:center;color:#475569;font-size:.75rem;margin-top:12px}
+    #errorMsg{color:#ef4444;text-align:center;margin-top:12px}
+    .legend{display:flex;gap:12px;margin-top:6px;font-size:.7rem;color:#94a3b8}
+    .legend-item{display:flex;align-items:center;gap:4px}
+    .legend-dot{width:8px;height:8px;border-radius:50%}
+  </style>
+</head>
+<body>
+  <h1>Dashboard</h1>
+  <div class="grid">
+    <div class="card"><h3>HTTP Requests</h3><div class="val" id="httpTotal">0</div><div class="sub">Total</div></div>
+    <div class="card"><h3>Avg Latency</h3><div class="val" id="httpAvg">0</div><div class="sub">seconds</div></div>
+    <div class="card"><h3>WebSocket</h3><div class="val" id="wsConns">0</div><div class="sub">Connections</div></div>
+    <div class="card"><h3>Auctions</h3><div class="val" id="auctionsCreated">0</div><div class="sub">Created</div></div>
+    <div class="card"><h3>Bids</h3><div class="val" id="bidsCreated">0</div><div class="sub">Made</div></div>
+    <div class="card"><h3>Payments</h3><div class="val" id="paymentsProcessed">0</div><div class="sub">Processed</div></div>
+  </div>
+  <div class="charts">
+    <div class="chart-card"><h3>HTTP Latency Buckets</h3><div class="bar-chart" id="latencyChart"></div></div>
+    <div class="chart-card"><h3>Requests by Method</h3><div class="bar-chart" id="methodsChart"></div></div>
+    <div class="chart-card"><h3>Requests by Status</h3><div class="bar-chart" id="statusChart"></div></div>
+    <div class="chart-card">
+      <h3>Memory (MB)</h3>
+      <div style="margin-bottom:8px"><span style="font-size:.75rem;color:#94a3b8">Used: <span id="memUsed">0</span> MB</span>
+        <div class="memory-bar"><div class="memory-fill used" id="memUsedBar" style="width:0%"></div></div></div>
+      <div><span style="font-size:.75rem;color:#94a3b8">Total: <span id="memTotal">0</span> MB</span>
+        <div class="memory-bar"><div class="memory-fill total" id="memTotalBar" style="width:0%"></div></div></div>
+    </div>
+  </div>
+  <div id="lastUpdate"></div>
+  <div id="errorMsg"></div>
+  <script>
+    // ИСПРАВЛЕННЫЙ ПАРСЕР PROMETHEUS ФОРМАТА
+    var parseMetrics=function(t){
+      var d={};
+      var lines=t.split('\n');
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i];
+        if(line.charAt(0)==='#'||line.trim()==='')continue;
+        // Формат: name{label1="val1",label2="val2"} value
+        // Или: name value (без лейблов)
+        var m=line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(.+)\})?\s+([0-9.eE+-]+)$/);
+        if(!m)continue;
+        var name=m[1];
+        var labelsStr=m[2];
+        var value=parseFloat(m[3]);
+        if(isNaN(value))continue;
+        if(!d[name])d[name]={value:0,labels:[],values:[]};
+        if(labelsStr){
+          // Парсим лейблы: key="value",key2="value2"
+          var labels={};
+          var parts=labelsStr.split(',');
+          for(var j=0;j<parts.length;j++){
+            var eqIdx=parts[j].indexOf('=');
+            if(eqIdx>-1){
+              var k=parts[j].substring(0,eqIdx).trim();
+              var v=parts[j].substring(eqIdx+1).replace(/"/g,'').trim();
+              labels[k]=v;
+            }
+          }
+          d[name].labels.push(labels);
+        }else{
+          d[name].value=value;
+        }
+        d[name].values.push(value);
+      }
+      return d;
+    };
+    function renderBars(containerId,data,colors){var c=document.getElementById(containerId);if(!c)return;c.innerHTML='';if(!data||data.length===0){var empty=document.createElement('div');empty.className='bar';empty.style.height='10px';empty.style.flex='100%';c.appendChild(empty);return}var max=Math.max.apply(null,data.values);for(var i=0;i<data.labels.length;i++){var bar=document.createElement('div');bar.className='bar';var h=max>0?(data.values[i]/max*130):2;bar.style.height=h+'px';bar.style.background=colors?colors[i%colors.length]:'#38bdf8';if(data.labels[i]){var lbl=document.createElement('span');lbl.className='bar-label';lbl.textContent=data.labels[i];bar.appendChild(lbl)}var val=document.createElement('span');val.className='bar-value';val.textContent=data.values[i];bar.appendChild(val);c.appendChild(bar)}}
+    function update(){
+      var errEl=document.getElementById('errorMsg');
+      errEl.textContent='';
+      fetch('/metrics').then(function(r){
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        return r.text();
+      }).then(function(text){
+        var m=parseMetrics(text);
+        
+        // http_requests_total - суммируем все значения
+        var ht=m.http_requests_total;
+        var httpTotal=0;
+        if(ht&&ht.values){
+          for(var i=0;i<ht.values.length;i++)httpTotal+=ht.values[i];
+        }
+        document.getElementById('httpTotal').textContent=httpTotal.toLocaleString();
+        
+        // http_request_duration_seconds_sum и _count
+        var sumM=m.http_request_duration_seconds_sum;
+        var cntM=m.http_request_duration_seconds_count;
+        var httpSum=sumM&&sumM.values?sumM.values.reduce(function(a,b){return a+b},0):0;
+        var httpCnt=cntM&&cntM.values?cntM.values.reduce(function(a,b){return a+b},0):0;
+        document.getElementById('httpAvg').textContent=httpCnt>0?(httpSum/httpCnt).toFixed(3):'0';
+        
+        // WebSocket
+        var ws=m.websocket_connections_current;
+        document.getElementById('wsConns').textContent=ws?ws.value||0:0;
+        
+        // Бизнес метрики
+        var ac=m.auctions_created_total;
+        document.getElementById('auctionsCreated').textContent=ac?ac.value||0:0;
+        
+        var bc=m.bids_created_total;
+        document.getElementById('bidsCreated').textContent=bc?bc.value||0:0;
+        
+        var pc=m.payments_processed_total;
+        document.getElementById('paymentsProcessed').textContent=pc?pc.value||0:0;
+        
+        // Memory
+        var hu=m.nodejs_heap_size_used_bytes;
+        var ht2=m.nodejs_heap_size_total_bytes;
+        var hum=hu?Math.round(hu.value/1048576):0;
+        var htm=ht2?Math.round(ht2.value/1048576):0;
+        document.getElementById('memUsed').textContent=hum;
+        document.getElementById('memTotal').textContent=htm;
+        var maxMem=Math.max(htm,1);
+        document.getElementById('memUsedBar').style.width=(hum/maxMem*100)+'%';
+        document.getElementById('memTotalBar').style.width='100%';
+        document.getElementById('lastUpdate').textContent='Updated: '+new Date().toLocaleTimeString();
+        
+        // Charts
+        if(ht&&ht.labels&&ht.labels.length>0){
+          // Methods
+          var md={};
+          for(var i=0;i<ht.labels.length;i++){
+            var method=ht.labels[i]&&ht.labels[i].method?ht.labels[i].method:'unknown';
+            md[method]=(md[method]||0)+(ht.values[i]||0);
+          }
+          var ml=[];var mv=[];
+          for(var k in md){ml.push(k);mv.push(md[k])}
+          renderBars('methodsChart',{labels:ml,values:mv},['#38bdf8','#22c55e','#f59e0b','#ef4444']);
+          
+          // Status
+          var sd={};
+          for(var i=0;i<ht.labels.length;i++){
+            var status=ht.labels[i]&&ht.labels[i].status_code?ht.labels[i].status_code:'unknown';
+            sd[status]=(sd[status]||0)+(ht.values[i]||0);
+          }
+          var sl=[];var sv=[];
+          for(var k in sd){sl.push(k);sv.push(sd[k])}
+          renderBars('statusChart',{labels:sl,values:sv},['#22c55e','#22c55e','#f59e0b','#ef4444']);
+        }
+        
+        // Latency buckets
+        var hc=m.http_request_duration_seconds;
+        if(hc&&hc.labels&&hc.labels.length>0){
+          var leLabels=[];var leValues=[];
+          for(var i=0;i<hc.labels.length;i++){
+            var le=hc.labels[i]&&hc.labels[i].le?hc.labels[i].le:'?';
+            leLabels.push(le);
+            leValues.push(hc.values[i]||0);
+          }
+          renderBars('latencyChart',{labels:leLabels,values:leValues},['#38bdf8','#7dd3fc','#38bdf8','#7dd3fc','#38bdf8','#7dd3fc']);
+        }
+        
+      }).catch(function(e){
+        console.error('Error:',e);
+        document.getElementById('errorMsg').textContent='Error: '+e.message;
+      });
+    }
+    update();
+    setInterval(update,5000);
+  </script>
+</body>
+</html>
