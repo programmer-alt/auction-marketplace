@@ -14,7 +14,8 @@ export default function Layout({ children }: LayoutProps) {
 
   // Инициализация WebSocket подключения
   useEffect(() => {
-    createSocketConnection(token || undefined);
+    const socket = createSocketConnection(token || undefined);
+    return () => { socket.disconnect(); void 0; };
   }, [token]);
 
   return (
