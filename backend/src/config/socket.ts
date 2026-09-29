@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import type { AuthContext } from "../middleware/auth";
+import { websocketConnections } from "./metrics";
 
 // Расширяем типы Socket.io чтобы socket.data.user был типизирован
 declare module "socket.io" {
@@ -25,6 +26,16 @@ export function initSocket(
     },
     // Используем default in-memory adapter (без Redis)
   });
+
+  // Отслеживаем WebSocket подключения
+  io.on("connection", (socket) => {
+    websocketConnections.inc();
+    
+    socket.on("disconnect", () => {
+      websocketConnections.dec();
+    });
+  });
+
   return io;
 }
 

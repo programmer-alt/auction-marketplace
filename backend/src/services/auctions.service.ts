@@ -10,6 +10,7 @@ import {
 
 import { Prisma } from "../types";
 import { sanitizeObject } from "../utils/sanitization";
+import { auctionsCreatedTotal } from "../config/metrics";
 
 // Тип для одиночного аукциона (с детальными ставками)
 type SingleAuction = Prisma.AuctionGetPayload<{
@@ -141,6 +142,9 @@ export async function createAuction(data: CreateAuctionInput, userId: number) {
 
   // Уведомление через WebSocket о новом аукционе
   getIo().emit("auction:new", auction);
+
+  // Увеличиваем счётчик созданных аукционов
+  auctionsCreatedTotal.inc();
 
   return auction;
 }

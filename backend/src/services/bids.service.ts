@@ -7,6 +7,7 @@ import {
 } from "../repositories/bids.repository";
 import { Prisma } from "../types";
 import type { BidWithRelations } from "../types";
+import { bidsCreatedTotal } from "../config/metrics";
 
 // ========================================
 // Типы
@@ -137,6 +138,9 @@ export async function createBid(
       bid,
       auction: updatedAuction,
     });
+
+    // Увеличиваем счётчик ставок
+    bidsCreatedTotal.inc();
 
     return {
       bid,
