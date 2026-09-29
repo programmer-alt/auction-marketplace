@@ -13,13 +13,13 @@
     .card .val{font-size:1.8rem;font-weight:700;color:#38bdf8}
     .card .sub{font-size:.75rem;color:#64748b;margin-top:2px}
     .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:12px}
-    .chart-card{background:#1e293b;border-radius:8px;padding:16px;border:1px solid #334155}
+    .chart-card{background:#1e293b;border-radius:8px;padding:16px;border:1px solid #334155;overflow-y:auto}
     .chart-card h3{color:#94a3b8;font-size:.85rem;margin-bottom:10px}
-    .bar-chart{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
-    .bar{flex:1;background:#38bdf8;border-radius:4px 4px 0 0;min-height:2px;position:relative;transition:height .3s}
+    .bar-chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:8px;overflow-x:auto;overflow-y:hidden}
+    .bar{min-width:30px;max-width:60px;flex:0 0 auto;background:#38bdf8;border-radius:4px 4px 0 0;position:relative;transition:height .3s}
     .bar:hover{background:#7dd3fc}
-    .bar-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.65rem;color:#64748b;white-space:nowrap}
-    .bar-value{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.65rem;color:#94a3b8}
+    .bar-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:.6rem;color:#64748b;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+    .bar-value{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:.6rem;color:#94a3b8}
     .memory-bar{height:20px;background:#334155;border-radius:4px;overflow:hidden;margin-top:6px}
     .memory-fill{height:100%;border-radius:4px;transition:width .3s}
     .memory-fill.used{background:#a855f7}
@@ -63,36 +63,116 @@
       for(var i=0;i<lines.length;i++){
         var line=lines[i];
         if(line.charAt(0)==='#'||line.trim()==='')continue;
-        // Формат: name{label1="val1",label2="val2"} value
-        // Или: name value (без лейблов)
         var m=line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(.+)\})?\s+([0-9.eE+-]+)$/);
         if(!m)continue;
         var name=m[1];
         var labelsStr=m[2];
         var value=parseFloat(m[3]);
         if(isNaN(value))continue;
-        if(!d[name])d[name]={value:0,labels:[],values:[]};
+        // Определяем тип метрики
+        var baseName=name;
+        var metricType='gauge';
+        if(name.endsWith('_bucket')){
+          baseName=name.substring(0,name.length-7);
+          metricType='bucket';
+        }else if(name.endsWith('_sum')){
+          baseName=name.substring(0,name.length-4);
+          metricType='sum';
+        }else if(name.endsWith('_count')){
+          baseName=name.substring(0,name.length-6);
+          metricType='count';
+        }
+        if(!d[baseName])d[baseName]={value:0,labels:[],values:[]};
         if(labelsStr){
-          // Парсим лейблы: key="value",key2="value2"
           var labels={};
-          var parts=labelsStr.split(',');
-          for(var j=0;j<parts.length;j++){
-            var eqIdx=parts[j].indexOf('=');
-            if(eqIdx>-1){
-              var k=parts[j].substring(0,eqIdx).trim();
-              var v=parts[j].substring(eqIdx+1).replace(/"/g,'').trim();
-              labels[k]=v;
+          // Parse labels respecting quoted values with escaped commas
+          var chArr=labelsStr.split('');
+          var inQuote=false,escaped=false;
+          var curKey='',curVal='';
+          var state='key'; // key, eq, val
+          for(var j=0;j<chArr.length;j++){
+            var ch=chArr[j];
+            if(escaped){
+              if(state==='val')curVal+=ch;
+              else curKey+=ch;
+              escaped=false;
+            }else if(ch==='\\'){
+              escaped=true;
+            }else if(ch==='"'){
+              // Closing quote inside a value
+              if(state==='val'&&inQuote){
+                inQuote=false;
+              }else{
+                // Opening quote — transition eq→val if needed
+                inQuote=true;
+                if(state==='eq')state='val';
+              }
+            }else if(!inQuote){
+              if(state==='key'&&ch==='='){state='eq'}
+              else if(ch===','){
+                labels[curKey.trim()]=curVal.replace(/"/g,'').trim();
+                curKey='';curVal='';state='key';
+              }else{
+                if(state==='val')curVal+=ch;
+                else curKey+=ch;
+              }
+            }else{
+              if(state==='val')curVal+=ch;
             }
           }
-          d[name].labels.push(labels);
+          // Push last label
+          if(curKey||curVal)labels[curKey.trim()]=curVal.replace(/"/g,'').trim();
+          d[baseName].labels.push(labels);
+          d[baseName].values.push(value);
+          if(metricType==='bucket'){
+            d[baseName].type='bucket';
+          }else if(metricType==='sum'){
+            d[baseName].sum=(d[baseName].sum||0)+value;
+          }else if(metricType==='count'){
+            d[baseName].count=(d[baseName].count||0)+value;
+          }
         }else{
-          d[name].value=value;
+          d[baseName].value=value;
         }
-        d[name].values.push(value);
       }
       return d;
     };
-    function renderBars(containerId,data,colors){var c=document.getElementById(containerId);if(!c)return;c.innerHTML='';if(!data||data.length===0){var empty=document.createElement('div');empty.className='bar';empty.style.height='10px';empty.style.flex='100%';c.appendChild(empty);return}var max=Math.max.apply(null,data.values);for(var i=0;i<data.labels.length;i++){var bar=document.createElement('div');bar.className='bar';var h=max>0?(data.values[i]/max*130):2;bar.style.height=h+'px';bar.style.background=colors?colors[i%colors.length]:'#38bdf8';if(data.labels[i]){var lbl=document.createElement('span');lbl.className='bar-label';lbl.textContent=data.labels[i];bar.appendChild(lbl)}var val=document.createElement('span');val.className='bar-value';val.textContent=data.values[i];bar.appendChild(val);c.appendChild(bar)}}
+    function renderBars(containerId,data,colors){
+      var c=document.getElementById(containerId);
+      if(!c)return;
+      c.innerHTML='';
+      if(!data||data.labels.length===0){
+        var empty=document.createElement('div');
+        empty.className='bar';
+        empty.style.height='10px';
+        empty.style.minWidth='30px';
+        c.appendChild(empty);
+        return;
+      }
+      var max=Math.max.apply(null,data.values);
+      // Адаптивная высота: больше баров = выше контейнер
+      var barCount=data.labels.length;
+      var containerHeight=Math.max(120,Math.min(300,barCount*25));
+      c.style.height=containerHeight+'px';
+      for(var i=0;i<data.labels.length;i++){
+        var bar=document.createElement('div');
+        bar.className='bar';
+        var h=max>0?(data.values[i]/max*(containerHeight-40)):2;
+        bar.style.height=Math.max(2,h)+'px';
+        bar.style.background=colors?colors[i%colors.length]:'#38bdf8';
+        if(data.labels[i]){
+          var lbl=document.createElement('span');
+          lbl.className='bar-label';
+          lbl.textContent=data.labels[i];
+          bar.appendChild(lbl);
+        }
+        var val=document.createElement('span');
+        val.className='bar-value';
+        val.textContent=data.values[i];
+        bar.appendChild(val);
+        c.appendChild(bar);
+      }
+    }
     function update(){
       var errEl=document.getElementById('errorMsg');
       errEl.textContent='';
@@ -110,11 +190,10 @@
         }
         document.getElementById('httpTotal').textContent=httpTotal.toLocaleString();
         
-        // http_request_duration_seconds_sum и _count
-        var sumM=m.http_request_duration_seconds_sum;
-        var cntM=m.http_request_duration_seconds_count;
-        var httpSum=sumM&&sumM.values?sumM.values.reduce(function(a,b){return a+b},0):0;
-        var httpCnt=cntM&&cntM.values?cntM.values.reduce(function(a,b){return a+b},0):0;
+        // http_request_duration_seconds — содержит bucket, sum, count
+        var hc=m.http_request_duration_seconds;
+        var httpSum=hc&&hc.sum?hc.sum:0;
+        var httpCnt=hc&&hc.count?hc.count:0;
         document.getElementById('httpAvg').textContent=httpCnt>0?(httpSum/httpCnt).toFixed(3):'0';
         
         // WebSocket
@@ -126,10 +205,14 @@
         document.getElementById('auctionsCreated').textContent=ac?ac.value||0:0;
         
         var bc=m.bids_created_total;
-        document.getElementById('bidsCreated').textContent=bc?bc.value||0:0;
+        document.getElementById('bidsCreated').textContent=bc?bc.value||(bc.values?0:0):0;
         
         var pc=m.payments_processed_total;
-        document.getElementById('paymentsProcessed').textContent=pc?pc.value||0:0;
+        var payTotal=0;
+        if(pc&&pc.values){
+          for(var i=0;i<pc.values.length;i++)payTotal+=pc.values[i];
+        }
+        document.getElementById('paymentsProcessed').textContent=payTotal;
         
         // Memory
         var hu=m.nodejs_heap_size_used_bytes;
@@ -166,16 +249,35 @@
           renderBars('statusChart',{labels:sl,values:sv},['#22c55e','#22c55e','#f59e0b','#ef4444']);
         }
         
-        // Latency buckets
+        // Latency buckets — cumulative counts, plot deltas per le; exclude +Inf
         var hc=m.http_request_duration_seconds;
         if(hc&&hc.labels&&hc.labels.length>0){
-          var leLabels=[];var leValues=[];
+          // Group by le value, sum counts across method/route/status
+          var leSum={};
           for(var i=0;i<hc.labels.length;i++){
-            var le=hc.labels[i]&&hc.labels[i].le?hc.labels[i].le:'?';
-            leLabels.push(le);
-            leValues.push(hc.values[i]||0);
+            var le=hc.labels[i]&&hc.labels[i].le?hc.labels[i].le:null;
+            if(le&&le!=='+Inf'){
+              if(!leSum[le])leSum[le]=0;
+              leSum[le]+=hc.values[i]||0;
+            }
           }
-          renderBars('latencyChart',{labels:leLabels,values:leValues},['#38bdf8','#7dd3fc','#38bdf8','#7dd3fc','#38bdf8','#7dd3fc']);
+          var sortedLe=Object.keys(leSum).sort(function(a,b){
+            if(a==='+Inf')return 1;
+            if(b==='+Inf')return -1;
+            return parseFloat(a)-parseFloat(b);
+          });
+          var leLabels=[];var leValues=[];
+          var prev=0;
+          for(var i=0;i<sortedLe.length;i++){
+            var k=sortedLe[i];
+            var v=leSum[k];
+            leLabels.push(k);
+            leValues.push(v-prev);
+            prev=v;
+          }
+          if(leLabels.length>0){
+            renderBars('latencyChart',{labels:leLabels,values:leValues},['#38bdf8','#7dd3fc','#38bdf8','#7dd3fc','#38bdf8','#7dd3fc']);
+          }
         }
         
       }).catch(function(e){

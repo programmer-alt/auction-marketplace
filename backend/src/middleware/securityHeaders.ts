@@ -115,6 +115,7 @@ function generatePermissionsPolicyHeader(policy: Record<string, string[]>): stri
 const defaultCspConfig: CspConfig = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
+  scriptSrcElem: ["'self'"], // Без unsafe-inline — только для dashboard
   styleSrc: ["'self'", "https://fonts.googleapis.com"],
   imgSrc: ["'self'", "data:", "https:"], // Изображения с любых HTTPS источников
   fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
@@ -130,6 +131,12 @@ const defaultCspConfig: CspConfig = {
   // Явно добавляем специфичные директивы для разрешения элементов стилей из Google Fonts
   styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
   styleSrcAttr: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+};
+
+// CSP для дашборда — разрешает inline-скрипты только для этой страницы
+const dashboardCspConfig: CspConfig = {
+  ...defaultCspConfig,
+  scriptSrcElem: ["'self'", "'unsafe-inline'"],
 };
 
 // Конфигурация CSP для development режима - улучшенная версия для поддержки инструментов разработки
@@ -315,3 +322,8 @@ export function securityHeaders(config: SecurityHeadersConfig = defaultSecurityH
  * Экспорт дефолтной конфигурации для использования в других частях приложения
  */
 export const defaultSecurityHeaders = securityHeaders();
+
+/**
+ * Экспорт CSP-конфигурации для дашборда (разрешает inline-скрипты)
+ */
+export const dashboardSecurityHeaders = securityHeaders({ csp: dashboardCspConfig });

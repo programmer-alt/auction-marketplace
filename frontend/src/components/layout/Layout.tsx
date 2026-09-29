@@ -1,4 +1,7 @@
+import { useEffect } from "react";
+import { createSocketConnection } from "@/utils/websocket";
 import type { ReactNode } from "react";
+import { useAuthStore } from "@/store/auth.store";
 import Footer from "./Footer";
 import Header from "./Header";
 
@@ -7,6 +10,13 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const token = useAuthStore((s) => s.token);
+
+  // Инициализация WebSocket подключения
+  useEffect(() => {
+    createSocketConnection(token || undefined);
+  }, [token]);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />

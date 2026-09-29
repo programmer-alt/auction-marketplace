@@ -21,6 +21,7 @@ import {
 import { getUserById } from "../repositories/users.repository";
 // Импортируем типы, включая Payment
 import type { Payment, PaymentWithAuctionSeller, PaymentWithRelations } from "../types/index";
+import { paymentsProcessedTotal } from "../config/metrics";
 
 // ========================================
 // Типы
@@ -185,6 +186,12 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
     // При manual capture — статус меняется на COMPLETED
     await updatePayment(prisma, payment.id, { status: "COMPLETED" });
     await updateAuctionPaidAt(prisma, payment.auctionId);
+    
+    // Увеличиваем счётчик только если статус был изменён (защита от дублей вебхука)
+    if (payment.status !== "COMPLETED") {
+      paymentsProcessedTotal.inc({ status: "COMPLETED" });
+    }
+    
     console.log(`[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`);
   } else {
     console.warn(

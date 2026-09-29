@@ -43,7 +43,7 @@ import paymentsRouter from "@/routes/payments.routes";
 
 // Import error handler
 import { errorHandler } from "@/errors/handler";
-import { securityHeaders } from "@/middleware/securityHeaders";
+import { securityHeaders, dashboardCspConfig, dashboardSecurityHeaders } from "@/middleware/securityHeaders";
 import { autoCompleteExpiredAuctions } from "@/services/auctions.service";
 
 validateEnv();
@@ -97,13 +97,7 @@ export { io };
 // Middleware безопасности и производительности
 // ========================================
 
-// Dashboard — отдаём статический HTML (ДО CSP middleware)
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-app.get("/dashboard", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../public/dashboard.html"));
-});
-
-// Helmet для базовых security headers (отключаем CSP, т.к. используем кастомный middleware)
+// Helmet для базовых security headers
 app.use(
   helmet({
     contentSecurityPolicy: false, // Будет установлен нашим securityHeaders middleware
@@ -148,6 +142,13 @@ app.use(metricsMiddleware);
 // CSRF protection
 app.use(generateCsrfToken);
 app.use(verifyCsrfToken);
+
+// Dashboard — отдаём статический HTML (после security/rate-limit/metrics/CSRF)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use("/dashboard", dashboardSecurityHeaders);
+app.get("/dashboard", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../public/dashboard.html"));
+});
 
 // Health check
 app.get("/health", (_req, res) => {

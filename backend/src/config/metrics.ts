@@ -74,7 +74,6 @@ export const auctionsCreatedTotal = new promClient.Counter({
 export const bidsCreatedTotal = new promClient.Counter({
   name: "bids_created_total",
   help: "Total number of bids created",
-  labelNames: ["auction_id"],
   registers: [register],
 });
 
