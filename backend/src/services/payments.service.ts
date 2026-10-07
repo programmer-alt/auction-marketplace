@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
+import { z } from "zod";
 import { prisma } from "../config/db";
 // Импортируем глобальный экземпляр stripe
 import { stripe } from "../config/stripe";
@@ -22,6 +23,8 @@ import { getUserById } from "../repositories/users.repository";
 // Импортируем типы, включая Payment
 import type { Payment, PaymentWithAuctionSeller, PaymentWithRelations } from "../types/index";
 import { paymentsProcessedTotal } from "../config/metrics";
+import logger from "../config/logger";
+import { CURRENCY_ZERO_DECIMAL } from "../config/constants";
 
 // ========================================
 // Типы
@@ -74,43 +77,28 @@ export async function createPaymentIntent(
 
   // Предположим, что у аукциона есть базовая валюта, но мы можем изменить её в зависимости от страны
   // или использовать countryCode для других целей в Stripe
+  // Валидация countryCode
+  const validatedCountryCode = z.string().length(2).parse(countryCode).toUpperCase();
+  
   const currency = auction.currency?.toLowerCase() || "usd"; // Базовая валюта из аукциона или USD по умолчанию
 
   // Stripe требует amount в минорных единицах (центы), НО для zero-decimal валют (JPY, KRW, VND и др.)
   // сумма передаётся как есть, без умножения на 100
-  const ZERO_DECIMAL_CURRENCIES = new Set([
-    "bif",
-    "clp",
-    "djf",
-    "gnf",
-    "jpy",
-    "kmf",
-    "krw",
-    "mga",
-    "pyg",
-    "rwf",
-    "ugx",
-    "vnd",
-    "vuv",
-    "xaf",
-    "xof",
-    "xpf",
-    // ISK, HUF, TWD, UGX (специальные случаи) не включены сюда в базовой реализации
-  ]);
-  const multiplier = ZERO_DECIMAL_CURRENCIES.has(currency) ? 1 : 100;
+  const multiplier = CURRENCY_ZERO_DECIMAL.has(currency) ? 1 : 100;
 
-  // Создаем PaymentIntent через Stripe
+  // Создаем PaymentIntent через Stripe с ручным списанием (manual capture)
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Number(auction.currentPrice) * multiplier, // Цена в центах или в основных единицах
     currency: currency,
     description: `Оплата аукциона: ${auction.title}`, // Добавляем описание
+    capture_method: "manual", // Ручное списание после победы на аукционе
     automatic_payment_methods: {
       enabled: true,
     },
     metadata: {
       auctionId: auction.id.toString(),
       userId: user.id.toString(),
-      countryCode, // Добавляем countryCode в метаданные
+      countryCode: validatedCountryCode, // Добавляем countryCode в метаданные
     },
   });
 
@@ -148,13 +136,28 @@ async function handlePaymentIntentEvent(
   const payment = await getPaymentByStripeId(prisma, stripePaymentId);
 
   if (payment) {
+    // Idempotency: пропускаем события для уже обработанных платежей
+    if (payment.status === paymentStatus) {
+      logger.debug(`Платёж ${payment.id} уже в статусе ${paymentStatus}, пропускаем дубликат события`);
+      return;
+    }
+
+    // Защита от перезаписи терминальных состояний (COMPLETED/REFUNDED) на FAILED
+    const terminalStates: Payment["status"][] = ["COMPLETED", "REFUNDED"];
+    if (terminalStates.includes(payment.status) && paymentStatus === "FAILED") {
+      logger.warn(
+        `Платёж ${payment.id} в терминальном статусе ${payment.status}, игнорируем delayed failed/canceled webhook`,
+      );
+      return;
+    }
+    
     if (extraCheck && paymentIntent) {
       await extraCheck(payment, paymentIntent);
     }
     await updatePayment(prisma, payment.id, { status: paymentStatus });
-    console.log(logMessage);
+    logger.info(logMessage);
   } else {
-    console.warn(`[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
+    logger.warn(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД`);
   }
 }
 
@@ -170,12 +173,11 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
 
   if (payment) {
     // Defense in depth: проверяем, что сумма PI совпадает с суммой в БД
-    const ZERO_DECIMAL_CURRENCIES = new Set(["jpy", "krw", "vnd"]);
-    const expectedAmount = ZERO_DECIMAL_CURRENCIES.has(payment.currency.toLowerCase())
+    const expectedAmount = CURRENCY_ZERO_DECIMAL.has(payment.currency.toLowerCase())
       ? Math.round(payment.amount.toNumber())
       : Math.round(payment.amount.toNumber() * 100);
     if (paymentIntent.amount !== expectedAmount) {
-      console.error(
+      logger.error(
         `[SECURITY] Сумма PaymentIntent (${paymentIntent.amount}) не совпадает с суммой в БД (${expectedAmount}). ` +
           `stripePaymentId=${stripePaymentId}, paymentId=${payment.id}`,
       );
@@ -184,18 +186,22 @@ async function handlePaymentSucceeded(event: Stripe.Event): Promise<void> {
     }
 
     // При manual capture — статус меняется на COMPLETED
+    // Idempotency: пропускаем если уже в терминальном статусе
+    const terminalStates: Payment["status"][] = ["COMPLETED", "REFUNDED"];
+    if (terminalStates.includes(payment.status)) {
+      logger.debug(`Платёж ${payment.id} уже в терминальном статусе ${payment.status}, пропускаем дубликат succeeded webhook`);
+      return;
+    }
+    
     await updatePayment(prisma, payment.id, { status: "COMPLETED" });
     await updateAuctionPaidAt(prisma, payment.auctionId);
     
-    // Увеличиваем счётчик только если статус был изменён (защита от дублей вебхука)
-    if (payment.status !== "COMPLETED") {
-      paymentsProcessedTotal.inc({ status: "COMPLETED" });
-    }
+    paymentsProcessedTotal.inc({ status: "COMPLETED" });
     
-    console.log(`[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`);
+    logger.info(`[CAPTURE] Платёж ${stripePaymentId} успешно списан, paymentId=${payment.id}`);
   } else {
-    console.warn(
-      `[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД — пользователь мог оплатить, но система не записала платёж`,
+    logger.warn(
+      `Платёж с stripePaymentId ${stripePaymentId} не найден в БД — пользователь мог оплатить, но система не записала платёж`,
     );
   }
 }
@@ -224,17 +230,17 @@ async function handleRefund(event: Stripe.Event): Promise<void> {
     const payment = await getPaymentByStripeId(prisma, stripePaymentId);
     if (payment) {
       await updatePayment(prisma, payment.id, { status: "REFUNDED" });
-      console.log(`Возврат для платежа ${stripePaymentId} обработан`);
+      logger.info(`Возврат для платежа ${stripePaymentId} обработан`);
     } else {
-      console.error(`[ALERT] Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
+      logger.error(`Платёж с stripePaymentId ${stripePaymentId} не найден в БД при обработке возврата`);
     }
   }
 }
 
-export async function handleWebhook(body: Buffer | string, sig: string) {
+export async function handleWebhook(body: Buffer | string, sig: string): Promise<{ success: boolean; event?: string }> {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error("[FATAL] STRIPE_WEBHOOK_SECRET is not configured");
+    logger.error("STRIPE_WEBHOOK_SECRET is not configured");
     throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
   }
 
@@ -243,45 +249,62 @@ export async function handleWebhook(body: Buffer | string, sig: string) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (error) {
     if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
-      console.error(`[SECURITY] Invalid webhook signature: ${error.message}`);
+      logger.error(`Invalid webhook signature: ${error.message}`);
       throw createValidationError("Invalid webhook signature");
     }
     throw error;
   }
 
-  // Делегируем обработку событий специализированным функциям
   const eventType = event.type as string;
-  switch (eventType) {
-    case "payment_intent.succeeded":
-      await handlePaymentSucceeded(event);
-      break;
+  
+  // Делегируем обработку событий специализированным функциям
+  try {
+    switch (eventType) {
+      case "payment_intent.succeeded":
+        await handlePaymentSucceeded(event);
+        break;
 
-    case "payment_intent.payment_failed":
-      await handlePaymentStateChangeEvent(event, "FAILED", "Платёж не удался");
-      break;
+      case "payment_intent.payment_failed":
+        await handlePaymentStateChangeEvent(event, "FAILED", "Платёж не удался");
+        break;
 
-    case "payment_intent.canceled":
-      await handlePaymentStateChangeEvent(event, "FAILED", "Платёж отменён");
-      break;
+      case "payment_intent.canceled":
+        await handlePaymentStateChangeEvent(event, "FAILED", "Платёж отменён");
+        break;
 
-    case "payment_intent.requires_capture":
-      // PaymentIntent готов к manual capture — статус AUTHORIZED
-      {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        const payment = await getPaymentByStripeId(prisma, paymentIntent.id);
-        if (payment) {
-          await updatePayment(prisma, payment.id, { status: "AUTHORIZED" });
-          console.log(`[AUTH] PaymentIntent готов к capture, paymentId=${payment.id}`);
+      case "payment_intent.requires_capture":
+        // PaymentIntent готов к manual capture — статус AUTHORIZED
+        {
+          const paymentIntent = event.data.object as Stripe.PaymentIntent;
+          const payment = await getPaymentByStripeId(prisma, paymentIntent.id);
+          if (payment) {
+            // Защита от перезаписи терминальных состояний
+            const terminalStates: Payment["status"][] = ["COMPLETED", "REFUNDED", "FAILED"];
+            if (terminalStates.includes(payment.status)) {
+              logger.warn(
+                `Платёж ${payment.id} в статусе ${payment.status}, игнорируем delayed requires_capture webhook`,
+              );
+              break;
+            }
+            await updatePayment(prisma, payment.id, { status: "AUTHORIZED" });
+            logger.info(`PaymentIntent готов к capture, paymentId=${payment.id}`);
+          }
         }
-      }
-      break;
+        break;
 
-    case "charge.refunded":
-      await handleRefund(event);
-      break;
+      case "charge.refunded":
+        await handleRefund(event);
+        break;
 
-    default:
-      console.log(`Необработанное событие типа ${eventType}`);
+      default:
+        logger.info(`Необработанное событие типа ${eventType}`);
+    }
+    
+    logger.info(`Webhook event ${eventType} обработан успешно`);
+    return { success: true, event: eventType };
+  } catch (error) {
+    logger.error(`Ошибка при обработке webhook event ${eventType}:`, error);
+    return { success: false, event: eventType };
   }
 }
 
@@ -347,7 +370,7 @@ export async function capturePayment(paymentId: number): Promise<{ success: bool
   // Обновляем auction paidAt
   await updateAuctionPaidAt(prisma, payment.auctionId);
 
-  console.log(`[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`);
+  logger.info(`[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`);
 
   return { success: true, paymentIntentId: capturedIntent.id };
 }
@@ -369,11 +392,13 @@ export async function cancelHold(paymentId: number): Promise<void> {
   });
 
   if (!payment) {
-    return; // Уже удалён
+    logger.debug(`Платёж ${paymentId} не найден при отмене холда`);
+    return;
   }
 
   if (payment.status !== "AUTHORIZED") {
-    return; // Не в статусе холда
+    logger.debug(`Платёж ${paymentId} не в статусе холда (текущий: ${payment.status}), отмена пропущена`);
+    return;
   }
 
   // SECURITY: проверяем что аукцион завершён и пользователь НЕ победитель
@@ -390,11 +415,13 @@ export async function cancelHold(paymentId: number): Promise<void> {
 
   if (auction.winnerId === payment.userId) {
     // Победитель — холд НЕ отменяем (будет списан)
+    logger.debug(`Платёж ${payment.id}: пользователь ${payment.userId} является победителем, холд не отменяется`);
     return;
   }
 
   if (!payment.stripePaymentId) {
     // Удаляем запись из БД
+    logger.info(`Платёж ${payment.id} не имеет Stripe ID, запись удаляется`);
     await prisma.payment.delete({ where: { id: payment.id } });
     return;
   }
@@ -402,10 +429,10 @@ export async function cancelHold(paymentId: number): Promise<void> {
   // Отменяем холд в Stripe
   try {
     await stripe.paymentIntents.cancel(payment.stripePaymentId);
-    console.log(`[CANCEL] Холд отменён: paymentId=${payment.id}`);
+    logger.info(`[CANCEL] Холд отменён: paymentId=${payment.id}`);
   } catch (error) {
     // Холд мог истечь автоматически (24-168ч в зависимости от банка)
-    console.warn(`[WARN] Не удалось отменить холд ${payment.stripePaymentId}:`, error);
+    logger.warn(`Не удалось отменить холд ${payment.stripePaymentId}:`, error);
   }
 
   // Удаляем запись из БД
@@ -483,7 +510,7 @@ export async function refundPayment(paymentId: number, adminId: number, reason?:
     refundReason: reason ?? "Административный возврат",
   });
 
-  console.log(`Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`);
+  logger.info(`Возврат ${refund.id} для платежа ${payment.stripePaymentId} создан администратором ${adminId}`);
 
   return {
     refundId: refund.id,
