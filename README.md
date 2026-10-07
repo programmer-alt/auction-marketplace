@@ -76,8 +76,8 @@
 ### 💳 Интеграция Stripe с ручным списанием (Manual Capture)
 
 Уникальный процесс оплаты, который **замораживает** средства победителя и проигравших:
-1. **При ставке** — создаётся PaymentIntent с `payment_method_types: card`
-2. **При выигрыше** — статус `AUTHORIZED` (средства заморожены, но не списаны)
+1. **При переходе к оплате** — создаётся PaymentIntent с `payment_method_types: card`
+2. **При подтверждении оплаты** — статус `AUTHORIZED` (средства заморожены, но не списаны)
 3. **При завершении аукциона** — автоматическое списание `capture()` для победителя
 4. **Для проигравших** — автоматическая отмена `cancel()` заморозок
 
@@ -214,55 +214,68 @@
 
 Проект следует принципам **чистой архитектуры** с чётким разделением ответственности:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Client (React 19)                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐   │
-│  │ Zustand  │  │ React    │  │ Socket.io-client     │   │
-│  │ Store    │  │ Router   │  │ + WebSocket handlers │   │
-│  └──────────┘  └──────────┘  └──────────────────────┘   │
-└────────────────────────┬────────────────────────────────┘
-                         │ HTTP / WebSocket
-┌────────────────────────▼────────────────────────────────┐
-│                   Server (Express + TS)                  │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │              Middleware Layer                      │   │
-│  │  Helmet → CORS → Compression → Security Headers  │   │
-│  │  Rate Limit → CSRF → Auth → Metrics              │   │
-│  └──────────────────────────────────────────────────┘   │
-│  ┌────────────┐  ┌──────────┐  ┌──────────────────┐    │
-│  │  Routes    │  │Controllers│  │  Error Handler   │    │
-│  │ (REST API) │  │ (HTTP)   │  │ (Zod/Prisma)     │    │
-│  └─────┬──────┘  └────┬─────┘  └────────┬─────────┘    │
-│        └───────────────┼────────────────┘               │
-│  ┌─────────────────────┼──────────────────┐            │
-│  │              Service Layer               │            │
-│  │  • auctions.service.ts (15KB)           │            │
-│  │  • payments.service.ts (17.4KB)         │            │
-│  │  • bids.service.ts + transaction lock   │            │
-│  │  • auth.service.ts + JWT flow           │            │
-│  └─────────────────────┼──────────────────┘            │
-│  ┌─────────────────────┼──────────────────┐            │
-│  │            Repository Layer              │            │
-│  │  • auctions.repository.ts (8.3KB)       │            │
-│  │  • payments.repository.ts (3.9KB)       │            │
-│  │  • bids.repository.ts + users           │            │
-│  └─────────────────────┼──────────────────┘            │
-│  ┌─────────────────────┼──────────────────┐            │
-│  │           Config Layer                     │            │
-│  │  • db.ts (Prisma + pg Pool)              │            │
-│  │  • jwt.ts, stripe.ts, socket.ts          │            │
-│  │  • metrics.ts (Prometheus)               │            │
-│  │  • logger.ts (Winston)                   │            │
-│  └──────────────────────────────────────────┘            │
-└─────────────────────────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-   ┌───────────┐  ┌───────────┐  ┌─────────────┐
-   │PostgreSQL │  │  Stripe   │  │  Socket.io  │
-   │  (Prisma) │  │  API      │  │  (WS)       │
-   └───────────┘  └───────────┘  └─────────────┘
+```mermaid
+graph TB
+    subgraph Client["Клиент (React 19)"]
+        Store["Zustand Store"]
+        Router["React Router"]
+        WS["Socket.io-client"]
+    end
+
+    subgraph Server["Сервер (Express + TypeScript)"]
+        subgraph Middleware["Middleware Layer"]
+            M1["Helmet"]
+            M2["CORS"]
+            M3["Compression"]
+            M4["Security Headers"]
+            M5["Rate Limit"]
+            M6["CSRF"]
+            M7["Auth"]
+            M8["Metrics"]
+        end
+
+        subgraph Controllers["Controllers"]
+            R["Routes REST API"]
+            C["HTTP handlers"]
+            EH["Error Handler"]
+        end
+
+        subgraph Services["Service Layer"]
+            S1["Auctions service"]
+            S2["Payments service"]
+            S3["Bids service + transaction lock"]
+            S4["Auth service + JWT flow"]
+        end
+
+        subgraph Repositories["Repository Layer"]
+            R1["Auctions repository"]
+            R2["Payments repository"]
+            R3["Bids + Users repository"]
+        end
+
+        subgraph Config["Config Layer"]
+            C1["Database + connection pool"]
+            C2["JWT + Stripe + Socket.io"]
+            C3["Metrics Prometheus"]
+            C4["Logger Winston"]
+        end
+    end
+
+    subgraph External["Внешние сервисы"]
+        DB["PostgreSQL"]
+        Stripe["Stripe API"]
+        Socket["Socket.io WS"]
+    end
+
+    Client -->|HTTP / WebSocket| Server
+    Server --> DB
+    Server --> Stripe
+    Server --> Socket
+
+    Middleware --> Controllers
+    Controllers --> Services
+    Services --> Repositories
+    Repositories --> Config
 ```
 
 ### Слои ответственности
@@ -403,51 +416,60 @@
 
 ### Процесс ставки (без гонки)
 
-```
-Пользователь нажимает "Сделать ставку"
-  │
-  ├─ Фронтенд: проверяет валидность суммы ставки
-  │
-  ├─ API: POST /api/auctions/:id/bids { amount }
-  │
-  ├─ Middleware: авторизация → проверка CSRF → ограничение запросов
-  │
-  └─ Сервис: bids.service.createBid()
-       │
-       ├─ 1. Загрузка данных аукциона из БД
-       │
-       ├─ 2. Ранняя проверка (время не вышло, валюта совпадает)
-       │
-       └─ 3. prisma.$transaction([
-            ├─ auctions.update({
-            │    where: { id, статус активен, время не вышло, сумма валидна, пользователь не продавец },
-            │    data: { обновлённая цена, идентификатор победителя }
-            │  })
-            │
-            └─ bids.create({ auctionId, userId, amount })
-          ])
-          │
-          ├─ ✅ Успех → WebSocket рассылка уведомления о ставке
-          └─ ❌ Ошибка → "Аукцион не найден, не активен, завершён или ставка слишком низкая"
+```mermaid
+sequenceDiagram
+    participant U as Пользователь
+    participant F as Фронтенд
+    participant A as API
+    participant M as Middleware
+    participant S as Сервис ставок
+    participant DB as База данных
+    participant W as WebSocket
+
+    U->>F: Нажимает "Сделать ставку"
+    F->>F: Проверяет валидность суммы
+    F->>A: POST /api/auctions/:id/bids
+    A->>M: Авторизация
+    M->>M: Проверка CSRF
+    M->>M: Ограничение запросов
+    M->>S: createBid()
+    S->>DB: Загрузка данных аукциона
+    S->>S: Ранняя проверка
+    S->>DB: Транзакция: обновление + создание ставки
+    alt Успех
+        DB-->>S: ✅ Обновлено
+        S->>W: Рассылка уведомления
+    else Ошибка
+        DB-->>S: ❌ Ошибка
+        S-->>U: Сообщение об ошибке
+    end
 ```
 
 ### Процесс платежей (ручное списание)
 
-```
-1. Пользователь делает ставку
-   └─ PaymentIntent создан (статус: PENDING)
+```mermaid
+sequenceDiagram
+    participant U as Пользователь
+    participant P as Платёжная страница
+    participant S as Stripe API
+    participant C as Cron job
+    participant WS as WebSocket
 
-2. Stripe подтверждает платёж
-   └─ Webhook: payment_intent.requires_capture
-   └─ Статус платежа → AUTHORIZED (средства заморожены, но не списаны)
+    U->>P: 1. Переход к оплате аукциона
+    P->>S: Создаётся PaymentIntent (PENDING)
 
-3. Аукцион завершён → определён победитель
-   └─ Автоматическое завершение (каждые 5 минут)
-   └─ capturePayment(winnerPaymentId) → статус COMPLETED
-   └─ cancelHold(otherPayments) → статус удалён (средства возвращены)
+    S->>P: 2. Webhook: requires_capture
+    P->>P: Статус → AUTHORIZED (заморожено)
 
-4. Если аукцион отменён / нет победителя
-   └─ cancelHold(allPayments) → средства автоматически возвращаются
+    C->>P: 3. Аукцион завершён (каждые 5 мин)
+    P->>P: capturePayment(победитель) → COMPLETED
+    P->>WS: Уведомление о завершении
+    P->>P: cancelHold(проигравшие) → возвращено
+
+    alt Аукцион отменён / нет победителя
+        C->>P: 4. Отмена
+        P->>P: cancelHold(все) → возврат средств
+    end
 ```
 
 ## Скриншоты
