@@ -77,7 +77,7 @@ export type BidSelect = Prisma.BidGetPayload<{
 // Типы для Payment
 // ========================================
 
-export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "AUTHORIZED";
+export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "AUTHORIZED" | "CAPTURE_PENDING";
 
 // biome-ignore lint/complexity/noBannedTypes: Prisma requires empty object for full payload
 export type Payment = Prisma.PaymentGetPayload<{}>;

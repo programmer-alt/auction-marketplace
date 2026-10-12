@@ -15,7 +15,7 @@ const WS_BID_WINDOW = 5; // 5 секунд
 const wsMemoryStore = new LRUCache<string, { count: number; resetAt: number }>({
   max: 10_000,
   ttl: Math.max(WS_CONNECTION_WINDOW, WS_BID_WINDOW) * 1000,
-  ttlAutopurge: false,
+  ttlAutopurge: true, // Автоматически удаляем просроченные записи при каждом access
 });
 
 /**
@@ -118,6 +118,18 @@ export async function socketBidRateLimit(socket: Socket, next: (err?: Error) => 
   }
 
   next();
+}
+
+/**
+ * Очистка rate limit записей пользователя при disconnect
+ */
+export function clearUserRateLimits(userId: number): void {
+  const prefix = `bid:${userId}`;
+  for (const key of wsMemoryStore.keys()) {
+    if (key.startsWith(prefix)) {
+      wsMemoryStore.delete(key);
+    }
+  }
 }
 
 /**

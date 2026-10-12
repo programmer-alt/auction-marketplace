@@ -321,6 +321,8 @@ export async function capturePayment(paymentId: number): Promise<{ success: bool
       status: true,
       auctionId: true,
       userId: true,
+      currency: true,
+      amount: true,
     },
   });
 
@@ -328,7 +330,7 @@ export async function capturePayment(paymentId: number): Promise<{ success: bool
     throw createNotFoundError("Платёж не найден");
   }
 
-  if (payment.status !== "AUTHORIZED") {
+  if (payment.status !== "AUTHORIZED" && payment.status !== "CAPTURE_PENDING") {
     throw createValidationError(`Платёж не в статусе холда (текущий: ${payment.status})`);
   }
 
@@ -339,7 +341,7 @@ export async function capturePayment(paymentId: number): Promise<{ success: bool
   // SECURITY: проверяем что аукцион завершён и пользователь — победитель
   const auction = await prisma.auction.findUnique({
     where: { id: payment.auctionId },
-    select: { status: true, winnerId: true, endsAt: true },
+    select: { status: true, winnerId: true, endsAt: true, currentPrice: true },
   });
 
   if (!auction) {
@@ -358,17 +360,50 @@ export async function capturePayment(paymentId: number): Promise<{ success: bool
     throw createValidationError("Аукцион ещё не завершён по времени");
   }
 
-  // Списываем деньги (manual capture)
-  const capturedIntent = await stripe.paymentIntents.capture(payment.stripePaymentId);
+  // Обновляем payment.amount в БД на актуальную цену аукциона
+  // Это нужно чтобы webhook succeeded сравнил правильные суммы
+  if (auction.currentPrice.toNumber() !== payment.amount.toNumber()) {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { amount: auction.currentPrice },
+    });
+    logger.info(`[CAPTURE] payment.amount обновлён до актуальной цены: paymentId=${payment.id}, amount=${auction.currentPrice}`);
+  }
 
-  // Обновляем статус в БД
+  // Сначала обновляем статус в БД (optimistic: помечаем как CAPTURED для защиты от retry)
   await prisma.payment.update({
     where: { id: payment.id },
-    data: { status: "COMPLETED" },
+    data: { status: "CAPTURED" },
   });
 
-  // Обновляем auction paidAt
-  await updateAuctionPaidAt(prisma, payment.auctionId);
+  // Списываем деньги через Stripe
+  let capturedIntent: Stripe.PaymentIntent;
+  try {
+    capturedIntent = await stripe.paymentIntents.capture(payment.stripePaymentId);
+  } catch (stripeError) {
+    // Stripe capture упал — возвращаем в CAPTURE_PENDING для retry
+    // Но НЕ в AUTHORIZED чтобы избежать двойного списания
+    logger.warn(`[ERROR] Не удалось списать paymentId=${payment.id}, статус изменён на CAPTURE_PENDING`);
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: "CAPTURE_PENDING" },
+    });
+    throw stripeError;
+  }
+
+  // Обновляем финальный статус и auction paidAt
+  try {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: "COMPLETED" },
+    });
+    await updateAuctionPaidAt(prisma, payment.auctionId);
+  } catch (dbError) {
+    // Stripe capture уже успешен — НЕ меняем статус на CAPTURE_PENDING
+    // Retry не будет делать двойной capture т.к. Stripe вернёт already-captured error
+    logger.error(`[ERROR] Не удалось обновить статус после capture: paymentId=${payment.id}`, dbError);
+    throw dbError;
+  }
 
   logger.info(`[CAPTURE] Ручное списание выполнено: paymentId=${payment.id}, piId=${capturedIntent.id}`);
 
