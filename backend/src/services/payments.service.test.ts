@@ -10,12 +10,14 @@ const {
   mockRefundsCreate,
   mockPaymentIntentsRetrieve,
   mockPaymentIntentsCancel,
+  mockPaymentIntentsCapture,
 } = vi.hoisted(() => ({
   mockPaymentIntentsCreate: vi.fn(),
   mockWebhooksConstructEvent: vi.fn(),
   mockRefundsCreate: vi.fn(),
   mockPaymentIntentsRetrieve: vi.fn(),
   mockPaymentIntentsCancel: vi.fn(),
+  mockPaymentIntentsCapture: vi.fn(),
 }));
 
 vi.mock("stripe", () => {
@@ -34,6 +36,7 @@ vi.mock("stripe", () => {
         create: mockPaymentIntentsCreate,
         retrieve: mockPaymentIntentsRetrieve,
         cancel: mockPaymentIntentsCancel,
+        capture: mockPaymentIntentsCapture,
       };
       this.webhooks = {
         constructEvent: mockWebhooksConstructEvent,
@@ -65,6 +68,25 @@ vi.mock("../config/db", () => ({
     payment: {
       findFirst: vi.fn(),
       create: vi.fn().mockImplementation(async () => ({
+        id: 1,
+        userId: 1,
+        auctionId: 1,
+        amount: new Prisma.Decimal(500),
+        currency: "usd",
+        stripePaymentId: "pi_test",
+        status: "PENDING",
+      })),
+      findUnique: vi.fn(),
+      update: vi.fn().mockImplementation(async () => ({
+        id: 1,
+        userId: 1,
+        auctionId: 1,
+        amount: new Prisma.Decimal(500),
+        currency: "usd",
+        stripePaymentId: "pi_test",
+        status: "COMPLETED",
+      })),
+      delete: vi.fn().mockImplementation(async () => ({
         id: 1,
         userId: 1,
         auctionId: 1,
@@ -124,9 +146,19 @@ vi.mock("../errors/factories", () => ({
   }),
 }));
 
+vi.mock("../config/logger", () => ({
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 // Импортируем моканые модули
 import { prisma } from "../config/db";
 import * as usersRepo from "../repositories/users.repository";
+import logger from "../config/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrisma = prisma as any;
@@ -137,6 +169,8 @@ const mockUpdatePayment = vi.mocked(paymentsRepo.updatePayment);
 const mockCreatePayment = vi.mocked(paymentsRepo.createPayment);
 const mockGetPaymentsByUserId = vi.mocked(paymentsRepo.getPaymentsByUserId);
 const mockGetPaymentsCountByUserId = vi.mocked(paymentsRepo.getPaymentsCountByUserId);
+const mockGetPaymentByIdWithAuction = vi.mocked(paymentsRepo.getPaymentByIdWithAuction);
+const mockUpdateAuctionPaidAt = vi.mocked(paymentsRepo.updateAuctionPaidAt);
 
 describe("Payments Service", () => {
   beforeEach(() => {
@@ -206,6 +240,7 @@ describe("Payments Service", () => {
         amount: 50000, // 500 * 100
         currency: "usd",
         description: "Оплата аукциона: Test Auction",
+        capture_method: "manual",
         automatic_payment_methods: {
           enabled: true,
         },
@@ -319,7 +354,6 @@ describe("Payments Service", () => {
     });
 
     it("должен залогировать предупреждение, если платёж не найден (succeeded)", async () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mockEvent = {
         type: "payment_intent.succeeded",
         data: {
@@ -331,14 +365,12 @@ describe("Payments Service", () => {
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Платёж с stripePaymentId pi_unknown не найден"),
       );
-      consoleWarnSpy.mockRestore();
     });
 
     it("должен залогировать предупреждение, если платёж не найден (failed)", async () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mockEvent = {
         type: "payment_intent.payment_failed",
         data: {
@@ -350,14 +382,12 @@ describe("Payments Service", () => {
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Платёж с stripePaymentId pi_unknown2 не найден"),
       );
-      consoleWarnSpy.mockRestore();
     });
 
     it("должен залогировать необработанное событие", async () => {
-      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const mockEvent = {
         type: "invoice.payment_failed",
         data: { object: { id: "in_test" } },
@@ -366,8 +396,7 @@ describe("Payments Service", () => {
 
       await paymentsService.handleWebhook(Buffer.from("{}"), "sig_test");
 
-      expect(consoleLogSpy).toHaveBeenCalledWith("Необработанное событие типа invoice.payment_failed");
-      consoleLogSpy.mockRestore();
+      expect(logger.info).toHaveBeenCalledWith("Необработанное событие типа invoice.payment_failed");
     });
 
     it("должен пробросить ошибку при неверной сигнатуре", async () => {

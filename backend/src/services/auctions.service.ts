@@ -1,4 +1,5 @@
 import { prisma } from "../config/db";
+import logger from "../config/logger";
 import { getIo } from "../config/socket";
 import {
   createAuction as createAuctionRepo,
@@ -355,7 +356,7 @@ export async function autoCompleteExpiredAuctions() {
       endsAt: { lte: now },
       winnerId: { not: null },
     },
-    select: { id: true },
+    select: { id: true, winnerId: true },
   });
 
   const updated: number[] = [];
@@ -365,10 +366,77 @@ export async function autoCompleteExpiredAuctions() {
       where: { id: auction.id },
       data: { status: "COMPLETED" },
     });
+
+    // Списываем деньги с победителя (manual capture)
+    try {
+      if (auction.winnerId !== null) {
+        const winnerPayment = await prisma.payment.findFirst({
+          where: {
+            auctionId: auction.id,
+            userId: auction.winnerId,
+            status: { in: ["AUTHORIZED", "CAPTURE_PENDING"] },
+          },
+          select: { id: true },
+        });
+
+        if (winnerPayment) {
+          const { capturePayment } = await import("./payments.service");
+          await capturePayment(winnerPayment.id);
+        }
+      }
+    } catch (error) {
+      logger.error(`[ERROR] Не удалось списать деньги для аукциона ${auction.id}:`, error);
+    }
+
+    // Отменяем холды у всех проигравших
+    try {
+      if (auction.winnerId !== null) {
+        const otherPayments = await prisma.payment.findMany({
+          where: {
+            auctionId: auction.id,
+            userId: { not: auction.winnerId },
+            status: "AUTHORIZED",
+          },
+          select: { id: true },
+        });
+
+        for (const payment of otherPayments) {
+          const { cancelHold } = await import("./payments.service");
+          await cancelHold(payment.id);
+        }
+      }
+    } catch (error) {
+      logger.error(`[ERROR] Не удалось отменить холды для аукциона ${auction.id}:`, error);
+    }
+
     updated.push(auction.id);
 
     // Уведомление через WebSocket
     getIo().to(`auction:${auction.id}`).emit("auction:completed", { id: auction.id, status: "COMPLETED" });
+  }
+
+  // Retry: пробуем списать платежи со статусом CAPTURE_PENDING
+  const capturePendingPayments = await prisma.payment.findMany({
+    where: {
+      status: "CAPTURE_PENDING",
+      auction: {
+        status: "COMPLETED",
+        endsAt: { lte: now },
+      },
+    },
+    include: {
+      auction: { select: { winnerId: true, id: true } },
+    },
+  });
+
+  for (const payment of capturePendingPayments) {
+    try {
+      const { capturePayment } = await import("./payments.service");
+      await capturePayment(payment.id);
+      logger.info(`[RETRY] Успешное списание для paymentId=${payment.id}`);
+    } catch (error) {
+      logger.error(`[RETRY] Не удалось списать paymentId=${payment.id}:`, error);
+    }
   }
 
   return updated;

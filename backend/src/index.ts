@@ -43,7 +43,7 @@ import paymentsRouter from "@/routes/payments.routes";
 
 // Import error handler
 import { errorHandler } from "@/errors/handler";
-import { securityHeaders, dashboardCspConfig, dashboardSecurityHeaders } from "@/middleware/securityHeaders";
+import { securityHeaders, dashboardSecurityHeaders } from "@/middleware/securityHeaders";
 import { autoCompleteExpiredAuctions } from "@/services/auctions.service";
 
 validateEnv();
@@ -249,9 +249,15 @@ io.on("connection", (socket) => {
     logger.info(`Клиент ${socket.id} покинул аукцион:${auctionId}`);
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", (reason: string) => {
+    // Явно покидаем все комнаты — Socket.io делает это автоматически,
+    // но явная очистка гарантирует отсутствие утечек памяти при резких отключениях
+    const rooms = Array.from(socket.rooms).filter((r) => !r.startsWith("socket:"));
+    for (const room of rooms) {
+      socket.leave(room);
+    }
     logger.info(
-      `Клиент отключен: ${socket.id} (пользователь ${user?.id ?? "гость"})`,
+      `Клиент отключен: ${socket.id} (пользователь ${user?.id ?? "гость"}), причина: ${reason}`,
     );
   });
 });

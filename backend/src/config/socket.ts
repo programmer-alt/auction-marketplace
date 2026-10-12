@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import type { AuthContext } from "../middleware/auth";
+import logger from "../config/logger";
 import { websocketConnections } from "./metrics";
 
 // Расширяем типы Socket.io чтобы socket.data.user был типизирован
@@ -24,15 +25,27 @@ export function initSocket(
       origin: (origin, callback) => corsOriginHandler(origin, callback, "CORS (socket.io)"),
       credentials: true,
     },
-    // Используем default in-memory adapter (без Redis)
+    // Используем default in-memory adapter
   });
 
   // Отслеживаем WebSocket подключения
   io.on("connection", (socket) => {
     websocketConnections.inc();
     
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason: string) => {
       websocketConnections.dec();
+      logger.debug(`Socket ${socket.id} отключен, причина: ${reason}`);
+      
+      // Очищаем rate limit записи при disconnect
+      const user = socket.data.user;
+      if (user) {
+        // Импортируем динамически чтобы избежать circular dependency
+        import("../middleware/socketRateLimit").then(({ clearUserRateLimits }) => {
+          clearUserRateLimits(user.id);
+        }).catch(() => {
+          // Игнорируем ошибки импорта
+        });
+      }
     });
   });
 
